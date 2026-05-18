@@ -94,6 +94,12 @@ def _extract_thumbnail(item: ET.Element, description: str) -> Optional[str]:
             url = "https:" + url
         if not url.startswith("http"):
             return None
+
+        # Descartar imagens genéricas de placeholder da Investing.com
+        url_lower = url.lower()
+        if "world_news_" in url_lower or "news_headline_" in url_lower:
+            return None
+
         # Accept anything that isn't obviously a tracking pixel (< 5 chars ext)
         ext = url.split("?")[0].split(".")[-1].lower()
         if ext in ("js", "css", "html", "htm", "xml", "json", "txt"):
