@@ -57,8 +57,16 @@ Regras:
 
 
 def _build_user_msg(title: str, summary: str, category: str, duration: int) -> str:
+    if duration <= 30:
+        scene_count = "6 a 8"
+    elif duration <= 45:
+        scene_count = "9 a 11"
+    else:
+        scene_count = "12 a 14"
+
     return (
-        f"Crie roteiro visual de {duration}s para Reels sobre esta notícia:\n\n"
+        f"Crie roteiro visual de exatamente {duration} segundos para Reels sobre esta notícia.\n"
+        f"Gere entre {scene_count} cenas no total para cobrir esse tempo de forma equilibrada.\n\n"
         f"Título: {title}\n"
         f"Categoria: {category}\n"
         f"Resumo: {summary or title}\n\n"
@@ -139,6 +147,36 @@ async def _generate_with_ollama(user_msg: str) -> dict[str, Any]:
     return _parse_json(content)
 
 
+def _adjust_scene_durations(scenes: list[dict[str, Any]], target_duration: int) -> list[dict[str, Any]]:
+    if not scenes:
+        return scenes
+
+    total_generated = sum(s.get("duration_seconds", 0.0) for s in scenes)
+    if total_generated <= 0:
+        avg = target_duration / len(scenes)
+        for s in scenes:
+            s["duration_seconds"] = round(avg, 1)
+        total_generated = sum(s["duration_seconds"] for s in scenes)
+
+    scale = target_duration / total_generated
+    for s in scenes:
+        curr = s.get("duration_seconds", 0.0)
+        s["duration_seconds"] = round(curr * scale, 1)
+
+    current_sum = sum(s["duration_seconds"] for s in scenes)
+    diff = round(target_duration - current_sum, 1)
+    if diff != 0:
+        idx = 0
+        max_dur = -1.0
+        for i, s in enumerate(scenes):
+            if s["duration_seconds"] > max_dur:
+                max_dur = s["duration_seconds"]
+                idx = i
+        scenes[idx]["duration_seconds"] = round(scenes[idx]["duration_seconds"] + diff, 1)
+
+    return scenes
+
+
 async def generate_video_scenes(
     title: str,
     summary: str,
@@ -156,6 +194,7 @@ async def generate_video_scenes(
     def _validate(result: dict[str, Any], provider: str) -> dict[str, Any]:
         if not result.get("scenes"):
             raise ValueError(f"Resposta sem campo 'scenes' (chaves recebidas: {list(result.keys())})")
+        result["scenes"] = _adjust_scene_durations(result["scenes"], duration)
         return result
 
     # 1. Gemini — primary key
