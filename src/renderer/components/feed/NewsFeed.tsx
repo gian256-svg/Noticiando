@@ -19,7 +19,12 @@ export function NewsFeed() {
   if (isLoading && filteredNews.length === 0) return <EmptyState type="loading" />;
   if (filteredNews.length === 0) return <EmptyState type="empty" />;
 
-  const [featured, ...rest] = filteredNews;
+  // Find the news item with the highest viral_score to feature at the top as the featured story
+  const featured = filteredNews.reduce((max, current) =>
+    current.viral_score > max.viral_score ? current : max
+  , filteredNews[0]);
+
+  const rest = filteredNews.filter((n) => n.id !== featured.id);
 
   return (
     <div className="flex-1 overflow-hidden flex flex-col relative">

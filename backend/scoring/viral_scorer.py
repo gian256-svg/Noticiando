@@ -108,7 +108,7 @@ def _propagation_velocity(item: "NewsItem", all_items: list["NewsItem"]) -> floa
         if x.id != item.id
         and x.source_count > 1
         and x.published_at
-        and abs((x.published_at.replace(tzinfo=timezone.utc) if x.published_at.tzinfo is None else x.published_at - pub).total_seconds()) < 1800
+        and abs(((x.published_at.replace(tzinfo=timezone.utc) if x.published_at.tzinfo is None else x.published_at) - pub).total_seconds()) < 1800
     ]
 
     if len(similar_recent) >= 3:

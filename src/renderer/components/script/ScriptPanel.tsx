@@ -132,7 +132,7 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
       if (result.error || !result.scenes?.length) {
         setVideoError(
           result.error ??
-            "Falha ao gerar cenas — verifique se o backend Python está rodando e se a API Key está configurada."
+            "Falha ao gerar cenas — resposta sem campo 'scenes'. Reinicie o backend Python e tente novamente."
         );
         return;
       }

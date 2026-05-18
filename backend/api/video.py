@@ -47,8 +47,9 @@ async def render_video_endpoint(req: RenderVideoRequest):
     with open(props_file, "w", encoding="utf-8") as f:
         json.dump(req.composition_props, f)
 
+    executable = "npx.cmd" if os.name == "nt" else "npx"
     cmd = [
-        "npx", "remotion", "render",
+        executable, "remotion", "render",
         _VIDEO_ENTRY,
         "Reels",
         output_path,

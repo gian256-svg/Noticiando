@@ -23,7 +23,7 @@ GROQ_API_KEY     = os.getenv("GROQ_API_KEY", "")
 OLLAMA_BASE_URL  = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL     = os.getenv("OLLAMA_MODEL", "llama3.1")
 
-GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-2.5-flash"
 GROQ_MODEL   = "llama-3.3-70b-versatile"
 
 SYSTEM_PROMPT = """\
@@ -86,7 +86,11 @@ async def _generate_with_gemini(user_msg: str, api_key: str) -> dict[str, Any]:
 
     client = genai.Client(api_key=api_key)
     full_prompt = f"{SYSTEM_PROMPT}\n\n{user_msg}"
-    cfg = types.GenerateContentConfig(temperature=0.7, max_output_tokens=2048)
+    cfg = types.GenerateContentConfig(
+        temperature=0.7,
+        max_output_tokens=2048,
+        response_mime_type="application/json"
+    )
 
     response = await asyncio.to_thread(
         client.models.generate_content,
@@ -94,6 +98,8 @@ async def _generate_with_gemini(user_msg: str, api_key: str) -> dict[str, Any]:
         contents=full_prompt,
         config=cfg,
     )
+    if not response.text:
+        raise ValueError("Gemini retornou uma resposta vazia ou nula")
     return _parse_json(response.text)
 
 

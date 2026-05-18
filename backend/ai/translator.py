@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 GEMINI_API_KEY   = os.getenv("GEMINI_API_KEY", "")
 GEMINI_API_KEY_2 = os.getenv("GEMINI_API_KEY_2", "")
-GEMINI_MODEL     = "gemini-2.0-flash"
+GEMINI_MODEL     = "gemini-2.5-flash"
 
 _PROMPT = (
     "Traduza para português brasileiro natural e fluente, "
