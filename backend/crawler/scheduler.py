@@ -39,10 +39,10 @@ def unregister_sse_listener(q: asyncio.Queue):
         pass
 
 
-async def _notify_sse(items: list[dict]):
+async def _notify_sse(payload):
     for q in list(_sse_listeners):
         try:
-            await q.put(items)
+            await q.put(payload)
         except Exception:
             pass
 

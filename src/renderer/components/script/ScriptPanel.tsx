@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { getApiBase } from "@/lib/api";
 import {
   Sparkles,
   ExternalLink,
@@ -101,32 +102,24 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
     try {
       let result: { scenes?: unknown[]; error?: string };
 
+      const payload = {
+        news_id: news.id,
+        title: news.title,
+        summary: news.summary ?? "",
+        category: news.category,
+        duration,
+        thumbnail_url: news.thumbnail_url ?? null,
+      };
+
       if (window.noticiando?.invoke) {
-        // Electron: use IPC tunnel
-        const raw = await window.noticiando.invoke("video:generate-scenes", {
-          news_id: news.id,
-          title: news.title,
-          summary: news.summary ?? "",
-          category: news.category,
-          duration,
-          thumbnail_url: news.thumbnail_url ?? null,
-        });
+        const raw = await window.noticiando.invoke("video:generate-scenes", payload);
         result = (raw ?? {}) as { scenes?: unknown[]; error?: string };
       } else {
-        // Browser: call backend REST directly
-        const { getApiBase } = await import("@/lib/api");
         const base = await getApiBase();
         const resp = await fetch(`${base}/generate-video-scenes`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            news_id: news.id,
-            title: news.title,
-            summary: news.summary ?? "",
-            category: news.category,
-            duration,
-            thumbnail_url: news.thumbnail_url ?? null,
-          }),
+          body: JSON.stringify(payload),
         });
         if (!resp.ok) {
           const detail = await resp.text().catch(() => String(resp.status));

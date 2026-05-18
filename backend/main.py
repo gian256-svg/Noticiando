@@ -24,8 +24,7 @@ app = FastAPI(title="Noticiando Backend", version="0.1.0", docs_url=None)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:*", "file://"],
-    allow_origin_regex=r"http://localhost:\d+",
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
