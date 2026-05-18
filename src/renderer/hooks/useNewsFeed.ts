@@ -17,7 +17,7 @@ export function useNewsFeed() {
     lastFetchRef.current = now;
     try {
       const base = await getApiBase();
-      const res = await fetch(`${base}/news?limit=150&sort=published_at`);
+      const res = await fetch(`${base}/news?limit=150&sort=published_at&min_score=0&period=24h`);
       if (!res.ok) throw new Error("fetch failed");
       const data = await res.json();
       setNews(data.items ?? []);
@@ -43,8 +43,18 @@ export function useNewsFeed() {
     };
 
     sse.addEventListener("crawling", () => setCrawlerStatus("crawling"));
-    sse.addEventListener("idle", () => { setCrawlerStatus("idle"); fetchNews(); });
-    sse.onerror = () => setCrawlerStatus("error");
+    sse.addEventListener("idle", () => {
+      setCrawlerStatus("idle");
+      lastFetchRef.current = 0; // bypass debounce — sempre re-fetch após ciclo do crawler
+      fetchNews();
+    });
+    sse.onerror = () => {
+      setCrawlerStatus("error");
+      sse.close();
+      sseRef.current = null;
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      setTimeout(() => startPolling(), 5_000);
+    };
 
     pollRef.current = setInterval(fetchNews, POLL_INTERVAL_MS);
   }, [fetchNews, appendNews, setCrawlerStatus, setLoading]);

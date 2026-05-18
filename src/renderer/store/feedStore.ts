@@ -89,15 +89,28 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const existing = get().allNews;
     const existingIds = new Set(existing.map((n) => n.id));
     const newItems = incoming.filter((n) => !existingIds.has(n.id));
-    if (!newItems.length) return;
-    const all = [...newItems, ...existing];
+    // Backfill thumbnails for items that now have og:image but didn't before
+    const thumbUpdates = new Map(
+      incoming
+        .filter((n) => existingIds.has(n.id) && n.thumbnail_url)
+        .map((n) => [n.id, n.thumbnail_url!])
+    );
+    if (!newItems.length && !thumbUpdates.size) return;
+    const merged = thumbUpdates.size
+      ? existing.map((n) =>
+          thumbUpdates.has(n.id) && !n.thumbnail_url
+            ? { ...n, thumbnail_url: thumbUpdates.get(n.id) }
+            : n
+        )
+      : existing;
+    const all = [...newItems, ...merged];
     const filtered = applyFilters(all, get().filters);
     const newIds = new Set([...get().newItemIds, ...newItems.map((n) => n.id)]);
     set({
       allNews: all,
       filteredNews: filtered,
       newsCount: filtered.length,
-      liveCount: (get().liveCount) + newItems.length,
+      liveCount: get().liveCount + newItems.length,
       newItemIds: newIds,
     });
   },

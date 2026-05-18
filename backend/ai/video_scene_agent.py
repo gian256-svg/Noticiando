@@ -1,6 +1,6 @@
 """
 video_scene_agent.py — Gerador de cenas para Reels
-Cascade de provedores: Claude (Anthropic) → Gemini (x2) → Groq → Ollama
+Cascade de provedores: Gemini (x2) → Groq → Ollama
 Chaves lidas do backend/.env — NUNCA hardcodar aqui.
 """
 
@@ -17,14 +17,12 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 logger = logging.getLogger(__name__)
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-GEMINI_API_KEY    = os.getenv("GEMINI_API_KEY", "")
-GEMINI_API_KEY_2  = os.getenv("GEMINI_API_KEY_2", "")
-GROQ_API_KEY      = os.getenv("GROQ_API_KEY", "")
-OLLAMA_BASE_URL   = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL      = os.getenv("OLLAMA_MODEL", "llama3.1")
+GEMINI_API_KEY   = os.getenv("GEMINI_API_KEY", "")
+GEMINI_API_KEY_2 = os.getenv("GEMINI_API_KEY_2", "")
+GROQ_API_KEY     = os.getenv("GROQ_API_KEY", "")
+OLLAMA_BASE_URL  = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL     = os.getenv("OLLAMA_MODEL", "llama3.1")
 
-CLAUDE_MODEL = "claude-sonnet-4-6"
 GEMINI_MODEL = "gemini-2.0-flash"
 GROQ_MODEL   = "llama-3.3-70b-versatile"
 
@@ -79,21 +77,6 @@ def _parse_json(text: str) -> dict[str, Any]:
     except json.JSONDecodeError as e:
         logger.error(f"JSON parse error: {e} | raw: {text[:300]}")
         raise ValueError(f"Resposta inválida do modelo: {e}")
-
-
-async def _generate_with_claude(user_msg: str) -> dict[str, Any]:
-    import anthropic
-    client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
-    message = await client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=2048,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_msg}],
-    )
-    text = message.content[0].text if message.content else ""
-    if not text:
-        raise ValueError("Claude retornou resposta vazia")
-    return _parse_json(text)
 
 
 async def _generate_with_gemini(user_msg: str, api_key: str) -> dict[str, Any]:
@@ -159,57 +142,50 @@ async def generate_video_scenes(
 ) -> dict[str, Any]:
     """
     Generate Reels scene data.
-    Cascade: Claude → Gemini (key 1) → Gemini (key 2) → Groq → Ollama
+    Cascade: Gemini (key 1) → Gemini (key 2) → Groq → Ollama
     """
     user_msg = _build_user_msg(title, summary, category, duration)
     errors: list[str] = []
 
-    # 1. Claude (Anthropic) — primary, most reliable
-    if ANTHROPIC_API_KEY:
-        try:
-            logger.info("Generating scenes via Claude (Anthropic)…")
-            return await _generate_with_claude(user_msg)
-        except Exception as e:
-            logger.warning(f"Claude failed: {e}")
-            errors.append(f"Claude: {e}")
+    def _validate(result: dict[str, Any], provider: str) -> dict[str, Any]:
+        if not result.get("scenes"):
+            raise ValueError(f"Resposta sem campo 'scenes' (chaves recebidas: {list(result.keys())})")
+        return result
 
-    # 2. Gemini — primary key
+    # 1. Gemini — primary key
     if GEMINI_API_KEY:
         try:
             logger.info("Generating scenes via Gemini (primary key)…")
-            return await _generate_with_gemini(user_msg, GEMINI_API_KEY)
+            return _validate(await _generate_with_gemini(user_msg, GEMINI_API_KEY), "Gemini-1")
         except Exception as e:
             logger.warning(f"Gemini primary key failed: {e}")
             errors.append(f"Gemini-1: {e}")
 
-    # 3. Gemini — secondary key
+    # 2. Gemini — secondary key
     if GEMINI_API_KEY_2:
         try:
             logger.info("Generating scenes via Gemini (secondary key)…")
-            return await _generate_with_gemini(user_msg, GEMINI_API_KEY_2)
+            return _validate(await _generate_with_gemini(user_msg, GEMINI_API_KEY_2), "Gemini-2")
         except Exception as e:
             logger.warning(f"Gemini secondary key failed: {e}")
             errors.append(f"Gemini-2: {e}")
 
-    # 4. Groq
+    # 3. Groq
     if GROQ_API_KEY:
         try:
             logger.info("Generating scenes via Groq…")
-            return await _generate_with_groq(user_msg)
+            return _validate(await _generate_with_groq(user_msg), "Groq")
         except Exception as e:
             logger.warning(f"Groq failed: {e}")
             errors.append(f"Groq: {e}")
 
-    # 5. Ollama (local) — last resort
+    # 4. Ollama (local) — last resort
     try:
         logger.info(f"Generating scenes via Ollama local ({OLLAMA_MODEL})…")
-        return await _generate_with_ollama(user_msg)
+        return _validate(await _generate_with_ollama(user_msg), "Ollama")
     except Exception as e:
         logger.error(f"Ollama fallback failed: {e}")
         errors.append(f"Ollama: {e}")
 
-    summary_msg = " | ".join(errors) if errors else "Nenhum provedor configurado"
-    raise RuntimeError(
-        f"Todos os provedores falharam: {summary_msg}. "
-        "Configure ANTHROPIC_API_KEY em backend/.env"
-    )
+    summary_msg = " | ".join(errors) if errors else "Nenhum provedor configurado (configure GEMINI_API_KEY ou GROQ_API_KEY em backend/.env)"
+    raise RuntimeError(f"Todos os provedores falharam: {summary_msg}")
