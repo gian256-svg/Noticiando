@@ -58,6 +58,8 @@ export function NewsCard({ news, isSelected, featured = false }: NewsCardProps) 
   return (
     <div
       onClick={() => setSelectedNews(news)}
+      data-news-card
+      data-score={news.viral_score}
       className={cn(
         "rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 group",
         "hover:scale-[1.02] hover:shadow-card-hover",
@@ -99,6 +101,8 @@ function FeaturedCard({ news, isSelected }: { news: NewsItem; isSelected: boolea
   return (
     <div
       onClick={() => setSelectedNews(news)}
+      data-news-card
+      data-score={news.viral_score}
       className={cn(
         "w-full h-44 rounded-2xl overflow-hidden cursor-pointer relative",
         "transition-all duration-200 hover:scale-[1.01] hover:shadow-card-hover shadow-card",

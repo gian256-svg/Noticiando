@@ -319,30 +319,6 @@ const NewsScene: React.FC<SceneProps> = ({
         )}
       </div>
 
-      {/* ── Bottom bar ── */}
-      <div style={{
-        position: "absolute", bottom: 0, left: 0, right: 0,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 44px 48px",
-      }}>
-        <span style={{
-          fontFamily: "'Inter', 'Helvetica Neue', sans-serif",
-          fontSize: 13, fontWeight: 600,
-          color: "rgba(255,255,255,0.3)",
-          textTransform: "uppercase", letterSpacing: "0.1em",
-        }}>
-          {sourceName ?? ""}
-        </span>
-        <span style={{
-          fontFamily: "'Inter', 'Helvetica Neue', sans-serif",
-          fontSize: 13, fontWeight: 800,
-          color: pal.accent,
-          textTransform: "uppercase", letterSpacing: "0.12em",
-        }}>
-          GRUPO PRIMO
-        </span>
-      </div>
-
     </AbsoluteFill>
   );
 };
