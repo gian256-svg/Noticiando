@@ -118,6 +118,20 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 - **Polling a cada 2 minutos** como fallback confiável (não depender apenas de SSE)
 - O backend deve emitir `{"event": "idle"}` ao final de **cada** ciclo de crawl, mesmo sem novos itens
 
+### Fetch de notícias (frontend)
+- O hook `fetchNews` **deve sempre passar** `min_score=0&period=24h` na query. O endpoint `/news` tem defaults `min_score=10.0` e `period=6h` que filtram a maioria das notícias.
+- **A filtragem por score, categoria e período é responsabilidade do `feedStore`**, não do backend.
+- O debounce de 30s em `fetchNews` existe para evitar chamadas excessivas durante polling. **No handler do evento SSE `idle`, resetar `lastFetchRef.current = 0` antes de chamar `fetchNews()`** — caso contrário o re-fetch pós-crawl é bloqueado silenciosamente.
+- O handler `sse.onerror` deve fechar a conexão, limpar o intervalo e reconectar via `startPolling()` após 5 segundos. Não apenas setar status de erro.
+
+**Arquivo:** `src/renderer/hooks/useNewsFeed.ts`
+
+### appendNews e thumbnails
+- `appendNews` no `feedStore` deve **backfillar `thumbnail_url`** em itens cujo ID já existe no estado mas que agora têm thumbnail: o crawler faz og:image enrichment assíncrono e envia os itens atualizados via SSE — ignorar IDs duplicados sem verificar thumbnail causa thumbs faltando permanentemente.
+- Padrão: separar `newItems` (IDs novos) de `thumbUpdates` (IDs existentes com thumbnail novo), aplicar ambos.
+
+**Arquivo:** `src/renderer/store/feedStore.ts`
+
 ### Ordenação do feed
 1. **Data de publicação** (mais recente primeiro)
 2. **Viral score** como critério de desempate dentro do mesmo minuto
@@ -133,13 +147,18 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 
 ### Fluxo do usuário
 1. Seleciona notícia no feed
-2. Clica em **"Gerar Reels"** (autonomo via Claude no sidecar)
+2. Clica em **"Gerar Reels"** (geração autônoma via cascade de IA)
 3. **OU** clica em "Abrir no myhub" → copia prompt → obtém roteiro → cola na seção "Cole o roteiro do agente"
 
-### Integração Claude
-- API Key do Anthropic deve ser configurada pelo usuário em **Configurações**
-- Nunca hardcodar API keys no código
-- Mensagens de erro devem ser claras: "Configure a API Key em Configurações"
+### Cascade de providers (ordem obrigatória)
+`Gemini (primary key) → Gemini (secondary key) → Groq → Ollama`
+
+- **Anthropic/Claude não é usado neste projeto.** Não adicionar `ANTHROPIC_API_KEY` nem o pacote `anthropic`.
+- Todas as chaves ficam exclusivamente em `backend/.env` — nunca hardcodar.
+- Após cada provider call, **validar que o resultado contém o campo `"scenes"`**. Se ausente, tratar como falha de provider e tentar o próximo — nunca retornar HTTP 200 com JSON sem `scenes`.
+- Mensagens de erro do cascade devem citar `GEMINI_API_KEY` ou `GROQ_API_KEY`.
+
+**Arquivo:** `backend/ai/video_scene_agent.py`
 
 ### Composição Remotion
 - Resolução obrigatória: **1080×1920** (vertical 9:16)
@@ -173,8 +192,7 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 
 ### 🔴 Alta prioridade
 - [ ] Filtro de nicho no backend: aplicar penalidade −50 em artigos fora do nicho antes de salvar
-- [ ] Configurações: tela para inserir API Key do Anthropic
-- [ ] Thumbnails: pular fetch de og:image para domínios que sempre bloqueiam
+- [ ] Thumbnails: pular fetch de og:image para domínios que sempre bloqueiam (bloomberg, wsj, ft, investing)
 
 ### 🟡 Média prioridade
 - [ ] Notificação desktop quando viral_score > 80
@@ -187,6 +205,18 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 - [ ] Remove.bg para recortes de personagens no estilo colagem
 - [ ] Painel de analytics: quais categorias geram mais engajamento
 - [ ] Modo dark/light toggle
+
+---
+
+---
+
+## 9. Dependências Python
+
+- `feedparser>=6.0.0` é obrigatório — usado pelo crawler RSS; fácil de esquecer pois não aparece nos imports do entry point.
+- `anthropic` não deve estar no `requirements.txt` nem no código.
+- Ao adicionar um novo provider de IA, adicionar a dependência correspondente ao `requirements.txt` imediatamente.
+
+**Arquivo:** `backend/requirements.txt`
 
 ---
 
