@@ -86,39 +86,47 @@ PENALTY_KEYWORDS: list[str] = [
     "gol", "artilheiro", "campeão", "campeonato", "champions league",
     "premier league", "la liga", "série a", "brasileirão",
     "nfl", "nba", "mlb", "formula 1", "f1", "moto gp",
-    "ancelotti", "mbappé", "neymar", "vinicius",
-    # Entretenimento / celebridades
+    "ancelotti", "mbappé", "neymar", "vinicius", "flamengo", "palmeiras",
+    "corinthians", "são paulo", "vasco", "surfe", "tênis profissional", "golfe", "vôlei",
+    # Entretenimento / celebridades / fofocas
     "celebridade", "ator", "atriz", "cantor", "cantora",
-    "show musical", "álbum", "música nova", "clipe",
-    "novela", "série de tv", "stranger things", "the boroughs",
-    "squid game", "la casa de papel", "reality show",
-    "oscar", "grammy", "emmy", "bbb", "big brother",
-    "ludmilla", "anitta", "mc", "funk",
+    "show musical", "álbum", "música nova", "clipe", "concerto", "turnê", "festival",
+    "novela", "série de tv", "stranger things", "the boroughs", "joão gomes",
+    "squid game", "la casa de papel", "reality show", "oscar", "grammy", "emmy", "bbb", "big brother",
+    "ludmilla", "anitta", "mc", "funk", "gusttavo lima", "luan santana", "festa", "casamento",
+    "divórcio", "separação", "namoro", "gravidez", "filho", "famoso", "famosa",
+    "influenciador", "influenciadora", "blogueira", "post", "seguidores",
     # Games / tecnologia de entretenimento
     "gta", "gta 6", "gta vi", "playstation", "xbox",
     "nintendo", "jogo eletrônico", "videogame", "esports",
-    # Lifestyle / comportamento
-    "vinho", "gastronomia", "receita culinária", "restaurante",
-    "moda", "beleza", "make up", "skincare", "lifestyle",
-    "viagem", "turismo", "destino de viagem", "hotel", "cruzeiro",
+    # Lifestyle / comportamento / gastronomia / bebidas
+    "vinho", "gastronomia", "receita culinária", "restaurante", "gourmet", "chef de cozinha",
+    "cardápio", "bebida", "cerveja", "chope", "chopp", "glúten", "gluten", "heineken", "ambev",
+    "moda", "beleza", "make up", "skincare", "lifestyle", "maquiagem", "cabelo", "perfume", "cosmético",
+    "desfile", "grife", "gucci", "prada", "chanel", "vestido", "roupa",
+    "viagem", "turismo", "destino de viagem", "hotel", "cruzeiro", "resort",
     "horóscopo", "signos", "tarot",
-    # Esportes radicais / outros
-    "surfe", "tênis profissional", "golfe", "vôlei",
+    # Artes / Design / Cultura (conteúdo não financeiro)
+    "design", "designer", "bordado", "pôster", "exposição", "museu", "teatro", "peça teatral", "cinema", "filme",
+    "estreia", "lançamento de filme", "diretor de cinema", "galeria de arte", "bienal", "quadro", "pintura",
 ]
 
 PENALTY_KEYWORDS_EN: list[str] = [
     # Sports
     "soccer", "football match", "world cup squad", "goal scorer",
     "premier league", "champions league", "nfl", "nba", "mlb",
-    # Entertainment
-    "celebrity", "actor", "actress", "singer", "album release",
-    "tv series", "netflix show", "movie premiere", "award show",
-    "oscar", "grammy", "emmy", "reality tv",
+    # Entertainment / Celebrity
+    "celebrity", "actor", "actress", "singer", "album release", "single release", "concert", "tour",
+    "tv series", "netflix show", "movie premiere", "award show", "oscar", "grammy", "emmy", "reality tv",
+    "wedding", "divorce", "separation", "pregnancy", "baby born", "famous", "influencer", "celebrity gossip",
     # Gaming
     "gta", "playstation", "xbox", "nintendo", "video game",
-    # Lifestyle
-    "fashion", "beauty tips", "recipe", "restaurant review",
-    "travel guide", "horoscope",
+    # Lifestyle / Food & Drink
+    "fashion", "beauty tips", "recipe", "restaurant review", "travel guide", "horoscope",
+    "beer", "gluten", "gluten-free", "wine", "winery", "chef", "gourmet", "resort", "cruise",
+    "runway", "designer brand", "dress", "makeup", "skincare", "haircare", "perfume", "cosmetics",
+    # Arts / Design
+    "design", "designer", "poster", "exhibition", "museum", "theater", "movie", "film", "cinema", "gallery",
 ]
 
 # Palavras em inglês equivalentes (para fontes INT)

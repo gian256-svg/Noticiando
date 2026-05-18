@@ -17,9 +17,30 @@ from scoring.keywords import PENALTY_KEYWORDS, PENALTY_KEYWORDS_EN
 _ALL_PENALTY = [kw.lower() for kw in PENALTY_KEYWORDS + PENALTY_KEYWORDS_EN]
 
 
-def _is_off_topic(title: str, summary: str) -> bool:
+def _is_off_topic(title: str, summary: str, sources: list[str] = None) -> bool:
     text = f"{title} {summary}".lower()
-    return any(kw in text for kw in _ALL_PENALTY)
+    
+    # 1. Strict penalty keyword check
+    if any(kw in text for kw in _ALL_PENALTY):
+        return True
+
+    # 2. Mixed-content source relevance check
+    if sources:
+        mixed_identifiers = {"exame", "forbes", "cnn", "g1"}
+        is_mixed = any(any(m in s.lower() for m in mixed_identifiers) for s in sources)
+        if is_mixed:
+            # Must contain at least one positive financial term to be relevant
+            from scoring.keywords import HIGH_ENGAGEMENT_KEYWORDS, HIGH_ENGAGEMENT_KEYWORDS_EN
+            finance_kws = [kw.lower() for kw, _ in HIGH_ENGAGEMENT_KEYWORDS + HIGH_ENGAGEMENT_KEYWORDS_EN]
+            has_finance = any(kw in text for kw in finance_kws)
+
+            # Simple check for numbers, percentages, or money symbols
+            has_numbers = any(c.isdigit() for c in title) or "%" in text or "r$" in text or "$" in text
+
+            if not has_finance and not has_numbers:
+                return True # Off-topic due to lack of financial relevance in mixed source
+
+    return False
 
 logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
@@ -98,10 +119,12 @@ async def run_crawl():
             else:
                 base = group[0]
                 # Rejeitar artigos fora do nicho financeiro antes de salvar
-                if _is_off_topic(base["title"], base.get("summary", "")):
-                    logger.debug(f"Off-topic rejected: {base['title'][:80]}")
+                if _is_off_topic(base["title"], base.get("summary", ""), merged_sources):
+                    logger.debug(f"Off-topic rejected (penalty keywords/mixed source relevance): {base['title'][:80]}")
                     continue
-                news = NewsItem(
+
+                # Crie objeto temporário para fazer scoring de relevância antes de salvar
+                temp_item = NewsItem(
                     title=base["title"],
                     title_hash=h,
                     url=base["url"],
@@ -112,18 +135,33 @@ async def run_crawl():
                     thumbnail_url=base.get("thumbnail_url"),
                     published_at=base["published_at"],
                 )
-                db.add(news)
-                new_items.append(news)
+
+                # Verifica relevância calculando score prévio
+                from scoring.viral_scorer import score_news
+                existing_active = db.query(NewsItem).filter(NewsItem.is_active == True).all()
+                prelim_score = score_news(temp_item, existing_active + new_items)
+
+                if prelim_score < 10.0:
+                    logger.info(f"Relevance rejected (preliminary score {prelim_score} < 10.0): {base['title'][:80]}")
+                    continue
+
+                temp_item.viral_score = prelim_score
+                db.add(temp_item)
+                new_items.append(temp_item)
 
         db.commit()
 
-        # Re-score all recent news
+        # Re-score all recent news, deactivating those that fall below 10.0
         all_recent = db.query(NewsItem).filter(NewsItem.is_active == True).all()
         scores = score_all(all_recent)
         for item_id, score in scores.items():
             item = db.get(NewsItem, item_id)
             if item:
-                item.viral_score = score
+                if score < 10.0:
+                    logger.info(f"Deactivating stale item (re-score {score} < 10.0): {item.title[:80]}")
+                    item.is_active = False
+                else:
+                    item.viral_score = score
         db.commit()
 
         logger.info(f"Crawl complete: {len(new_items)} new, {len(updated_items)} updated")
