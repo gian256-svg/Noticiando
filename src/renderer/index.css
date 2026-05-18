@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+    --background: #0D0E1A;
+    --surface: #141528;
+    --surface-2: #1C1E38;
+    --border: #252845;
+    --accent: #F97316;
+    --text-primary: #E8EAF6;
+    --text-secondary: #8892B0;
+    --live: #22C55E;
+  }
+
+  * {
+    border-color: var(--border);
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;
+    background: var(--background);
+    color: var(--text-primary);
+    font-family: "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2A2D4A; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3A3D5A; }
+
+  ::selection {
+    background: rgba(249, 115, 22, 0.3);
+    color: #E8EAF6;
+  }
+}
+
+@layer utilities {
+  .app-drag { -webkit-app-region: drag; }
+  .app-no-drag { -webkit-app-region: no-drag; }
+
+  .text-balance { text-wrap: balance; }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Glass card effect */
+  .glass {
+    background: rgba(20, 21, 40, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Category gradient backgrounds */
+  .bg-cat-investments  { background: linear-gradient(135deg, #7C3AED 0%, #4F46E5 50%, #2563EB 100%); }
+  .bg-cat-economy_br   { background: linear-gradient(135deg, #059669 0%, #0D9488 50%, #0891B2 100%); }
+  .bg-cat-economy_int  { background: linear-gradient(135deg, #2563EB 0%, #4F46E5 50%, #7C3AED 100%); }
+  .bg-cat-geopolitics  { background: linear-gradient(135deg, #EA580C 0%, #DC2626 50%, #BE185D 100%); }
+  .bg-cat-crypto       { background: linear-gradient(135deg, #D97706 0%, #F97316 50%, #EA580C 100%); }
+  .bg-cat-general      { background: linear-gradient(135deg, #475569 0%, #334155 50%, #1E293B 100%); }
+}

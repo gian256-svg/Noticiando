@@ -1,0 +1,64 @@
+import argparse
+import os
+import sys
+import logging
+
+import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from db.database import init_db
+from api.news import router as news_router
+from api.scripts import router as scripts_router
+from api.config import router as config_router
+from api.video import router as video_router
+from crawler.scheduler import start_scheduler
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+)
+logger = logging.getLogger("noticiando")
+
+app = FastAPI(title="Noticiando Backend", version="0.1.0", docs_url=None)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:*", "file://"],
+    allow_origin_regex=r"http://localhost:\d+",
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(news_router, prefix="/news", tags=["news"])
+app.include_router(scripts_router, tags=["scripts"])
+app.include_router(config_router, prefix="/config", tags=["config"])
+app.include_router(video_router, tags=["video"])
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "version": "0.1.0"}
+
+
+@app.on_event("startup")
+async def on_startup():
+    init_db()
+    logger.info("Database initialized")
+    start_scheduler()
+    logger.info("Crawler scheduler started")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=int(os.getenv("PORT", "8765")))
+    args = parser.parse_args()
+
+    logger.info(f"Starting backend on port {args.port}")
+    uvicorn.run(
+        "main:app",
+        host="127.0.0.1",
+        port=args.port,
+        log_level="warning",
+        access_log=False,
+    )
