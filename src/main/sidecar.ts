@@ -18,22 +18,29 @@ function getFreePort(): Promise<number> {
   });
 }
 
+function getBackendDir(): string {
+  return app.isPackaged
+    ? process.resourcesPath
+    : path.join(app.getAppPath(), "backend");
+}
+
 function getBackendExecutable(): string {
   if (app.isPackaged) {
-    const platform = process.platform;
-    const exe = platform === "win32" ? "noticiando_backend.exe" : "noticiando_backend";
+    const exe = process.platform === "win32" ? "noticiando_backend.exe" : "noticiando_backend";
     return path.join(process.resourcesPath, exe);
   }
-  // Dev mode: run Python directly
-  return process.platform === "win32" ? "python" : "python3";
+  // Dev mode: use the venv Python so all packages are available
+  const backendDir = getBackendDir();
+  return process.platform === "win32"
+    ? path.join(backendDir, ".venv", "Scripts", "python.exe")
+    : path.join(backendDir, ".venv", "bin", "python3");
 }
 
 function getBackendArgs(port: number): string[] {
   if (app.isPackaged) {
     return [`--port=${port}`];
   }
-  const backendMain = path.join(app.getAppPath(), "backend", "main.py");
-  return [backendMain, `--port=${port}`];
+  return ["main.py", `--port=${port}`];
 }
 
 export async function startSidecar(): Promise<number> {
@@ -42,6 +49,7 @@ export async function startSidecar(): Promise<number> {
   const args = getBackendArgs(backendPort);
 
   sidecarProcess = spawn(exe, args, {
+    cwd: getBackendDir(),
     env: { ...process.env, PORT: String(backendPort) },
     stdio: ["ignore", "pipe", "pipe"],
   });

@@ -42,7 +42,7 @@ export function useNewsFeed() {
 
     // Crawler state transitions
     sse.addEventListener("crawling", () => setCrawlerStatus("crawling"));
-    sse.addEventListener("idle", () => setCrawlerStatus("idle"));
+    sse.addEventListener("idle", () => { setCrawlerStatus("idle"); fetchNews(); });
     sse.onerror = () => setCrawlerStatus("error");
 
     // ── Fallback polling every 2 min ────────────────────────────────────────

@@ -55,6 +55,7 @@ async def run_crawl():
     raw_items = await crawl_all_sources(DEFAULT_SOURCES)
     if not raw_items:
         logger.warning("Crawl returned 0 items")
+        await _notify_sse({"event": "idle"})
         return
 
     db = SessionLocal()

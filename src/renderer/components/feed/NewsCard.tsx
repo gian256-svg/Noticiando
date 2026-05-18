@@ -159,6 +159,8 @@ function CardThumbnail({ news, height, isNew, featured = false }: CardThumbnailP
         <img
           src={news.thumbnail_url}
           alt=""
+          referrerPolicy="no-referrer"
+          loading="lazy"
           className="absolute inset-0 w-full h-full object-cover"
           onError={() => setImgFailed(true)}
         />

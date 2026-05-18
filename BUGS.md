@@ -253,5 +253,70 @@ crypto:       { a: "#713f12", b: "#a16207", c: "#eab308" }  // âmbar/dourado
 
 ---
 
+---
+
+## BUG-008 — "Gerar Reels" inoperante no modo browser (sem Electron IPC)
+
+**Data:** 2026-05-18
+**Área:** Frontend — `ScriptPanel.tsx`
+**Severidade:** Crítica
+
+### Sintoma
+No modo web (`npm run web`), clicar em "Gerar Reels" exibia "Função não disponível fora do Electron." e abortava sem chamar o backend.
+
+### Causa Raiz
+`handleGenerateVideo` verificava `window.noticiando?.invoke` (exclusivo do preload Electron) e retornava erro se ausente, sem fallback via fetch HTTP.
+
+### Solução Aplicada
+Adicionada bifurcação: se `window.noticiando?.invoke` existe → IPC Electron; caso contrário → `fetch` direto ao endpoint `POST /generate-video-scenes` do backend.
+
+### Regra Para Nunca Repetir
+> Toda feature que consome o backend deve ter dois caminhos: IPC (Electron) e fetch REST (browser). Nunca assumir que `window.noticiando` existe.
+
+---
+
+## BUG-009 — Scheduler emite `crawling` mas nunca `idle` quando crawl retorna 0 items
+
+**Data:** 2026-05-18
+**Área:** Backend — `crawler/scheduler.py`
+**Severidade:** Alta
+
+### Sintoma
+Quando o crawl retornava 0 itens (falha de rede ou feeds vazios), o live-dot ficava preso em estado "crawling" para sempre. O frontend nunca sabia que o ciclo havia terminado.
+
+### Causa Raiz
+`run_crawl()` fazia `return` imediato após logar "Crawl returned 0 items", pulando o `_notify_sse({"event": "idle"})` que vem no final da função.
+
+### Solução Aplicada
+Adicionado `await _notify_sse({"event": "idle"})` antes do `return` antecipado.
+
+### Regra Para Nunca Repetir
+> Toda função que emite um evento de início (`crawling`) **deve garantir** emitir o evento de término (`idle`) em todos os caminhos de saída — inclusive os de erro e retorno antecipado.
+
+---
+
+## BUG-010 — Feed não atualiza após ciclo de crawl sem itens novos
+
+**Data:** 2026-05-18
+**Área:** Frontend — `useNewsFeed.ts`
+**Severidade:** Alta
+
+### Sintoma
+O feed parava de atualizar visualmente após ciclos de crawl que não produziam itens novos. Scores virais re-calculados no backend não apareciam. A página ficava estática até reload manual.
+
+### Causa Raiz
+O evento SSE `idle` apenas atualizava o status do live-dot (`setCrawlerStatus("idle")`), mas não disparava `fetchNews()`. Sem re-fetch, scores atualizados e novos artigos de repositório existente nunca chegavam ao frontend.
+
+### Solução Aplicada
+```ts
+sse.addEventListener("idle", () => { setCrawlerStatus("idle"); fetchNews(); });
+```
+Agora após cada ciclo de crawl o frontend re-fetcha o feed completo.
+
+### Regra Para Nunca Repetir
+> O evento `idle` do SSE sinaliza fim de ciclo — o frontend **sempre** deve re-buscar o feed ao recebê-lo, não apenas atualizar o indicador visual.
+
+---
+
 *Última atualização: 2026-05-18*
 *Mantenedor: Antigravity AI + Grupo Primo*

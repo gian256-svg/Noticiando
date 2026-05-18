@@ -94,30 +94,53 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
 
   const handleGenerateVideo = useCallback(async () => {
     if (!news) return;
-    // Guard: window.noticiando must exist (runs inside Electron)
-    if (!window.noticiando?.invoke) {
-      setVideoError("Função não disponível fora do Electron.");
-      return;
-    }
     setGeneratingVideo(true);
     setVideoError(null);
     setVideoProps(null);
 
     try {
-      const raw = await window.noticiando.invoke("video:generate-scenes", {
-        news_id: news.id,
-        title: news.title,
-        summary: news.summary ?? "",
-        category: news.category,
-        duration,
-        thumbnail_url: news.thumbnail_url ?? null,
-      });
+      let result: { scenes?: unknown[]; error?: string };
 
-      // Safeguard: result may be null/undefined if sidecar is down
-      const result = (raw ?? {}) as { scenes?: unknown[]; error?: string };
+      if (window.noticiando?.invoke) {
+        // Electron: use IPC tunnel
+        const raw = await window.noticiando.invoke("video:generate-scenes", {
+          news_id: news.id,
+          title: news.title,
+          summary: news.summary ?? "",
+          category: news.category,
+          duration,
+          thumbnail_url: news.thumbnail_url ?? null,
+        });
+        result = (raw ?? {}) as { scenes?: unknown[]; error?: string };
+      } else {
+        // Browser: call backend REST directly
+        const { getApiBase } = await import("@/lib/api");
+        const base = await getApiBase();
+        const resp = await fetch(`${base}/generate-video-scenes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            news_id: news.id,
+            title: news.title,
+            summary: news.summary ?? "",
+            category: news.category,
+            duration,
+            thumbnail_url: news.thumbnail_url ?? null,
+          }),
+        });
+        if (!resp.ok) {
+          const detail = await resp.text().catch(() => String(resp.status));
+          result = { error: `Erro do backend: ${detail}` };
+        } else {
+          result = await resp.json();
+        }
+      }
 
       if (result.error || !result.scenes?.length) {
-        setVideoError(result.error ?? "Falha ao gerar cenas — verifique se o backend Python está rodando e se a API Key está configurada em Configurações.");
+        setVideoError(
+          result.error ??
+            "Falha ao gerar cenas — verifique se o backend Python está rodando e se a API Key está configurada."
+        );
         return;
       }
 

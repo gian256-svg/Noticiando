@@ -2,10 +2,11 @@
   "name": "noticiando",
   "version": "0.1.0",
   "description": "Central de inteligência de conteúdo para Reels virais — Grupo Primo",
-  "main": ".vite/build/main/index.js",
+  "main": ".vite/build/index.js",
   "scripts": {
     "start": "electron-forge start",
     "dev": "electron-forge start",
+    "web": "vite --config vite.renderer.config.ts",
     "build": "electron-forge make",
     "package": "electron-forge package",
     "lint": "eslint src --ext .ts,.tsx"
