@@ -96,6 +96,36 @@ async def run_crawl():
             existing = db.query(NewsItem).filter_by(title_hash=h).first()
             merged_sources = list({s for item in group for s in item["sources"]})
 
+            # 1. Encontrar a melhor miniatura no próprio grupo (match exato de hash)
+            best_thumb = next(
+                (item.get("thumbnail_url") for item in group if item.get("thumbnail_url")),
+                None,
+            )
+
+            # 2. Se ainda não temos thumbnail, buscar por similaridade com outros itens
+            if not best_thumb:
+                from crawler.deduplicator import titles_are_similar
+                base_title = existing.title if existing else group[0]["title"]
+                
+                # Buscar nos outros itens recém-coletados
+                for other_item in raw_items:
+                    if other_item.get("thumbnail_url") and titles_are_similar(base_title, other_item["title"]):
+                        best_thumb = other_item["thumbnail_url"]
+                        logger.info(f"Borrowed thumbnail from similar raw item: '{other_item['title'][:50]}' -> '{base_title[:50]}'")
+                        break
+                
+                # Se não encontrou, buscar no banco (itens ativos com miniatura)
+                if not best_thumb:
+                    active_with_thumb = db.query(NewsItem).filter(
+                        NewsItem.is_active == True,
+                        NewsItem.thumbnail_url != None
+                    ).all()
+                    for other_item in active_with_thumb:
+                        if titles_are_similar(base_title, other_item.title):
+                            best_thumb = other_item.thumbnail_url
+                            logger.info(f"Borrowed thumbnail from similar DB item: '{other_item.title[:50]}' -> '{base_title[:50]}'")
+                            break
+
             if existing:
                 changed = False
                 # Update source count if new sources found
@@ -106,14 +136,9 @@ async def run_crawl():
                     existing.source_count = len(existing.sources)
                     changed = True
                 # Backfill thumbnail if still missing
-                if not existing.thumbnail_url:
-                    candidate = next(
-                        (item.get("thumbnail_url") for item in group if item.get("thumbnail_url")),
-                        None,
-                    )
-                    if candidate:
-                        existing.thumbnail_url = candidate
-                        changed = True
+                if not existing.thumbnail_url and best_thumb:
+                    existing.thumbnail_url = best_thumb
+                    changed = True
                 if changed:
                     updated_items.append(existing)
             else:
@@ -132,7 +157,7 @@ async def run_crawl():
                     sources=merged_sources,
                     source_count=len(merged_sources),
                     category=base["category"],
-                    thumbnail_url=base.get("thumbnail_url"),
+                    thumbnail_url=best_thumb,
                     published_at=base["published_at"],
                 )
 
