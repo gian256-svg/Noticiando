@@ -26,7 +26,7 @@ class VideoSceneRequest(BaseModel):
     category: str = "general"
     duration: int = 45
     thumbnail_url: str | None = None
-    api_key: str
+    # api_key removed — keys are loaded from backend/.env
 
 
 class RenderVideoRequest(BaseModel):
@@ -84,12 +84,8 @@ async def render_video_endpoint(req: RenderVideoRequest):
 
 @router.post("/generate-video-scenes")
 async def generate_scenes_endpoint(req: VideoSceneRequest):
-    if not req.api_key or not req.api_key.startswith("sk-ant-"):
-        raise HTTPException(status_code=400, detail="API key inválida")
-
     try:
         result = await generate_video_scenes(
-            api_key=req.api_key,
             title=req.title,
             summary=req.summary,
             category=req.category,

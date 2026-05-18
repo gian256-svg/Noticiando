@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { Clock } from "lucide-react";
 import { ViralBadge } from "./ViralBadge";
 import { SourceChips } from "./SourceChips";
+import { GenerativeThumbnail } from "./GenerativeThumbnail";
 import { useFeedStore } from "@/store/feedStore";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "@/lib/time";
+import { useRelativeTimeTick } from "@/hooks/useRelativeTimeTick";
 
 export interface NewsItem {
   id: string;
@@ -47,6 +50,7 @@ function categoryClass(cat: string) {
 
 export function NewsCard({ news, isSelected, featured = false }: NewsCardProps) {
   const { setSelectedNews } = useFeedStore();
+  useRelativeTimeTick(); // re-render every 60s so timestamps stay fresh
   const isNew = isWithinMinutes(news.published_at, 30);
 
   if (featured) return <FeaturedCard news={news} isSelected={isSelected} />;
@@ -63,46 +67,8 @@ export function NewsCard({ news, isSelected, featured = false }: NewsCardProps) 
           : "ring-1 ring-white/[0.05]"
       )}
     >
-      {/* Thumbnail — real image or category gradient fallback */}
-      <div className={cn("h-28 relative overflow-hidden", !news.thumbnail_url && categoryClass(news.category))}>
-        {news.thumbnail_url ? (
-          <img
-            src={news.thumbnail_url}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover"
-            onError={(e) => {
-              const target = e.currentTarget;
-              target.style.display = "none";
-              target.parentElement?.classList.add(categoryClass(news.category));
-            }}
-          />
-        ) : (
-          <div className="absolute inset-0 opacity-20 mix-blend-overlay" style={{
-            backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-          }} />
-        )}
-        {/* Bottom gradient for text legibility */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-
-        {/* Score badge - top left */}
-        <div className="absolute top-2.5 left-2.5">
-          <ViralBadge score={news.viral_score} size="sm" />
-        </div>
-
-        {/* NEW badge - top right */}
-        {isNew && (
-          <div className="absolute top-2.5 right-2.5">
-            <span className="text-[9px] font-black text-white bg-live/90 px-1.5 py-0.5 rounded-full tracking-wider">
-              NOVO
-            </span>
-          </div>
-        )}
-
-        {/* Category emoji - bottom right */}
-        <div className="absolute bottom-2 right-2.5 text-lg opacity-70 group-hover:opacity-90 transition-opacity">
-          {CATEGORY_EMOJI[news.category] ?? "📰"}
-        </div>
-      </div>
+      {/* Thumbnail — real image or generative fallback */}
+      <CardThumbnail news={news} height="h-28" isNew={isNew} />
 
       {/* Content */}
       <div className="bg-surface-2 p-3.5">
@@ -127,6 +93,7 @@ export function NewsCard({ news, isSelected, featured = false }: NewsCardProps) 
 
 function FeaturedCard({ news, isSelected }: { news: NewsItem; isSelected: boolean }) {
   const { setSelectedNews } = useFeedStore();
+  useRelativeTimeTick(); // re-render every 60s so timestamps stay fresh
   const isNew = isWithinMinutes(news.published_at, 30);
 
   return (
@@ -138,27 +105,8 @@ function FeaturedCard({ news, isSelected }: { news: NewsItem; isSelected: boolea
         isSelected ? "ring-2 ring-accent/60" : "ring-1 ring-white/[0.06]"
       )}
     >
-      {/* Background — real image or category gradient fallback */}
-      {news.thumbnail_url ? (
-        <img
-          src={news.thumbnail_url}
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover"
-          onError={(e) => {
-            const target = e.currentTarget;
-            target.style.display = "none";
-            target.parentElement?.classList.add(categoryClass(news.category));
-          }}
-        />
-      ) : (
-        <>
-          <div className={cn("absolute inset-0", categoryClass(news.category))} />
-          <div className="absolute inset-0 opacity-10 mix-blend-overlay" style={{
-            backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-          }} />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,rgba(255,255,255,0.15),transparent_60%)]" />
-        </>
-      )}
+      {/* Background — real image or generative fallback */}
+      <CardThumbnail news={news} height="h-full" isNew={isNew} featured />
 
       {/* Dark overlay for text readability */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
@@ -189,6 +137,67 @@ function FeaturedCard({ news, isSelected }: { news: NewsItem; isSelected: boolea
         </p>
         <SourceChips sources={news.sources} maxVisible={4} variant="overlay" />
       </div>
+    </div>
+  );
+}
+
+interface CardThumbnailProps {
+  news: NewsItem;
+  height: string;
+  isNew: boolean;
+  featured?: boolean;
+}
+
+function CardThumbnail({ news, height, isNew, featured = false }: CardThumbnailProps) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const showGenerative = !news.thumbnail_url || imgFailed;
+
+  return (
+    <div className={cn("relative overflow-hidden", height)}>
+      {/* Real image — hidden via state if it fails to load */}
+      {news.thumbnail_url && !imgFailed && (
+        <img
+          src={news.thumbnail_url}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          onError={() => setImgFailed(true)}
+        />
+      )}
+
+      {/* Generative fallback — shown when no URL or img errors */}
+      {showGenerative && (
+        <GenerativeThumbnail
+          title={news.title}
+          source={news.sources[0] ?? ""}
+          category={news.category}
+          viralScore={news.viral_score}
+          className="absolute inset-0"
+        />
+      )}
+
+      {/* Gradient overlay for legibility */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
+
+      {/* Score badge */}
+      <div className={cn("absolute left-2.5", featured ? "top-3.5" : "top-2.5")}>
+        <ViralBadge score={news.viral_score} size={featured ? "lg" : "sm"} showLabel={featured} />
+      </div>
+
+      {/* NEW pill */}
+      {isNew && (
+        <div className={cn("absolute right-2.5", featured ? "top-3.5" : "top-2.5")}>
+          <span className="text-[9px] font-black text-white bg-live/90 px-1.5 py-0.5 rounded-full tracking-wider">
+            NOVO
+          </span>
+        </div>
+      )}
+
+      {/* Category emoji (regular cards only) */}
+      {!featured && (
+        <div className="absolute bottom-2 right-2.5 text-lg opacity-60 group-hover:opacity-90 transition-opacity">
+          {CATEGORY_EMOJI[news.category] ?? "📰"}
+        </div>
+      )}
     </div>
   );
 }

@@ -22,6 +22,18 @@ HEADERS = {
     "Accept": "application/rss+xml, application/xml, text/xml, */*",
 }
 
+# Domínios que bloqueiam og:image (paywall, 403, redirects infinitos)
+# Para esses, o GenerativeThumbnail do frontend faz o fallback visual
+BLOCKED_OG_DOMAINS = {
+    "bloomberg.com", "www.bloomberg.com",
+    "wsj.com", "www.wsj.com", "online.wsj.com",
+    "ft.com", "www.ft.com",
+    "economist.com", "www.economist.com",
+    "br.investing.com", "investing.com", "www.investing.com",
+    "marketwatch.com", "www.marketwatch.com",
+    "project-syndicate.org", "www.project-syndicate.org",
+}
+
 # Browser-like headers for og:image page fetches (avoids 403 blocks)
 BROWSER_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -71,50 +83,85 @@ def _clean_html(raw: str) -> str:
 
 
 def _extract_thumbnail(item: ET.Element, description: str) -> Optional[str]:
-    """Try multiple RSS thumbnail sources in priority order."""
-    # media:thumbnail (Yahoo Media RSS)
-    thumb = item.find("media:thumbnail", NS)
-    if thumb is not None:
-        url = thumb.get("url")
-        if url:
-            return url
+    """Try every possible RSS thumbnail source in priority order."""
 
-    # media:content with image type
+    def _valid(url: Optional[str]) -> Optional[str]:
+        """Return url if it looks like an image URL, else None."""
+        if not url:
+            return None
+        url = url.strip()
+        if url.startswith("//"):
+            url = "https:" + url
+        if not url.startswith("http"):
+            return None
+        # Accept anything that isn't obviously a tracking pixel (< 5 chars ext)
+        ext = url.split("?")[0].split(".")[-1].lower()
+        if ext in ("js", "css", "html", "htm", "xml", "json", "txt"):
+            return None
+        return url
+
+    # 1. media:thumbnail (Yahoo Media RSS)
+    for tag in ("media:thumbnail", "{http://search.yahoo.com/mrss/}thumbnail"):
+        thumb = item.find(tag) if ":" not in tag else item.find(tag, NS)
+        if thumb is not None:
+            u = _valid(thumb.get("url"))
+            if u:
+                return u
+
+    # 2. media:content — accept any URL (many feeds omit type="image/...")
     for mc in item.findall("media:content", NS):
         t = mc.get("type", "")
         medium = mc.get("medium", "")
+        url_attr = _valid(mc.get("url"))
+        # Prefer explicit image type, but fall back to any non-video URL
         if t.startswith("image/") or medium == "image":
-            url = mc.get("url")
-            if url:
-                return url
+            if url_attr:
+                return url_attr
+        elif url_attr and not t.startswith("video/") and not t.startswith("audio/"):
+            # Store as candidate, prefer explicit hits above
+            pass
+    # Second pass — accept any media:content URL that isn't video/audio
+    for mc in item.findall("media:content", NS):
+        t = mc.get("type", "")
+        if not t.startswith("video/") and not t.startswith("audio/"):
+            u = _valid(mc.get("url"))
+            if u:
+                return u
 
-    # enclosure (podcasts use this for images too)
+    # 3. media:group children (G1/Globo use this)
+    for group in item.findall("media:group", NS):
+        for mc in group.findall("media:content", NS):
+            u = _valid(mc.get("url"))
+            if u:
+                return u
+
+    # 4. enclosure
     enc = item.find("enclosure")
     if enc is not None:
         t = enc.get("type", "")
-        if t.startswith("image/"):
-            url = enc.get("url")
-            if url:
-                return url
+        if "image" in t or not t:  # accept missing type too
+            u = _valid(enc.get("url"))
+            if u:
+                return u
 
-    # content:encoded — look for first <img>
+    # 5. content:encoded — first <img> with src or data-src
     content_enc = item.find("content:encoded", NS)
     if content_enc is not None and content_enc.text:
         soup = BeautifulSoup(content_enc.text, "html.parser")
-        img = soup.find("img")
-        if img:
-            src = img.get("src", "")
-            if src and src.startswith("http"):
-                return src
+        for img in soup.find_all("img"):
+            for attr in ("src", "data-src", "data-original", "data-lazy-src"):
+                u = _valid(img.get(attr, ""))
+                if u and "pixel" not in u and "tracking" not in u:
+                    return u
 
-    # img inside description HTML
+    # 6. description HTML — first <img>
     if description:
         soup = BeautifulSoup(description, "html.parser")
-        img = soup.find("img")
-        if img:
-            src = img.get("src", "")
-            if src and src.startswith("http"):
-                return src
+        for img in soup.find_all("img"):
+            for attr in ("src", "data-src", "data-original"):
+                u = _valid(img.get(attr, ""))
+                if u and "pixel" not in u:
+                    return u
 
     return None
 
@@ -215,6 +262,10 @@ async def crawl_source(source: Source, client: httpx.AsyncClient) -> list[dict]:
         if not items:
             items = _parse_atom(root, source.name, source.category)
 
+    # Attach language so Phase 3 (translation) can identify EN articles
+    for item in items:
+        item["language"] = source.language
+
     logger.debug(f"Crawled {len(items)} items from {source.name}")
     return items
 
@@ -257,26 +308,48 @@ async def _fetch_og_image(url: str, client: httpx.AsyncClient) -> Optional[str]:
 async def crawl_all_sources(sources: list[Source]) -> list[dict]:
     """Crawls all enabled sources concurrently, then enriches missing thumbnails via og:image."""
     enabled = [s for s in sources if s.enabled]
-    async with httpx.AsyncClient() as client:
-        tasks = [crawl_source(src, client) for src in enabled]
+
+    # ── Phase 1: RSS crawl ──────────────────────────────────────────────────
+    async with httpx.AsyncClient() as rss_client:
+        tasks = [crawl_source(src, rss_client) for src in enabled]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        items: list[dict] = []
-        for result in results:
-            if isinstance(result, list):
-                items.extend(result)
+    items: list[dict] = []
+    for result in results:
+        if isinstance(result, list):
+            items.extend(result)
 
-        # Enrich items missing thumbnails with og:image (max 8 concurrent requests)
-        missing = [item for item in items if not item.get("thumbnail_url") and item.get("url")]
-        if missing:
-            sem = asyncio.Semaphore(8)
+    # ── Phase 2: og:image enrichment (NEW client — the RSS one is closed) ──
+    def _og_blocked(url: str) -> bool:
+        from urllib.parse import urlparse
+        return urlparse(url).netloc in BLOCKED_OG_DOMAINS
 
+    missing = [
+        item for item in items
+        if not item.get("thumbnail_url") and item.get("url") and not _og_blocked(item["url"])
+    ]
+    if missing:
+        sem = asyncio.Semaphore(8)
+        async with httpx.AsyncClient() as enrich_client:
             async def enrich(item: dict) -> None:
                 async with sem:
-                    og = await _fetch_og_image(item["url"], client)
+                    og = await _fetch_og_image(item["url"], enrich_client)
                     if og:
                         item["thumbnail_url"] = og
 
             await asyncio.gather(*[enrich(item) for item in missing], return_exceptions=True)
 
+    # ── Phase 3: EN→PT-BR translation ──────────────────────────────────────
+    en_count = sum(1 for i in items if i.get("language") == "en")
+    if en_count:
+        try:
+            from ai.translator import translate_batch
+            await translate_batch(items)
+        except Exception as e:
+            logger.warning(f"Translation phase failed (non-blocking): {e}")
+
+    logger.info(f"crawl_all_sources done — {len(items)} items, "
+                f"{sum(1 for i in items if i.get('thumbnail_url'))} with thumbnails, "
+                f"{en_count} EN translated")
     return items
+

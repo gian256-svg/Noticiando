@@ -13,7 +13,12 @@ import re
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from scoring.keywords import HIGH_ENGAGEMENT_KEYWORDS, HIGH_ENGAGEMENT_KEYWORDS_EN
+from scoring.keywords import (
+    HIGH_ENGAGEMENT_KEYWORDS,
+    HIGH_ENGAGEMENT_KEYWORDS_EN,
+    PENALTY_KEYWORDS,
+    PENALTY_KEYWORDS_EN,
+)
 
 if TYPE_CHECKING:
     from models.news import NewsItem
@@ -113,6 +118,15 @@ def _propagation_velocity(item: "NewsItem", all_items: list["NewsItem"]) -> floa
     return 0.0
 
 
+def _penalty_score(text: str) -> float:
+    text_lower = text.lower()
+    all_penalty = PENALTY_KEYWORDS + PENALTY_KEYWORDS_EN
+    for kw in all_penalty:
+        if kw in text_lower:
+            return -60.0
+    return 0.0
+
+
 def score_news(item: "NewsItem", all_items: list["NewsItem"]) -> float:
     text = f"{item.title} {item.summary or ''}"
 
@@ -122,9 +136,10 @@ def score_news(item: "NewsItem", all_items: list["NewsItem"]) -> float:
         + _keyword_score(text)
         + _propagation_velocity(item, all_items)
         + CATEGORY_WEIGHTS.get(item.category or "general", 3.0)
+        + _penalty_score(text)
     )
 
-    return round(min(s, 100.0), 1)
+    return round(max(min(s, 100.0), 0.0), 1)
 
 
 def score_all(items: list["NewsItem"]) -> dict[str, float]:

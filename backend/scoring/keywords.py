@@ -78,6 +78,49 @@ HIGH_ENGAGEMENT_KEYWORDS: list[tuple[str, int]] = [
     # bilhões, trilhões detectados via regex no scorer
 ]
 
+# Palavras de penalidade — conteúdo fora do nicho financeiro do Grupo Primo
+# Artigos que batem nestas palavras recebem −60 pts no viral score
+PENALTY_KEYWORDS: list[str] = [
+    # Esportes
+    "futebol", "copa do mundo", "seleção brasileira", "convocação",
+    "gol", "artilheiro", "campeão", "campeonato", "champions league",
+    "premier league", "la liga", "série a", "brasileirão",
+    "nfl", "nba", "mlb", "formula 1", "f1", "moto gp",
+    "ancelotti", "mbappé", "neymar", "vinicius",
+    # Entretenimento / celebridades
+    "celebridade", "ator", "atriz", "cantor", "cantora",
+    "show musical", "álbum", "música nova", "clipe",
+    "novela", "série de tv", "stranger things", "the boroughs",
+    "squid game", "la casa de papel", "reality show",
+    "oscar", "grammy", "emmy", "bbb", "big brother",
+    "ludmilla", "anitta", "mc", "funk",
+    # Games / tecnologia de entretenimento
+    "gta", "gta 6", "gta vi", "playstation", "xbox",
+    "nintendo", "jogo eletrônico", "videogame", "esports",
+    # Lifestyle / comportamento
+    "vinho", "gastronomia", "receita culinária", "restaurante",
+    "moda", "beleza", "make up", "skincare", "lifestyle",
+    "viagem", "turismo", "destino de viagem", "hotel", "cruzeiro",
+    "horóscopo", "signos", "tarot",
+    # Esportes radicais / outros
+    "surfe", "tênis profissional", "golfe", "vôlei",
+]
+
+PENALTY_KEYWORDS_EN: list[str] = [
+    # Sports
+    "soccer", "football match", "world cup squad", "goal scorer",
+    "premier league", "champions league", "nfl", "nba", "mlb",
+    # Entertainment
+    "celebrity", "actor", "actress", "singer", "album release",
+    "tv series", "netflix show", "movie premiere", "award show",
+    "oscar", "grammy", "emmy", "reality tv",
+    # Gaming
+    "gta", "playstation", "xbox", "nintendo", "video game",
+    # Lifestyle
+    "fashion", "beauty tips", "recipe", "restaurant review",
+    "travel guide", "horoscope",
+]
+
 # Palavras em inglês equivalentes (para fontes INT)
 HIGH_ENGAGEMENT_KEYWORDS_EN: list[tuple[str, int]] = [
     ("breaking", 3),

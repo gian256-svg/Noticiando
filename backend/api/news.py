@@ -23,7 +23,7 @@ async def list_news(
     limit: int = Query(100, le=200),
     offset: int = Query(0, ge=0),
     category: Optional[str] = None,
-    min_score: float = Query(0.0, ge=0, le=100),
+    min_score: float = Query(10.0, ge=0, le=100),
     period: str = Query("6h"),
     sort: str = Query("viral_score"),
 ):
@@ -66,12 +66,16 @@ async def news_feed():
 
     async def event_stream():
         try:
-            # Send heartbeat every 30s to keep connection alive
             while True:
                 try:
                     data = await asyncio.wait_for(queue.get(), timeout=30.0)
-                    if isinstance(data, dict) and data.get("event") == "crawling":
-                        yield f"event: crawling\ndata: {{}}\n\n"
+                    if isinstance(data, dict):
+                        event = data.get("event", "")
+                        if event == "crawling":
+                            yield f"event: crawling\ndata: {{}}\n\n"
+                        elif event == "idle":
+                            yield f"event: idle\ndata: {{}}\n\n"
+                        # else: ignore unknown dict events
                     else:
                         yield f"data: {json.dumps(data)}\n\n"
                 except asyncio.TimeoutError:

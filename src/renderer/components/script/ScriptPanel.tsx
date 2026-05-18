@@ -57,6 +57,11 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
   const [copied, setCopied] = useState(false);
   const [opened, setOpened] = useState(false);
 
+  // Paste-back script state (from MyHub agent)
+  const [showPasteArea, setShowPasteArea] = useState(false);
+  const [pastedScript, setPastedScript] = useState("");
+  const [scriptCopied, setScriptCopied] = useState(false);
+
   // Video generation state
   const [generatingVideo, setGeneratingVideo] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
@@ -89,22 +94,30 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
 
   const handleGenerateVideo = useCallback(async () => {
     if (!news) return;
+    // Guard: window.noticiando must exist (runs inside Electron)
+    if (!window.noticiando?.invoke) {
+      setVideoError("Função não disponível fora do Electron.");
+      return;
+    }
     setGeneratingVideo(true);
     setVideoError(null);
     setVideoProps(null);
 
     try {
-      const result = (await window.noticiando.invoke("video:generate-scenes", {
+      const raw = await window.noticiando.invoke("video:generate-scenes", {
         news_id: news.id,
         title: news.title,
         summary: news.summary ?? "",
         category: news.category,
         duration,
         thumbnail_url: news.thumbnail_url ?? null,
-      })) as { scenes?: unknown[]; error?: string };
+      });
 
-      if (result.error || !result.scenes) {
-        setVideoError(result.error ?? "Falha ao gerar cenas");
+      // Safeguard: result may be null/undefined if sidecar is down
+      const result = (raw ?? {}) as { scenes?: unknown[]; error?: string };
+
+      if (result.error || !result.scenes?.length) {
+        setVideoError(result.error ?? "Falha ao gerar cenas — verifique se o backend Python está rodando e se a API Key está configurada em Configurações.");
         return;
       }
 
@@ -117,7 +130,7 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
       });
       setShowPlayer(true);
     } catch (err) {
-      setVideoError(String(err));
+      setVideoError(`Erro: ${String(err)}`);
     } finally {
       setGeneratingVideo(false);
     }
@@ -203,7 +216,64 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
           )}
         </div>
 
-        <div className="flex-1" />
+        {/* ── Paste-back section: receive MyHub agent output ── */}
+        <div className="px-5 py-3 border-b border-border/50 shrink-0">
+          <button
+            onClick={() => setShowPasteArea(!showPasteArea)}
+            className="flex items-center justify-between w-full group"
+          >
+            <span className={cn(
+              "text-[10px] font-semibold uppercase tracking-wider transition-colors",
+              pastedScript ? "text-accent" : "text-text-secondary group-hover:text-text-primary"
+            )}>
+              {pastedScript ? "✓ Roteiro colado" : "Cole o roteiro do agente"}
+            </span>
+            <div className={cn("transition-colors", showPasteArea ? "text-accent" : "text-text-secondary group-hover:text-text-primary")}>
+              {showPasteArea ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </div>
+          </button>
+
+          {showPasteArea && (
+            <div className="mt-2 space-y-2">
+              <textarea
+                value={pastedScript}
+                onChange={(e) => setPastedScript(e.target.value)}
+                placeholder="Cole aqui o roteiro gerado pelo agente PrimoScript no myhub..."
+                className="w-full h-40 bg-background/60 rounded-lg border border-border/40 p-3 text-[10px] text-text-secondary font-mono leading-relaxed resize-none focus:outline-none focus:border-accent/50 placeholder:text-text-muted transition-colors"
+              />
+              {pastedScript && (
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(pastedScript);
+                      setScriptCopied(true);
+                      setTimeout(() => setScriptCopied(false), 2000);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-medium text-text-secondary border border-border/60 rounded-lg hover:text-text-primary hover:border-border transition-all"
+                  >
+                    {scriptCopied ? <Check size={10} className="text-live" /> : <Copy size={10} />}
+                    {scriptCopied ? "Copiado!" : "Copiar"}
+                  </button>
+                  <button
+                    onClick={() => { setPastedScript(""); setShowPasteArea(false); }}
+                    className="flex items-center justify-center gap-1 px-3 py-1.5 text-[10px] font-medium text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/10 transition-all"
+                  >
+                    Limpar
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Formatted roteiro display when content is pasted */}
+          {pastedScript && !showPasteArea && (
+            <div className="mt-2 max-h-52 overflow-y-auto bg-background/40 rounded-lg border border-accent/20 p-3">
+              <pre className="text-[10px] text-text-secondary whitespace-pre-wrap font-mono leading-relaxed">
+                {pastedScript}
+              </pre>
+            </div>
+          )}
+        </div>
 
         {/* CTAs */}
         <div className="px-5 py-4 border-t border-border/50 shrink-0 space-y-2">

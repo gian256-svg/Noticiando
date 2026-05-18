@@ -1,0 +1,257 @@
+# 🐛 NOTICIANDO — Registro de Bugs e Correções
+
+> Cada bug grave deve ser documentado aqui com: causa raiz, impacto, solução aplicada
+> e regra para nunca repetir. Leia antes de mexer nas áreas afetadas.
+
+---
+
+## BUG-001 — Timestamps sempre mostrando "agora"
+
+**Data:** 2026-05-18
+**Área:** Frontend — `NewsCard.tsx`, `lib/time.ts`
+**Severidade:** Média
+
+### Sintoma
+Todos os cards do feed exibiam o timestamp como "agora" independente de quando a notícia foi publicada. Notícias de 3h atrás mostravam "agora".
+
+### Causa Raiz
+`formatDistanceToNow` calculava o tempo corretamente, mas o componente `NewsCard` **nunca re-renderizava após o mount inicial**. O valor calculado na primeira renderização ficava congelado para sempre.
+
+### Solução Aplicada
+Criado hook `useRelativeTimeTick` em `src/renderer/hooks/useRelativeTimeTick.ts`:
+```ts
+export function useRelativeTimeTick(intervalMs = 60_000): number {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return tick;
+}
+```
+Hook chamado em `NewsCard` e `FeaturedCard` — força re-render a cada 60s.
+
+### Regra Para Nunca Repetir
+> Qualquer componente que exibe tempo relativo ("5min atrás", "2h") **deve** chamar
+> `useRelativeTimeTick()` para manter o valor atualizado.
+
+---
+
+## BUG-002 — Thumbnails ausentes: og:image usando client HTTP fechado
+
+**Data:** 2026-05-18
+**Área:** Backend — `backend/crawler/rss_crawler.py`
+**Severidade:** Alta
+
+### Sintoma
+A fase de enriquecimento de thumbnails via `og:image` não funcionava para nenhum artigo — todos ficavam sem imagem, mesmo para sites que expõem og:image publicamente.
+
+### Causa Raiz
+A função `crawl_all_sources` abria um único `httpx.AsyncClient` com `async with`. O bloco `async with` encerrava o client **após o crawl RSS**. A fase 2 de enriquecimento (`_fetch_og_image`) tentava reutilizar o mesmo client — que já estava **fechado** — gerando erros silenciosos em todas as chamadas.
+
+```python
+# ❌ ERRADO — client fechado antes do enrich rodar
+async with httpx.AsyncClient() as client:
+    results = await asyncio.gather(...)   # crawl RSS
+    # client ainda aberto aqui...
+
+# client já fechado aqui! ↓
+await enrich(item)  # falha silenciosa
+```
+
+### Solução Aplicada
+Separadas as duas fases com dois clients independentes:
+```python
+# ✅ CORRETO — Phase 1: RSS crawl
+async with httpx.AsyncClient() as rss_client:
+    results = await asyncio.gather(...)
+# rss_client fechado aqui — OK
+
+# Phase 2: og:image com client NOVO
+async with httpx.AsyncClient() as enrich_client:
+    await asyncio.gather(*[enrich(item) for item in missing])
+```
+
+### Regra Para Nunca Repetir
+> Nunca reutilizar um `httpx.AsyncClient` fora do seu bloco `async with`.
+> Cada fase de I/O assíncrona que acontece após um `async with` deve abrir seu próprio client.
+
+---
+
+## BUG-003 — Feed sem atualização em tempo real
+
+**Data:** 2026-05-18
+**Área:** Frontend + Backend — `useNewsFeed.ts`, `scheduler.py`, `news.py`
+**Severidade:** Alta
+
+### Sintoma
+O feed não atualizava automaticamente após o crawl do backend. Novas notícias só apareciam após recarregar a página manualmente.
+
+### Causa Raiz (múltipla)
+1. **Backend**: O scheduler só emitia evento SSE quando `new_items` não estava vazio. Crawls que não produziam notícias novas não emitiam nenhum evento — o live-dot ficava preso em "crawling".
+2. **Frontend**: O polling de fallback usava `crawlInterval * 60 * 1000` (podia ser 5–15 min).
+3. **Frontend**: O hook `useNewsFeed` não escutava o evento SSE `"idle"` — não havia forma de saber quando o crawl terminava sem novidades.
+
+### Solução Aplicada
+**Backend (`scheduler.py`):** Sempre emitir `{"event": "idle"}` ao final de cada crawl:
+```python
+# Após commit e notificação de novos itens:
+await _notify_sse({"event": "idle"})  # sempre, mesmo sem novos itens
+```
+
+**Backend (`news.py`):** Handler SSE agora trata `"crawling"` e `"idle"`:
+```python
+if event == "crawling":
+    yield f"event: crawling\ndata: {{}}\n\n"
+elif event == "idle":
+    yield f"event: idle\ndata: {{}}\n\n"
+```
+
+**Frontend (`useNewsFeed.ts`):** Polling fixo em 2 minutos + listener `"idle"`:
+```ts
+sse.addEventListener("idle", () => setCrawlerStatus("idle"));
+pollRef.current = setInterval(fetchNews, 2 * 60 * 1000); // 2 min fixo
+```
+
+### Regra Para Nunca Repetir
+> O backend **sempre** deve emitir um evento de conclusão (ex: `"idle"`) ao final de
+> operações longas via SSE, independentemente do resultado.
+> O polling de fallback nunca deve depender de configuração do usuário para intervalo.
+
+---
+
+## BUG-004 — Notícias fora do nicho financeiro no feed
+
+**Data:** 2026-05-18
+**Área:** Backend — `scoring/viral_scorer.py`, `crawler/sources.py`
+**Severidade:** Alta (editorial)
+
+### Sintoma
+Feed exibindo artigos completamente fora do nicho do Grupo Primo:
+- "O vinho da terra de Cristiano Ronaldo pode desaparecer" (Exame)
+- "Com Ludmilla e João Gomes: como será a convocação de Ancelotti" (Exame)
+- "GTA 6: atraso no lançamento já completou 18 meses" (Exame)
+
+### Causa Raiz
+A fonte **Exame** (exame.com) foi marcada como `economy_br` mas publica conteúdo amplo de entretenimento, esportes, tecnologia e lifestyle — muito além do nicho financeiro. O viral scorer não aplicava penalidade por tema irrelevante.
+
+### Solução Necessária (a implementar)
+1. Adicionar lista de **palavras de penalidade** no viral scorer (−50 pts):
+```python
+PENALTY_KEYWORDS = [
+    "futebol", "copa do mundo", "seleção", "convocação",
+    "gta", "playstation", "game", "jogo eletrônico",
+    "celebridade", "ator", "atriz", "cantor", "show",
+    "vinho", "gastronomia", "receita", "culinária",
+    "novela", "série", "netflix", "moda", "beleza",
+]
+```
+2. Artigos com score < 10 após penalidade não devem ser salvos no banco.
+3. Fontes com alto índice de ruído devem ter filtro de palavras-chave obrigatório.
+
+### Regra Para Nunca Repetir
+> Ao adicionar uma nova fonte RSS, sempre verificar: "essa fonte publica apenas conteúdo
+> financeiro ou é de propósito geral?" Se for de propósito geral, adicionar filtro de
+> penalidade por palavras-chave antes de aceitar o artigo.
+
+---
+
+## BUG-005 — TypeError: Cannot read properties of null em handleGenerateVideo
+
+**Data:** 2026-05-18
+**Área:** Frontend — `ScriptPanel.tsx`
+**Severidade:** Média
+
+### Sintoma
+Clicar em "Gerar Reels" exibia: `TypeError: Cannot read properties of null (r...)`
+
+### Causa Raiz (múltipla)
+1. O IPC handler `video:generate-scenes` retorna `{ error: "API Key não configurada" }` quando a chave não está configurada — correto. Porém, se o sidecar Python estava **offline**, o `fetch` lançava exceção e o `catch` capturava, mas em outros edge cases o `result` poderia ser `null`.
+2. O código fazia `result.error` e `result.scenes` diretamente sem verificar se `result` era não-nulo.
+3. Não havia guard verificando se `window.noticiando?.invoke` existe (necessário fora do contexto Electron).
+
+### Solução Aplicada
+```ts
+// ✅ Guard de contexto Electron
+if (!window.noticiando?.invoke) {
+  setVideoError("Função não disponível fora do Electron.");
+  return;
+}
+
+// ✅ Proteção contra null/undefined
+const raw = await window.noticiando.invoke("video:generate-scenes", payload);
+const result = (raw ?? {}) as { scenes?: unknown[]; error?: string };
+
+// ✅ Verificar scenes?.length (não apenas scenes)
+if (result.error || !result.scenes?.length) {
+  setVideoError(result.error ?? "Falha — verifique backend e API Key.");
+  return;
+}
+```
+
+### Regra Para Nunca Repetir
+> Todo acesso a `window.noticiando` deve ter optional chaining: `window.noticiando?.invoke`.
+> Todo resultado de `invoke` deve ser tratado como potencialmente `null` usando `?? {}`.
+> Verificar `array?.length` e não apenas `array` para arrays que podem ser vazios.
+
+---
+
+## BUG-006 — Usuário sem campo para colar roteiro gerado pelo MyHub
+
+**Data:** 2026-05-18
+**Área:** Frontend — `ScriptPanel.tsx`
+**Severidade:** Média (UX)
+
+### Sintoma
+O fluxo "Abrir no myhub" funcionava (abria o browser e copiava o prompt), mas após o usuário gerar o roteiro no agente Claude do MyHub, **não havia nenhuma forma de trazer esse roteiro de volta para o Noticiando**.
+
+### Causa Raiz
+O `ScriptPanel` foi projetado para o fluxo autônomo (Claude direto via API), mas o fluxo manual via MyHub não tinha etapa de retorno.
+
+### Solução Aplicada
+Adicionada seção **"Cole o roteiro do agente"** no `ScriptPanel`:
+- Área expansível com `<textarea>` para colar o roteiro
+- Preview formatado quando colapsado
+- Botões Copiar e Limpar
+- Label muda para "✓ Roteiro colado" quando há conteúdo
+
+### Regra Para Nunca Repetir
+> Qualquer fluxo que envolva o usuário sair do app para executar uma ação **deve ter
+> uma etapa de retorno** — um campo, botão ou modal para trazer o resultado de volta.
+
+---
+
+## BUG-007 — Thumbnails gerativos indistinguíveis do fundo escuro
+
+**Data:** 2026-05-18
+**Área:** Frontend — `GenerativeThumbnail.tsx`
+**Severidade:** Média (UX)
+
+### Sintoma
+O `GenerativeThumbnail` estava renderizando mas parecia um fundo escuro vazio. Usuários não conseguiam distinguir entre "thumbnail funcionando" e "card sem imagem".
+
+### Causa Raiz
+As cores das paletas das categorias eram todas tons muito escuros:
+- `investments`: `#052e16` (quase preto-verde)
+- `economy_br`: `#0a1628` (quase preto-azul)
+- `crypto`: `#0a0a1a` (quase preto)
+
+Todas eram visualmente idênticas ao fundo dark do app (`#0A0A0F`).
+
+### Solução Aplicada
+Paletas reescritas com cores vibrantes e distintas:
+```ts
+investments:  { a: "#064e3b", b: "#065f46", c: "#10b981" }  // verde esmeralda
+economy_br:   { a: "#1e3a8a", b: "#1d4ed8", c: "#3b82f6" }  // azul royal
+geopolitics:  { a: "#7c2d12", b: "#c2410c", c: "#f97316" }  // laranja profundo
+crypto:       { a: "#713f12", b: "#a16207", c: "#eab308" }  // âmbar/dourado
+```
+
+### Regra Para Nunca Repetir
+> Cores de fallback/placeholder nunca devem ser similares ao fundo do app.
+> Sempre testar visualmente: "se eu esconder a label, consigo perceber que há conteúdo aqui?"
+
+---
+
+*Última atualização: 2026-05-18*
+*Mantenedor: Antigravity AI + Grupo Primo*

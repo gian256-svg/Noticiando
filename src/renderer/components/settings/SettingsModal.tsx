@@ -1,7 +1,8 @@
 import { X, Settings2 } from "lucide-react";
 import { useConfigStore } from "@/store/configStore";
-import { MyhubInfo } from "./ApiKeyInput";
+import { AnthropicKeyInput, MyhubInfo } from "./ApiKeyInput";
 import { SourcesConfig } from "./SourcesConfig";
+
 
 export function SettingsModal() {
   const { settingsOpen, setSettingsOpen } = useConfigStore();
@@ -29,6 +30,8 @@ export function SettingsModal() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
+          <AnthropicKeyInput />
+          <div className="h-px bg-border/60" />
           <MyhubInfo />
           <div className="h-px bg-border/60" />
           <SourcesConfig />

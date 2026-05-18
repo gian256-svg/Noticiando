@@ -53,16 +53,15 @@ function createWindow() {
 app.on("ready", async () => {
   initDb();
 
+  // Register IPC handlers once — they read the port dynamically via getBackendPort()
+  setupIpcHandlers();
+
   // Create window immediately — don't wait for backend
   createWindow();
-  setupIpcHandlers(0); // placeholder port, will be updated
 
-  // Start backend in background
+  // Start backend in background — port is stored in sidecar module
   startSidecar()
     .then((port) => {
-      // Re-setup handlers with the real port
-      setupIpcHandlers(port);
-      // Notify renderer that backend is ready
       mainWindow?.webContents.send("backend:ready", port);
     })
     .catch((err) => {

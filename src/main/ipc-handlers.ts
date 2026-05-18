@@ -5,8 +5,9 @@ import Store from "electron-store";
 
 const store = new Store();
 
-export function setupIpcHandlers(port: number) {
-  ipcMain.handle("backend:port", () => port);
+// Called ONCE at app startup — no port arg needed, port is read dynamically
+export function setupIpcHandlers() {
+  ipcMain.handle("backend:port", () => getBackendPort());
 
   // Window controls
   ipcMain.handle("window:minimize", () => {
@@ -44,7 +45,7 @@ export function setupIpcHandlers(port: number) {
   ipcMain.handle("shell:open-external", (_e, url: string) => shell.openExternal(url));
   ipcMain.handle("app:version", () => app.getVersion());
 
-  // 'video:generate-scenes' — call Python sidecar to generate structured Reels scenes via Claude
+  // video:generate-scenes — calls Python sidecar (Gemini → Groq cascade)
   ipcMain.handle("video:generate-scenes", async (_e, payload: {
     news_id: string;
     title: string;
@@ -53,14 +54,13 @@ export function setupIpcHandlers(port: number) {
     duration: number;
     thumbnail_url: string | null;
   }) => {
+    const port = getBackendPort();
+    if (!port) return { error: "Backend ainda não iniciou. Aguarde alguns segundos e tente novamente." };
     try {
-      const apiKey = (store as any).get("anthropic_api_key", "") as string;
-      if (!apiKey) return { error: "API Key não configurada. Vá em Configurações." };
-
       const res = await fetch(`http://127.0.0.1:${port}/generate-video-scenes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, api_key: apiKey }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const detail = await res.text();
@@ -73,12 +73,14 @@ export function setupIpcHandlers(port: number) {
     }
   });
 
-  // 'video:render' — delegates to Python backend which runs `npx remotion render`
+  // video:render — delegates to Python backend which runs `npx remotion render`
   ipcMain.handle("video:render", async (_e, payload: {
     compositionProps: Record<string, unknown>;
     newsTitle: string;
     totalFrames: number;
   }) => {
+    const port = getBackendPort();
+    if (!port) return { ok: false, error: "Backend não iniciado." };
     try {
       const res = await fetch(`http://127.0.0.1:${port}/render-video`, {
         method: "POST",
@@ -101,16 +103,15 @@ export function setupIpcHandlers(port: number) {
     }
   });
 
-  // --- Spec-requested IPC Handlers ---
-  
-  // 'news:get' — fetch latest news items from the Python sidecar
+  // news:get — fetch latest news items from the Python sidecar
   ipcMain.handle("news:get", async (_e, filters?: { limit?: number; category?: string; min_score?: number; period?: string }) => {
+    const port = getBackendPort();
+    if (!port) return { total: 0, items: [] };
     try {
       const limit = filters?.limit ?? 100;
       const category = filters?.category ?? "all";
       const min_score = filters?.min_score ?? 0;
       const period = filters?.period ?? "6h";
-      
       const res = await fetch(`http://127.0.0.1:${port}/news?limit=${limit}&category=${category}&min_score=${min_score}&period=${period}`);
       if (!res.ok) throw new Error("Failed to fetch news from sidecar");
       return await res.json();
@@ -120,7 +121,7 @@ export function setupIpcHandlers(port: number) {
     }
   });
 
-  // 'script:generate' — trigger script generation on the Python sidecar (calls Claude)
+  // script:generate — trigger script generation on the Python sidecar
   ipcMain.handle("script:generate", async (_e, payload: {
     news_id: string;
     title: string;
@@ -133,11 +134,13 @@ export function setupIpcHandlers(port: number) {
     duration: number;
     api_key: string;
   }) => {
+    const port = getBackendPort();
+    if (!port) return { error: "Backend não iniciado." };
     try {
       const res = await fetch(`http://127.0.0.1:${port}/generate-script`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Failed to generate script from sidecar");
       return await res.json();
@@ -147,15 +150,12 @@ export function setupIpcHandlers(port: number) {
     }
   });
 
-  // 'config:get' — retrieve persistent key-value configuration
-  ipcMain.handle("config:get", (_e, key: string, defaultValue?: any) => {
+  // config:get / config:set — persistent key-value store
+  ipcMain.handle("config:get", (_e, key: string, defaultValue?: unknown) => {
     return (store as any).get(key, defaultValue);
   });
-
-  // 'config:set' — update persistent key-value configuration
-  ipcMain.handle("config:set", (_e, key: string, value: any) => {
+  ipcMain.handle("config:set", (_e, key: string, value: unknown) => {
     (store as any).set(key, value);
     return { success: true };
   });
 }
-

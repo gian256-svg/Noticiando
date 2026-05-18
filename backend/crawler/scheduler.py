@@ -12,6 +12,14 @@ from crawler.sources import DEFAULT_SOURCES
 from db.database import SessionLocal
 from models.news import NewsItem
 from scoring.viral_scorer import score_all
+from scoring.keywords import PENALTY_KEYWORDS, PENALTY_KEYWORDS_EN
+
+_ALL_PENALTY = [kw.lower() for kw in PENALTY_KEYWORDS + PENALTY_KEYWORDS_EN]
+
+
+def _is_off_topic(title: str, summary: str) -> bool:
+    text = f"{title} {summary}".lower()
+    return any(kw in text for kw in _ALL_PENALTY)
 
 logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
@@ -88,6 +96,10 @@ async def run_crawl():
                     updated_items.append(existing)
             else:
                 base = group[0]
+                # Rejeitar artigos fora do nicho financeiro antes de salvar
+                if _is_off_topic(base["title"], base.get("summary", "")):
+                    logger.debug(f"Off-topic rejected: {base['title'][:80]}")
+                    continue
                 news = NewsItem(
                     title=base["title"],
                     title_hash=h,
@@ -115,8 +127,13 @@ async def run_crawl():
 
         logger.info(f"Crawl complete: {len(new_items)} new, {len(updated_items)} updated")
 
-        if new_items:
-            await _notify_sse([item.to_dict() for item in new_items])
+        # Push new + thumbnail-updated items so the frontend refreshes cards
+        push_items = new_items + [u for u in updated_items if u.thumbnail_url]
+        if push_items:
+            await _notify_sse([item.to_dict() for item in push_items])
+
+        # Always signal idle so the live-dot resets on the frontend
+        await _notify_sse({"event": "idle"})
 
     except Exception as e:
         logger.error(f"Crawl error: {e}", exc_info=True)
