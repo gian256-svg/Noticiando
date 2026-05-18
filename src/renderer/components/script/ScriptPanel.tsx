@@ -143,6 +143,8 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
         source_name: news.sources[0],
         category: news.category,
         news_title: news.title,
+        narration_url: (result as any).narration_url,
+        music_url: (result as any).music_url,
       });
       setShowPlayer(true);
     } catch (err) {

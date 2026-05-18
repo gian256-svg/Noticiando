@@ -328,7 +328,12 @@ async def crawl_all_sources(sources: list[Source]) -> list[dict]:
     # ── Phase 2: og:image enrichment (NEW client — the RSS one is closed) ──
     def _og_blocked(url: str) -> bool:
         from urllib.parse import urlparse
-        return urlparse(url).netloc in BLOCKED_OG_DOMAINS
+        netloc = urlparse(url).netloc.lower()
+        blocked_bases = {
+            "bloomberg.com", "wsj.com", "ft.com", "economist.com",
+            "investing.com", "marketwatch.com", "project-syndicate.org"
+        }
+        return any(netloc == base or netloc.endswith("." + base) for base in blocked_bases)
 
     missing = [
         item for item in items

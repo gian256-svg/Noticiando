@@ -8,9 +8,9 @@ const providers: { name: string; desc: string; status: ProviderStatus }[] = [
   { name: "Google Gemini 2.0 Flash", desc: "Primário — 2 chaves configuradas",      status: "active" },
   { name: "Groq · Llama 3.3 70B",   desc: "Fallback #1 se Gemini falhar",           status: "fallback" },
   { name: "Ollama · llama3.1",       desc: "Fallback #2 — local, sem API key",       status: "local" },
-  { name: "ElevenLabs (locução)",    desc: "Narração automática de roteiros",        status: "soon" },
-  { name: "Envato Elements",         desc: "Stock footage e motion templates",       status: "soon" },
-  { name: "Epidemic Sound",          desc: "Trilha sonora licenciada para Reels",    status: "soon" },
+  { name: "ElevenLabs (locução)",    desc: "Narração brasileira ativa na pipeline",   status: "active" },
+  { name: "Envato Elements",         desc: "B-roll e stock footage integrados",       status: "active" },
+  { name: "Epidemic Sound",          desc: "Trilhas sonoras licenciadas por nicho",   status: "active" },
 ];
 
 const STATUS_CONFIG: Record<ProviderStatus, { label: string; dot: string; text: string; bg: string }> = {

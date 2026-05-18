@@ -22,6 +22,9 @@ logger = logging.getLogger("noticiando")
 
 app = FastAPI(title="Noticiando Backend", version="0.1.0", docs_url=None)
 
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,10 +32,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# Mount output folder statically
+app.mount("/output", StaticFiles(directory=str(_PROJECT_ROOT / "output")), name="output")
+
 app.include_router(news_router, prefix="/news", tags=["news"])
 app.include_router(scripts_router, tags=["scripts"])
 app.include_router(config_router, prefix="/config", tags=["config"])
 app.include_router(video_router, tags=["video"])
+
+
+@app.get("/cerebro/status")
+async def get_cerebro_status():
+    from ai.cerebro import cerebro
+    return cerebro.get_status_dict()
 
 
 @app.get("/health")
@@ -40,8 +53,12 @@ async def health():
     return {"status": "ok", "version": "0.1.0"}
 
 
+from ai.cerebro import cerebro
+
 @app.on_event("startup")
 async def on_startup():
+    # Executa a auditoria geral do CEREBRO (regras, bugs e APIs) na inicialização
+    cerebro.run_startup_audit()
     init_db()
     logger.info("Database initialized")
     start_scheduler()

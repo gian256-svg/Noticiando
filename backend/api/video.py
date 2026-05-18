@@ -55,6 +55,7 @@ async def render_video_endpoint(req: RenderVideoRequest):
         output_path,
         f"--props={props_file}",
         "--codec=h264",
+        "--pixel-format=yuv420p",
         "--log=error",
     ]
 
@@ -95,6 +96,30 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
         result["news_id"] = req.news_id
         if req.thumbnail_url:
             result["thumbnail_url"] = req.thumbnail_url
+
+        # ── Pipeline Integration: Locução (ElevenLabs), Trilha (Epidemic) e Footages (Envato) ──
+        from ai.voice_and_sound import generate_narration, get_epidemic_soundtrack, search_envato_footage
+        
+        # Concatenar os subtextos de todas as cenas para criar o áudio corrido da locução
+        subtexts = []
+        for s in result.get("scenes", []):
+            txt = s.get("subtext") or s.get("headline")
+            if txt:
+                subtexts.append(txt)
+        
+        full_script = ". ".join(subtexts)
+        narration_url = await generate_narration(full_script)
+        
+        # Obter trilha sonora licenciada do Epidemic Sound
+        music_url = await get_epidemic_soundtrack(req.category)
+        
+        # Obter vídeos de b-roll recomendados do Envato Elements
+        envato_assets = await search_envato_footage(req.title)
+        
+        result["narration_url"] = narration_url
+        result["music_url"] = music_url
+        result["envato_assets"] = envato_assets
+        
         return result
 
     except Exception as e:
