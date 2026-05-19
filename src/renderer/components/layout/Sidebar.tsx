@@ -22,7 +22,7 @@ const PERIODS = [
 ];
 
 export function Sidebar() {
-  const { filters, setFilters, newsCount, crawlerStatus, filteredNews } = useFeedStore();
+  const { filters, setFilters, newsCount, crawlerStatus, filteredNews, lastRefreshed } = useFeedStore();
   const { setSettingsOpen } = useConfigStore();
 
   const hotCount = filteredNews.filter((n) => n.viral_score >= 80).length;
@@ -132,6 +132,13 @@ export function Sidebar() {
               value={crawlerStatus === "crawling" ? "Buscando..." : crawlerStatus === "error" ? "Erro" : "Live"}
               color={crawlerStatus === "error" ? "text-red-400" : "text-live"}
             />
+            {lastRefreshed && (
+              <div className="px-3 pt-0.5">
+                <span className="text-[9px] text-text-muted">
+                  Atualizado às {lastRefreshed.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>

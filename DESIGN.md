@@ -18,13 +18,17 @@ Este é o manual definitivo do **Diretor de Arte (DESIGN.md)** do **Noticiando**
 
 Para garantir que cada Reels se destaque no feed com uma identidade altamente sofisticada, aplicamos as seguintes regras:
 
-* **Backgrounds Texturizados (Obrigatório):** Toda a timeline deve possuir fundo texturizado (grain, papel, ruído cinematográfico de textura fina) — **nunca** fundos lisos e sem vida.
+* **Backgrounds Dinâmicos e Ricos (Obrigatório):** Toda a timeline deve possuir fundo texturizado e rico para evitar layouts lisos e simplistas.
+  - **Textura de Papel/Grão:** Efeito granulado analógico de alta fidelidade misturado com cores quentes de papel.
+  - **Moving Grid (Grade Deslizante):** Um padrão de grid sutil da cor `accent` que desliza diagonalmente ao longo do tempo.
+  - **Gradientes Editoriais (HSL):** Gradientes lineares escuros e sutis (ângulos de 170deg) baseados no tema da notícia.
 * **Colagem de Estilo "Editorial Impresso Digitalizado":**
-  - Recortes de pessoas/objetos (silhuetas/cutouts) sobrepostos em backgrounds coloridos texturizados. Nunca usar a foto inteira crua.
+  - **Não Repetição de Imagens:** Não repita a mesma imagem nas cenas, exceto se for estritamente necessário (ex: bandeiras de países ou figuras públicas conhecidas). Varie os ativos para manter o dinamismo visual do vídeo.
+  - **Recortes Perfeitos (Cutouts):** Silhuetas de pessoas/objetos limpas e nítidas, **sem feather (bordas suavizadas/borradas)**.
+  - **Sticker Stroke de 4px:** Todo recorte de colagem (`cutout` ou `illustration`) deve ter uma borda/contorno branco sólido de **cerca de 4px de espessura, nítido e sem blur**.
   - Estrelas, formas geométricas, listras e elementos gráficos minimalistas decorando o layout.
   - Fotos em preto e branco combinadas com cores de fundo vibrantes para contraste extremo.
-  - Sombras suaves (`box-shadow` ou `filter: drop-shadow`) nos recortes para criar sensação real de profundidade tridimensional.
-* **Fundo Dinâmico (Dynamic Backgrounds):** Gradientes lineares escuros e sutis (ângulos de 170deg) que dão profundidade ao vídeo, evitando fundos pretos chapados.
+  - Sombras fortes e profundas abaixo do sticker (`drop-shadow`) para dar sensação física de colagem tridimensional.
 
 ---
 
@@ -158,36 +162,34 @@ const scale = spring({
 ## 🎬 9. Regras de Mídia Híbrida (Video + Photo + Decorator)
 
 ### VideoBackground (`visual_type: "video"`)
-- Usar `<OffthreadVideo>` do Remotion — necessário para render CLI; `<Video>` não funciona server-side
-- Overlay mínimo **60% de opacidade** sobre o vídeo: `linear-gradient(170deg, bg#99 0%, grad#cc 100%)` + vinheta superior/inferior
-- `volume={0}` sempre — áudio vem exclusivamente da narração ElevenLabs e trilha Epidemic
-- Fallback: se `media_url` ausente, cena usa gradient + glow normalmente
+- Usar `<OffthreadVideo>` do Remotion — necessário para render CLI; `<Video>` não funciona server-side.
+- Overlay mínimo **60% de opacidade** sobre o vídeo: `linear-gradient(170deg, bg#99 0%, grad#cc 100%)` + vinheta superior/inferior.
+- `volume={0}` sempre — áudio vem exclusivamente da narração ElevenLabs e trilha Epidemic.
+- **Liberdade de Duração:** Vídeos de background podem durar mais tempo nas cenas se fizer sentido para ilustrar a narração.
+- **Busca e Downloads:** Há liberdade e obrigação de baixar footages reais relevantes (noticiários, stock videos de pessoas/ações financeiras) e gerar imagens necessárias no nanobanana se necessário.
 
 ### PhotoCutout (`visual_type: "cutout"`)
-- Fonte: `og:image` da matéria → thumbnail → fallback gradient
-- Posicionamento alternado: cenas pares → `right: -20px`; ímpares → `left: -20px`
-- Tamanho: largura **52%** da tela, `height: auto`, `objectPosition: bottom center`
-- Entrada: spring `translateX` (220px → 0), delay 6 frames + float `sin(frame/35)*6px`
-- **Obrigatório**: `filter: drop-shadow(0 16px 48px rgba(0,0,0,0.9))` — sem sombra = sem profundidade
-- Headline e subtext com `maxWidth: 60%` para não sobrepor a foto
+- **Não Repetição:** Não repetir imagens ao longo das cenas (exceto se for uma bandeira ou figura pública proeminente).
+- **Sem Feather:** O recorte da imagem deve ser nítido e seco, sem feather/suavização de borda.
+- **Contorno de Sticker:** Borda branca sólida de **4px de espessura, completamente nítida e sem blur**.
+- Posicionamento alternado: cenas pares → `right: -20px`; ímpares → `left: -20px`.
+- Tamanho: largura **52%** da tela, `height: auto`, `objectPosition: bottom center`.
+- Entrada: spring `translateX` (220px → 0), delay 6 frames + float `sin(frame/35)*6px`.
+- **Obrigatório**: Filtro drop-shadow editorial de sombra projetada forte + o contorno branco nítido de 4px.
 
 ### DecoratorElement (todos os `visual_type` exceto CTA)
-- 4 tipos: `star` | `arrow` | `circle` | `stripes` — escolher baseado no contexto emocional da cena
-- Tamanho 80×80px, cor `pal.accent`, `drop-shadow` glow
-- Pulse scale `0.92–1.08` (sin/30) + rotation `±6°` (sin/50)
-- Alternado por `sceneIndex`: par → `top:100 right:40`; ímpar → `bottom:180 left:40`
-- Opacidade `enterSpring * 0.7` — sutil, não compete com headline
+- 4 tipos: `star` | `arrow` | `circle` | `stripes` — escolher baseado no contexto emocional da cena.
+- Tamanho 80×80px, cor `pal.accent`, `drop-shadow` glow.
+- Pulse scale `0.92–1.08` (sin/30) + rotation `±6°` (sin/50).
+- Alternado por `sceneIndex`: par → `top:100 right:40`; ímpar → `bottom:180 left:40`.
+- Opacidade `enterSpring * 0.7` — sutil, não compete com headline.
+
+### ✍️ Tipografia, Dinamismo e Quebra de Parágrafos
+- **Dinamismo Textual:** Não colocar blocos de texto muito grandes para não perder o dinamismo do Reels.
+- **Gramática Flexível:** Nem sempre as legendas ou títulos precisam seguir regras gramaticais rígidas de parágrafos. Podem entrar palavras isoladas ou frases muito curtas para reforçar dinamicamente o que está sendo dito na narração.
 
 ### Pipeline de Áudio
-- **Narração ElevenLabs**: `volume={1.0}`, arquivo local `output/narration_*.mp3`
-- **Trilha Epidemic Sound**: `volume={0.18}`, arquivo local `output/media/music_*.mp3`, `loop`
-- **NUNCA** usar URLs externas (SoundHelix, CDNs) no render — somente arquivos `localhost:8765`
-- Ducking de 40% durante narração: implementar via pre-processamento no backend antes do render
-
----
-
-## 🎬 9. Regras de Mídia Híbrida (Video + Photo + Decorator)
-
-### VideoBackground (`visual_type: "video"`)
-- Usar `<OffthreadVideo>` do Remotion (não `<Video>`) — necessário para render CLI funcionar corretamente
-- Overlay mínimo de **60
+- **Narração ElevenLabs**: `volume={1.0}`, arquivo local `output/narration_*.mp3`.
+- **Trilha Epidemic Sound**: `volume={0.18}`, arquivo local `output/media/music_*.mp3`, `loop`.
+- **NUNCA** usar URLs externas (SoundHelix, CDNs) no render — somente arquivos `localhost:8765`.
+- Ducking de 40% durante narração: implementar via pre-processamento no backend antes do render.

@@ -1,56 +1,99 @@
-import { ExternalLink, Bot, Zap, Clock, Cpu } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ExternalLink, Bot, Zap, Clock, Cpu, Loader2 } from "lucide-react";
+import { getApiBase } from "@/lib/api";
 
 const MYHUB_URL = "https://myhub.ia.br/agents";
 
-type ProviderStatus = "active" | "fallback" | "local" | "soon";
+type ProviderStatus = "active" | "fallback" | "local" | "missing" | "loading";
 
-const providers: { name: string; desc: string; status: ProviderStatus }[] = [
-  { name: "Google Gemini 2.0 Flash", desc: "Primário — 2 chaves configuradas",      status: "active" },
-  { name: "Groq · Llama 3.3 70B",   desc: "Fallback #1 se Gemini falhar",           status: "fallback" },
-  { name: "Ollama · llama3.1",       desc: "Fallback #2 — local, sem API key",       status: "local" },
-  { name: "ElevenLabs (locução)",    desc: "Narração brasileira ativa na pipeline",   status: "active" },
-  { name: "Envato Elements",         desc: "B-roll e stock footage integrados",       status: "active" },
-  { name: "Epidemic Sound",          desc: "Trilhas sonoras licenciadas por nicho",   status: "active" },
+const providers: { name: string; desc: string; defaultStatus: ProviderStatus; backendKey: string }[] = [
+  { name: "Google Gemini 2.0 Flash", desc: "Primário — 2 chaves configuradas",      defaultStatus: "active",   backendKey: "Google Gemini" },
+  { name: "Groq · Llama 3.3 70B",   desc: "Fallback #1 se Gemini falhar",           defaultStatus: "fallback", backendKey: "Groq (Llama)" },
+  { name: "OpenRouter (Llama/Gemma)", desc: "Fallback #2 se Groq falhar",           defaultStatus: "fallback", backendKey: "OpenRouter (Llama/Gemma)" },
+  { name: "Ollama · llama3.1",       desc: "Fallback #3 — local, sem API key",       defaultStatus: "local",    backendKey: "Ollama (Local)" },
+  { name: "ElevenLabs (locução)",    desc: "Narração brasileira ativa na pipeline",   defaultStatus: "active",   backendKey: "ElevenLabs (Locucao)" },
+  { name: "Envato Elements",         desc: "B-roll e stock footage integrados",       defaultStatus: "active",   backendKey: "Envato Elements" },
+  { name: "Epidemic Sound",          desc: "Trilhas sonoras licenciadas por nicho",   defaultStatus: "active",   backendKey: "Epidemic Sound" },
 ];
 
 const STATUS_CONFIG: Record<ProviderStatus, { label: string; dot: string; text: string; bg: string }> = {
   active:   { label: "ATIVO",    dot: "bg-green-400",   text: "text-green-400",   bg: "bg-green-400/10" },
   fallback: { label: "FALLBACK", dot: "bg-blue-400",    text: "text-blue-400",    bg: "bg-blue-400/10" },
   local:    { label: "LOCAL",    dot: "bg-purple-400",  text: "text-purple-400",  bg: "bg-purple-400/10" },
-  soon:     { label: "EM BREVE", dot: "bg-text-muted",  text: "text-text-muted",  bg: "bg-white/5" },
+  missing:  { label: "AUSENTE",  dot: "bg-red-500",     text: "text-red-500",     bg: "bg-red-500/10" },
+  loading:  { label: "CARREGANDO", dot: "bg-gray-400 animate-pulse", text: "text-text-muted", bg: "bg-white/5" },
 };
 
 // ── AI & Media Provider status panel ─────────────────────────────────────────
 export function AnthropicKeyInput() {
+  const [apiStatus, setApiStatus] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const fetchStatus = async () => {
+      try {
+        const base = await getApiBase();
+        const res = await fetch(`${base}/cerebro/status?t=${Date.now()}`);
+        if (!res.ok) throw new Error("HTTP error " + res.status);
+        const data = await res.json();
+        if (active && data.api_status) {
+          setApiStatus(data.api_status);
+        }
+      } catch (err) {
+        console.error("Failed to fetch cerebro status:", err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchStatus();
+    // Poll every 10 seconds to keep the dashboard real-time
+    const interval = setInterval(fetchStatus, 10000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   return (
     <div>
       <label className="flex items-center gap-1.5 text-xs font-semibold text-text-primary mb-2">
         <Zap size={12} className="text-accent" />
         Provedores de IA e Mídia
+        {loading && <Loader2 size={10} className="animate-spin text-text-muted ml-auto" />}
       </label>
 
       <div className="space-y-1.5">
-        {providers.map(({ name, desc, status }) => {
-          const cfg = STATUS_CONFIG[status];
+        {providers.map(({ name, desc, defaultStatus, backendKey }) => {
+          // Resolve current status
+          let currentStatus: ProviderStatus = "loading";
+          if (!loading) {
+            const statusStr = apiStatus[backendKey];
+            if (statusStr === "active") {
+              currentStatus = defaultStatus;
+            } else if (statusStr === "missing") {
+              currentStatus = "missing";
+            } else {
+              currentStatus = "missing"; // Default fallback
+            }
+          }
+
+          const cfg = STATUS_CONFIG[currentStatus];
           return (
             <div
               key={name}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border/50 bg-background/40"
-              style={{ opacity: status === "soon" ? 0.65 : 1 }}
             >
               <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] font-semibold text-text-primary">{name}</p>
                 <p className="text-[9px] text-text-muted">{desc}</p>
               </div>
-              {status === "soon"
-                ? <Clock size={11} className="text-text-muted shrink-0" />
-                : (
-                  <span className={`text-[9px] font-bold ${cfg.text} ${cfg.bg} px-2 py-0.5 rounded-full shrink-0`}>
-                    {cfg.label}
-                  </span>
-                )
-              }
+              <span className={`text-[9px] font-bold ${cfg.text} ${cfg.bg} px-2 py-0.5 rounded-full shrink-0`}>
+                {cfg.label}
+              </span>
             </div>
           );
         })}

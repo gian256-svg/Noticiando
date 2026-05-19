@@ -68,101 +68,63 @@ async def _notify_sse(payload):
             pass
 
 
-async def run_crawl():
-    logger.info("Starting crawl cycle")
-    # Notify crawling state
-    await _notify_sse({"event": "crawling"})
-
-    raw_items = await crawl_all_sources(DEFAULT_SOURCES)
-    if not raw_items:
-        logger.warning("Crawl returned 0 items")
-        await _notify_sse({"event": "idle"})
-        return
+def _process_crawl_results(raw_items: list[dict]) -> list[dict]:
+    """
+    Synchronous DB phase — runs in a thread to avoid blocking the event loop.
+    Returns a list of item.to_dict() payloads to push via SSE.
+    """
+    from crawler.deduplicator import normalize_title
+    from scoring.viral_scorer import score_news
 
     db = SessionLocal()
     try:
-        # Group by title_hash to detect cross-source items
         hash_groups: dict[str, list[dict]] = {}
         for item in raw_items:
             h = item["title_hash"]
-            if h not in hash_groups:
-                hash_groups[h] = []
-            hash_groups[h].append(item)
+            hash_groups.setdefault(h, []).append(item)
 
         new_items: list[NewsItem] = []
         updated_items: list[NewsItem] = []
 
-        # Pre-fetch all active news items once to avoid querying in the loop
         existing_active = db.query(NewsItem).filter(NewsItem.is_active == True).all()
 
-        # Pre-calculate normalized titles / bigrams of the active database items with thumbnails
-        from crawler.deduplicator import normalize_title
-        active_candidates = []
-        for item in existing_active:
-            if item.thumbnail_url:
-                norm = normalize_title(item.title)
-                words = norm.split()
-                bg = {f"{words[i]} {words[i+1]}" for i in range(len(words) - 1)} if len(words) > 1 else set(words)
-                if bg:
-                    active_candidates.append((item.thumbnail_url, bg))
+        def _bigrams(title: str) -> set[str]:
+            words = normalize_title(title).split()
+            return {f"{words[i]} {words[i+1]}" for i in range(len(words) - 1)} if len(words) > 1 else set(words)
 
-        # Pre-calculate bigrams of raw crawled items that have thumbnails
-        raw_with_thumb_candidates = []
-        for other_item in raw_items:
-            if other_item.get("thumbnail_url"):
-                norm = normalize_title(other_item["title"])
-                words = norm.split()
-                bg = {f"{words[i]} {words[i+1]}" for i in range(len(words) - 1)} if len(words) > 1 else set(words)
-                if bg:
-                    raw_with_thumb_candidates.append((other_item["thumbnail_url"], bg))
+        active_candidates = [(it.thumbnail_url, _bigrams(it.title)) for it in existing_active if it.thumbnail_url]
+        raw_candidates = [(it["thumbnail_url"], _bigrams(it["title"])) for it in raw_items if it.get("thumbnail_url")]
+
+        def _borrow_thumb(title: str) -> str | None:
+            bg_a = _bigrams(title)
+            if not bg_a:
+                return None
+            for thumb_url, bg_b in raw_candidates:
+                u = len(bg_a | bg_b)
+                if u and len(bg_a & bg_b) / u >= 0.75:
+                    return thumb_url
+            for thumb_url, bg_b in active_candidates:
+                u = len(bg_a | bg_b)
+                if u and len(bg_a & bg_b) / u >= 0.75:
+                    return thumb_url
+            return None
 
         for h, group in hash_groups.items():
             existing = db.query(NewsItem).filter_by(title_hash=h).first()
-            merged_sources = list({s for item in group for s in item["sources"]})
-
-            # 1. Encontrar a melhor miniatura no próprio grupo (match exato de hash)
-            best_thumb = next(
-                (item.get("thumbnail_url") for item in group if item.get("thumbnail_url")),
-                None,
-            )
-
-            # 2. Se ainda não temos thumbnail, buscar por similaridade com outros itens
+            merged_sources = list({s for it in group for s in it["sources"]})
+            best_thumb = next((it.get("thumbnail_url") for it in group if it.get("thumbnail_url")), None)
             if not best_thumb:
                 base_title = existing.title if existing else group[0]["title"]
-                norm_a = normalize_title(base_title)
-                words_a = norm_a.split()
-                bg_a = {f"{words_a[i]} {words_a[i+1]}" for i in range(len(words_a) - 1)} if len(words_a) > 1 else set(words_a)
-                
-                if bg_a:
-                    # Buscar nos outros itens recém-coletados
-                    for thumb_url, bg_b in raw_with_thumb_candidates:
-                        intersection = len(bg_a & bg_b)
-                        union = len(bg_a | bg_b)
-                        if union > 0 and (intersection / union) >= 0.75:
-                            best_thumb = thumb_url
-                            logger.info(f"Borrowed thumbnail from similar raw item: '{base_title[:50]}'")
-                            break
-                    
-                    # Se não encontrou, buscar no banco (itens ativos com miniatura)
-                    if not best_thumb:
-                        for thumb_url, bg_b in active_candidates:
-                            intersection = len(bg_a & bg_b)
-                            union = len(bg_a | bg_b)
-                            if union > 0 and (intersection / union) >= 0.75:
-                                best_thumb = thumb_url
-                                logger.info(f"Borrowed thumbnail from similar DB item: '{base_title[:50]}'")
-                                break
+                best_thumb = _borrow_thumb(base_title)
 
             if existing:
                 changed = False
-                # Update source count if new sources found
                 existing_sources = set(existing.sources or [])
-                new_sources = set(merged_sources) - existing_sources
-                if new_sources:
-                    existing.sources = list(existing_sources | new_sources)
+                new_src = set(merged_sources) - existing_sources
+                if new_src:
+                    existing.sources = list(existing_sources | new_src)
                     existing.source_count = len(existing.sources)
                     changed = True
-                # Backfill thumbnail if still missing
                 if not existing.thumbnail_url and best_thumb:
                     existing.thumbnail_url = best_thumb
                     changed = True
@@ -170,12 +132,9 @@ async def run_crawl():
                     updated_items.append(existing)
             else:
                 base = group[0]
-                # Rejeitar artigos fora do nicho financeiro antes de salvar
                 if _is_off_topic(base["title"], base.get("summary", ""), merged_sources):
-                    logger.debug(f"Off-topic rejected (penalty keywords/mixed source relevance): {base['title'][:80]}")
+                    logger.debug(f"Off-topic rejected: {base['title'][:80]}")
                     continue
-
-                # Crie objeto temporário para fazer scoring de relevância antes de salvar
                 temp_item = NewsItem(
                     title=base["title"],
                     title_hash=h,
@@ -187,49 +146,55 @@ async def run_crawl():
                     thumbnail_url=best_thumb,
                     published_at=base["published_at"],
                 )
-
-                # Verifica relevância calculando score prévio
-                from scoring.viral_scorer import score_news
                 prelim_score = score_news(temp_item, existing_active + new_items)
-
                 if prelim_score < 10.0:
-                    logger.info(f"Relevance rejected (preliminary score {prelim_score} < 10.0): {base['title'][:80]}")
+                    logger.info(f"Relevance rejected (score {prelim_score:.1f}): {base['title'][:80]}")
                     continue
-
                 temp_item.viral_score = prelim_score
                 db.add(temp_item)
                 new_items.append(temp_item)
 
         db.commit()
 
-        # Re-score all recent news, deactivating those that fall below 10.0
         all_recent = db.query(NewsItem).filter(NewsItem.is_active == True).all()
         scores = score_all(all_recent)
         for item_id, score in scores.items():
-            item = db.get(NewsItem, item_id)
-            if item:
+            it = db.get(NewsItem, item_id)
+            if it:
                 if score < 10.0:
-                    logger.info(f"Deactivating stale item (re-score {score} < 10.0): {item.title[:80]}")
-                    item.is_active = False
+                    it.is_active = False
                 else:
-                    item.viral_score = score
+                    it.viral_score = score
         db.commit()
 
         logger.info(f"Crawl complete: {len(new_items)} new, {len(updated_items)} updated")
-
-        # Push new + thumbnail-updated items so the frontend refreshes cards
         push_items = new_items + [u for u in updated_items if u.thumbnail_url]
-        if push_items:
-            await _notify_sse([item.to_dict() for item in push_items])
-
-        # Always signal idle so the live-dot resets on the frontend
-        await _notify_sse({"event": "idle"})
+        return [it.to_dict() for it in push_items]
 
     except Exception as e:
-        logger.error(f"Crawl error: {e}", exc_info=True)
+        logger.error(f"Crawl DB error: {e}", exc_info=True)
         db.rollback()
+        return []
     finally:
         db.close()
+
+
+async def run_crawl():
+    logger.info("Starting crawl cycle")
+    await _notify_sse({"event": "crawling"})
+
+    raw_items = await crawl_all_sources(DEFAULT_SOURCES)
+    if not raw_items:
+        logger.warning("Crawl returned 0 items")
+        await _notify_sse({"event": "idle"})
+        return
+
+    # Run the sync DB phase in a thread so it never blocks the event loop
+    push_payloads = await asyncio.to_thread(_process_crawl_results, raw_items)
+
+    if push_payloads:
+        await _notify_sse(push_payloads)
+    await _notify_sse({"event": "idle"})
 
 
 def reschedule_crawler(minutes: int):
@@ -237,6 +202,8 @@ def reschedule_crawler(minutes: int):
         "crawl",
         trigger=IntervalTrigger(minutes=minutes),
     )
+    # Run immediately after reschedule instead of waiting a full interval
+    scheduler.modify_job("crawl", next_run_time=datetime.now())
     logger.info(f"Rescheduled crawler to run every {minutes} minutes")
 
 
@@ -248,6 +215,9 @@ def start_scheduler():
         id="crawl",
         replace_existing=True,
         next_run_time=datetime.now(),  # run immediately on startup
+        max_instances=1,
+        coalesce=True,          # collapse missed runs into one instead of skipping
+        misfire_grace_time=120, # allow up to 2-min delay before marking as misfired
     )
     scheduler.start()
     logger.info(f"Scheduler started — interval: {interval} min")

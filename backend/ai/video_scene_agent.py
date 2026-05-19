@@ -20,11 +20,13 @@ logger = logging.getLogger(__name__)
 GEMINI_API_KEY   = os.getenv("GEMINI_API_KEY", "")
 GEMINI_API_KEY_2 = os.getenv("GEMINI_API_KEY_2", "")
 GROQ_API_KEY     = os.getenv("GROQ_API_KEY", "")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OLLAMA_BASE_URL  = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL     = os.getenv("OLLAMA_MODEL", "llama3.1")
 
 GEMINI_MODEL = "gemini-2.5-flash"
 GROQ_MODEL   = "llama-3.3-70b-versatile"
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free")
 
 SYSTEM_PROMPT = """\
 Você é um diretor criativo de motion design sênior especializado em Reels virais de finanças e economia (estilo editorial The Economist / Paulo Guedes Reels).
@@ -40,11 +42,11 @@ Schema obrigatório:
       "headline": "TEXTO CURTO IMPACTANTE EM CAIXA ALTA",
       "subtext": "Texto completo que será narrado nesta cena. Deve ser fluído, informativo e conter dados.",
       "duration_seconds": 3.0,
-      "visual_type": "hook" | "video" | "cutout" | "illustration" | "data" | "cta",
+      "visual_type": "hook" | "video" | "cutout" | "illustration" | "data",
       "accent_word_indices": [0, 2],
-      "decorator_type": "star" | "arrow" | "circle" | "stripes" | "none",
+      "decorator_type": "star" | "arrow" | "circle" | "stripes",
       "youtube_search": "Termo de busca bem curto para extrair um corte de vídeo do YouTube no yt-dlp (ex: 'bolsa de valores caindo', 'primo rico investimentos', 'empresa fabrica')",
-      "media_keyword": "money" | "growth" | "crypto" | "nigro" | "perini" | "chart" | "bitcoin" | "briefcase" | "primo"
+      "media_keyword": "money" | "growth" | "crypto" | "nigro" | "perini" | "chart" | "bitcoin" | "briefcase" | "primo" | "newspaper"
     }
   ]
 }
@@ -53,27 +55,35 @@ REGRAS OBRIGATÓRIAS DE DIREÇÃO DE ARTE — VIOLÁ-LAS INVALIDA O OUTPUT:
 
 VISUAL_TYPE — distribuição mínima obrigatória por reel:
   * "hook": Sempre a cena 1 (2 a 2,5s). Gancho agressivo, 3-5 palavras na headline.
-  * "video": MÍNIMO 2 cenas. B-roll de vídeo ao fundo. OBRIGATÓRIO: preencher "youtube_search" em inglês (4-6 palavras).
+  * "video": MÍNIMO 2 cenas. B-roll de vídeo ao fundo. OBRIGATÓRIO: preencher "youtube_search" em inglês (4-6 palavras) buscando footages REAIS relevantes (noticiários, pessoas, ações ou situações reais que se encaixem no roteiro e momento exato da narração).
   * "cutout": MÍNIMO 2 cenas. Foto editorial flutuante. OBRIGATÓRIO: preencher "media_keyword".
   * "illustration": MÍNIMO 1 cena. Gráfico animado. OBRIGATÓRIO: preencher "media_keyword".
-  * "data": 1 cena. Métrica, percentual ou número com barra animada.
-  * "cta": Sempre a cena final (2,5s). "SIGA PARA MAIS".
+  * "data": MÍNIMO 1 cena. Métrica, percentual ou número com barra animada.
+  * NÃO crie nenhuma cena de CTA (Call to Action), encerramento, agradecimento ou pedido de curtir/seguir no final. O roteiro deve focar 100% no conteúdo da notícia e terminar de forma informativa natural.
 
-DECORATOR_TYPE — OBRIGATÓRIO EM TODA CENA, PROIBIDO "none" (exceto cta):
+NÃO REPETIR MÍDIAS/IMAGENS:
+  * É expressamente proibido repetir a mesma media_keyword ou imagens similares em várias cenas (exceto se for extremamente necessário, como uma bandeira nacional ou uma figura pública central da matéria). Garanta que cada cena de cutout ou illustration traga elementos novos para manter o interesse.
+
+TEXTOS CURTOS E GRAMÁTICA DINÂMICA:
+  * As headlines e textos em tela devem ser extremamente curtos e dinâmicos para não poluir a tela.
+  * Você PODE e DEVE ignorar regras estritas de parágrafos/pontuação nos textos em tela. Prefira palavras soltas de impacto ou frases curtas de 2-4 palavras para reforçar as falas da narração.
+
+DECORATOR_TYPE — OBRIGATÓRIO EM TODA CENA, PROIBIDO "none":
   * "star"   → breaking news, choque, urgência
   * "arrow"  → crescimento, direção, tendência
   * "circle" → análise, contexto, dado circular
   * "stripes" → energia, momentum, impacto visual
 
 MEDIA_KEYWORD — obrigatório em cenas cutout e illustration:
-  * "nigro" | "perini" | "money" | "briefcase" | "growth" | "chart" | "crypto" | "bitcoin"
+  * "nigro" | "perini" | "money" | "briefcase" | "growth" | "chart" | "crypto" | "bitcoin" | "newspaper"
 
 YOUTUBE_SEARCH — obrigatório em cenas video:
-  * Em inglês, 4-6 palavras, ex: "brazil stock market trading", "federal reserve interest rates", "bitcoin price surge"
+  * Em inglês, 4-6 palavras, buscando trechos reais e precisos de noticiários, mercado financeiro, pessoas ou locais específicos da notícia. Ex: "brazil stock market trading", "federal reserve interest rates", "bitcoin price surge"
 
 - Cada subtext deve ser envolvente e narrável em voz alta. O conjunto dos subtexts forma o roteiro da locução ElevenLabs.
 - TODAS as headlines e subtexts DEVEM ser geradas em português brasileiro natural, envolvente e fluente para o público brasileiro, mesmo que o Título ou Resumo originais estejam em inglês. A única exceção é o campo 'youtube_search', que deve ser escrito em inglês para melhor busca no YouTube.
 - Máximo 3.5 segundos por cena para garantir dinamismo. Somar aproximadamente a duração pedida."""
+
 
 
 def _build_user_msg(title: str, summary: str, category: str, duration: int) -> str:
@@ -144,6 +154,34 @@ async def _generate_with_groq(user_msg: str) -> dict[str, Any]:
         temperature=0.7,
     )
     return _parse_json(response.choices[0].message.content or "")
+
+
+async def _generate_with_openrouter(user_msg: str) -> dict[str, Any]:
+    import httpx
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "HTTP-Referer": "https://noticiando.app",
+        "X-Title": "Noticiando",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": OPENROUTER_MODEL,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_msg},
+        ],
+        "temperature": 0.7,
+    }
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        res = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
+        res.raise_for_status()
+        data = res.json()
+    if not data.get("choices"):
+        raise ValueError(f"OpenRouter retornou resposta sem choices: {data}")
+    content = data["choices"][0]["message"]["content"]
+    if not content:
+        raise ValueError("OpenRouter retornou resposta vazia")
+    return _parse_json(content)
 
 
 async def _generate_with_ollama(user_msg: str) -> dict[str, Any]:
@@ -233,7 +271,7 @@ async def generate_video_scenes(
 ) -> dict[str, Any]:
     """
     Generate Reels scene data.
-    Cascade: Gemini (key 1) → Gemini (key 2) → Groq → Ollama
+    Cascade: Gemini (key 1) → Gemini (key 2) → Groq → OpenRouter → Ollama
     """
     user_msg = _build_user_msg(title, summary, category, duration)
     errors: list[str] = []
@@ -271,7 +309,16 @@ async def generate_video_scenes(
             logger.warning(f"Groq failed: {e}")
             errors.append(f"Groq: {e}")
 
-    # 4. Ollama (local) — last resort
+    # 4. OpenRouter
+    if OPENROUTER_API_KEY:
+        try:
+            logger.info(f"Generating scenes via OpenRouter ({OPENROUTER_MODEL})…")
+            return _validate(await _generate_with_openrouter(user_msg), "OpenRouter")
+        except Exception as e:
+            logger.warning(f"OpenRouter failed: {e}")
+            errors.append(f"OpenRouter: {e}")
+
+    # 5. Ollama (local) — last resort
     try:
         logger.info(f"Generating scenes via Ollama local ({OLLAMA_MODEL})…")
         return _validate(await _generate_with_ollama(user_msg), "Ollama")
@@ -279,5 +326,5 @@ async def generate_video_scenes(
         logger.error(f"Ollama fallback failed: {e}")
         errors.append(f"Ollama: {e}")
 
-    summary_msg = " | ".join(errors) if errors else "Nenhum provedor configurado (configure GEMINI_API_KEY ou GROQ_API_KEY em backend/.env)"
+    summary_msg = " | ".join(errors) if errors else "Nenhum provedor configurado (configure GEMINI_API_KEY, GROQ_API_KEY ou OPENROUTER_API_KEY em backend/.env)"
     raise RuntimeError(f"Todos os provedores falharam: {summary_msg}")

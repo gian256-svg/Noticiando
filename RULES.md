@@ -163,12 +163,18 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 ### Diretrizes Gráficas e Tipografia (Diretor de Arte DESIGN.md)
 * **Tipografia:** Fonte principal **Oswald** (Bold/SemiBold) para títulos; **Inter** ou **Roboto** para legendas e textos de apoio.
 * **Tamanho de Fonte Mínimo:** **Nunca inferior a 48px** na tela para assegurar legibilidade em dispositivos móveis.
+* **Não Colocar Textos Gigantes:** Evitar parágrafos longos ou textos maciços para não poluir a tela e não comprometer o dinamismo do Reels.
+* **Gramática Flexível de Legendas:** É permitido quebrar regras rígidas de parágrafos/pontuação, inserindo palavras isoladas ou frases curtas de impacto para reforçar a narração.
+* **Não Repetição de Imagens:** Não repetir a mesma imagem nas cenas, exceto em casos estritamente necessários (ex: bandeiras de países ou figuras conhecidas).
+* **Qualidade dos Recortes:** Recortes secos e nítidos nas fotos/ilustrações, **sem feather (suavização)** nas bordas, acompanhados de um contorno branco estilo sticker de **aproximadamente 4px de largura, sem blur**.
+* **Footage Real & Downloads:** É livre e obrigatório buscar e baixar vídeos reais relevantes (noticiários, stock financeiro) para as cenas e gerar imagens necessárias se preciso.
+* **Duração Flexível:** Vídeos podem durar um tempo maior caso faça sentido para acompanhar a narração de forma natural.
 * **Regra de Dinamismo:** Máximo de **2,5 segundos** sem mudança visual. Cada frase narrada deve apresentar pelo menos um elemento visual correspondente em tela.
 * **Elementos Obrigatórios por Reel:**
-  - Pelo menos **1 corte de vídeo real** ou YouTube (máx. 5s por corte, fins informativos/editoriais).
-  - Pelo menos **2 recortes fotográficos** animados (estilo colagem/cutout com sombras suaves).
-  - Pelo menos **1 elemento gráfico decorativo** animado.
-  - Background texturizado contínuo (film grain, papel ou ruído cinematográfico).
+  - Pelo menos **2 cortes de vídeo real** ou YouTube (fins informativos/editoriais).
+  - Pelo menos **3 recortes fotográficos** animados (estilo colagem/cutout).
+  - Pelo menos **2 elementos gráficos decorativo** animado.
+  - Background rico e texturizado (film grain, textura de papel, HSL gradients, grid dinâmico).
 
 ### Configurações de Locução (ElevenLabs)
 * **Voice Model:** `eleven_multilingual_v2`

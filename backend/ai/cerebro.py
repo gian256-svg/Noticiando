@@ -107,6 +107,7 @@ class CerebroCommander:
         providers = {
             "Google Gemini": "GEMINI_API_KEY",
             "Groq (Llama)": "GROQ_API_KEY",
+            "OpenRouter (Llama/Gemma)": "OPENROUTER_API_KEY",
             "Ollama (Local)": "OLLAMA_BASE_URL",
             "ElevenLabs (Locucao)": "ELEVENLABS_API_KEY",
             "Envato Elements": "ENVATO_API_KEY",

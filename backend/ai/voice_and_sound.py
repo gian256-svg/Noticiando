@@ -30,8 +30,8 @@ def _get_localhost_base() -> str:
     port = os.getenv("PORT", "8765")
     return f"http://localhost:{port}"
 
-# Voz premium para português brasileiro
-DEFAULT_BR_VOICE_ID = "ErXwobaYiN019PkySvjV"  # Antoni
+# Voz premium para português brasileiro (Beto)
+DEFAULT_BR_VOICE_ID = "xNGAXaCH8MaasNuo7Hr7"
 
 # Mapeamento de categorias para tags Epidemic Sound e queries de fallback YouTube
 CATEGORY_MUSIC_CONFIG: dict[str, dict[str, Any]] = {
@@ -70,6 +70,60 @@ CATEGORY_MUSIC_CONFIG: dict[str, dict[str, Any]] = {
 MUSIC_CACHE_DAYS = 7
 
 
+import re
+
+def sanitize_narration_text(text: str) -> str:
+    """
+    Sanitiza e normaliza o texto para evitar pronúncias incorretas ou truncadas no ElevenLabs.
+    """
+    # 1. Normaliza "77k" / "77K" -> "77 mil"
+    text = re.sub(r'\b(\d+)\s*[kK]\b', r'\1 mil', text)
+    
+    # 2. Normaliza abreviações de escalas de dinheiro (mi, bi, tri)
+    text = re.sub(r'\b(\d+)\s*mi\b', r'\1 milhões', text)
+    text = re.sub(r'\b(\d+)\s*bi\b', r'\1 bilhões', text)
+    text = re.sub(r'\b(\d+)\s*tri\b', r'\1 trilhões', text)
+    
+    # 3. Remove pontos de milhares soltos (ex: 77.000 -> 77000)
+    while True:
+        new_text = re.sub(r'\b(\d+)\.(\d{3})\b', r'\1\2', text)
+        if new_text == text:
+            break
+        text = new_text
+
+    # 4. Normaliza reais (R$ 100 ou R$ 100,50 ou R$ 77.000,00)
+    def replace_real(m):
+        val = m.group(1).replace(".", "")
+        cents = m.group(2)
+        if cents and int(cents) > 0:
+            return f"{val} reais e {int(cents)} centavos"
+        return f"{val} reais"
+    text = re.sub(r'R\$\s*([\d\.]+)(?:,(\d+))?\b', replace_real, text)
+    
+    # 5. Normaliza dólares ($ 100 ou $ 100,50 ou US$ 100)
+    def replace_dollar(m):
+        val = m.group(1).replace(".", "")
+        cents = m.group(2)
+        if cents and int(cents) > 0:
+            return f"{val} dólares e {int(cents)} centavos"
+        return f"{val} dólares"
+    text = re.sub(r'(?:US)?\$\s*([\d\.]+)(?:,(\d+))?\b', replace_dollar, text)
+    
+    # 6. Normaliza porcentagem (%) -> "por cento" (suporta decimais como 1,5% ou 1.5%)
+    text = re.sub(r'(\d+(?:[.,]\d+)?)\s*%', r'\1 por cento', text)
+    
+    # 7. Normaliza versus
+    text = re.sub(r'\bvs\.\b', 'versus', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bvs\b', 'versus', text, flags=re.IGNORECASE)
+    
+    # 8. Transforma pontos decimais remanescentes em vírgulas para leitura em PT-BR (ex: 1.5 -> 1,5)
+    text = re.sub(r'\b(\d+)\.(\d+)\b', r'\1,\2', text)
+
+    # 9. Remove espaços extras
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
 async def generate_narration(text: str, voice_id: str = DEFAULT_BR_VOICE_ID) -> Optional[str]:
     """
     Gera narração via ElevenLabs API.
@@ -79,10 +133,11 @@ async def generate_narration(text: str, voice_id: str = DEFAULT_BR_VOICE_ID) -> 
         logger.warning("ELEVENLABS_API_KEY não configurada. Pulando locução.")
         return None
 
+    sanitized = sanitize_narration_text(text)
     url     = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     headers = {"xi-api-key": ELEVENLABS_API_KEY, "Content-Type": "application/json"}
     payload = {
-        "text": text,
+        "text": sanitized,
         "model_id": "eleven_multilingual_v2",
         "voice_settings": {
             "stability": 0.45,
@@ -93,7 +148,7 @@ async def generate_narration(text: str, voice_id: str = DEFAULT_BR_VOICE_ID) -> 
     }
 
     try:
-        logger.info("Gerando narração no ElevenLabs (Multilingual v2, voz Antoni)...")
+        logger.info(f"Gerando narração no ElevenLabs (Beto)... original: '{text[:60]}...' | sanitized: '{sanitized[:60]}...'")
         async with httpx.AsyncClient() as client:
             resp = await client.post(url, json=payload, headers=headers, timeout=60.0)
             if resp.status_code != 200:
@@ -107,6 +162,7 @@ async def generate_narration(text: str, voice_id: str = DEFAULT_BR_VOICE_ID) -> 
     except Exception as e:
         logger.error(f"ElevenLabs falhou: {e}", exc_info=True)
         return None
+
 
 
 async def get_epidemic_soundtrack(category: str) -> Optional[str]:

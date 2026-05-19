@@ -25,6 +25,7 @@ export interface ReelsScene {
   media_keyword?: string;
   background_video_url?: string;
   illustration_url?: string;
+  audio_url?: string;
 }
 
 export interface ReelsCompositionProps {
@@ -80,6 +81,21 @@ export const ReelsComposition: React.FC<ReelsCompositionProps> = ({
 
       {/* 🎵 Epidemic Sound Soundtrack Mixed in Background */}
       {music_url && <Audio src={music_url} volume={0.15} loop />}
+
+      {/* SVG filter for sharp white 4px sticker outline */}
+      <svg style={{ position: "absolute", width: 0, height: 0 }}>
+        <defs>
+          <filter id="sticker-outline">
+            <feMorphology in="SourceAlpha" result="dilated" operator="dilate" radius="4" />
+            <feFlood floodColor="white" floodOpacity={1} result="flooded" />
+            <feComposite in="flooded" in2="dilated" operator="in" result="outline" />
+            <feMerge>
+              <feMergeNode in="outline" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+      </svg>
 
       <Series>
         {scenes.map((scene, idx) => {
@@ -196,17 +212,228 @@ const Decorator: React.FC<{ type: string; color: string; frame: number }> = ({ t
   return null;
 };
 
-interface Palette { bg: string; grad: string; accent: string; dim: string }
+interface PaletteWithText {
+  bg: string;
+  grad: string;
+  accent: string;
+  text: string;
+  dim: string;
+}
 
 interface SceneProps {
   scene: ReelsScene;
   sceneIndex: number;
   totalScenes: number;
   durationInFrames: number;
-  pal: Palette;
+  pal: PaletteWithText;
   sourceName?: string;
   thumbnailUrl?: string;
 }
+
+const WordHighlightLine: React.FC<{ color: string; width: number; frame: number }> = ({ color, width, frame }) => {
+  // Animate the line drawing from left to right with a spring overshoot
+  const progress = spring({
+    frame: Math.max(0, frame - 12),
+    fps: 30,
+    config: { damping: 14, stiffness: 110 },
+  });
+  const dashoffset = width * (1 - progress);
+  return (
+    <svg
+      width={width}
+      height={12}
+      viewBox={`0 0 ${width} 12`}
+      style={{
+        position: "absolute",
+        bottom: -6,
+        left: 0,
+        overflow: "visible",
+        pointerEvents: "none",
+        zIndex: -1,
+      }}
+    >
+      <path
+        d={`M 2 6 Q ${width / 2} 10 ${width - 2} 5`}
+        fill="none"
+        stroke={color}
+        strokeWidth={5}
+        strokeLinecap="round"
+        strokeDasharray={width}
+        strokeDashoffset={dashoffset}
+      />
+    </svg>
+  );
+};
+
+const NewspaperCutout: React.FC<{
+  title: string;
+  summary: string;
+  source: string;
+  date: string;
+  frame: number;
+  fps: number;
+  sceneIndex: number;
+}> = ({ title, summary, source, date, frame, fps, sceneIndex }) => {
+  const entrance = spring({ frame, fps, config: { damping: 15, stiffness: 85 } });
+  const rotate = interpolate(entrance, [0, 1], [15, sceneIndex % 2 === 0 ? -3 : 3]);
+  const scale = interpolate(entrance, [0, 1], [0.8, 1]);
+  const translateY = interpolate(entrance, [0, 1], [350, 0]);
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: "22%",
+        right: sceneIndex % 2 === 0 ? 30 : "auto",
+        left: sceneIndex % 2 !== 0 ? 30 : "auto",
+        width: "50%",
+        maxWidth: 520,
+        backgroundColor: "#f4f1ea", // newsprint warm paper color
+        backgroundImage: "radial-gradient(#e5dec9 1px, transparent 1px)", // subtle paper texture
+        backgroundSize: "20px 20px",
+        padding: "24px",
+        border: "1.5px solid #d4c8ac",
+        boxShadow: "0 25px 45px rgba(0, 0, 0, 0.45), inset 0 0 100px rgba(0,0,0,0.05)",
+        transform: `translateY(${translateY}px) scale(${scale}) rotate(${rotate}deg)`,
+        transformOrigin: "center center",
+        fontFamily: "'Georgia', 'Times New Roman', serif",
+        color: "#1a1a1a",
+        zIndex: 4,
+      }}
+    >
+      {/* Newspaper Header */}
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        borderBottom: "2px double #1a1a1a",
+        paddingBottom: 6,
+        marginBottom: 12,
+        textTransform: "uppercase",
+        fontSize: 10,
+        fontWeight: "bold",
+        letterSpacing: "0.1em",
+        color: "#555",
+      }}>
+        <span>{source || "Noticiando"}</span>
+        <span>{date || "Edição Especial"}</span>
+      </div>
+
+      {/* Main Headline */}
+      <h3 style={{
+        margin: "0 0 12px 0",
+        fontFamily: "'Georgia', serif",
+        fontWeight: "bold",
+        fontSize: 22,
+        lineHeight: 1.15,
+        color: "#000000",
+        textAlign: "left",
+      }}>
+        {title}
+      </h3>
+
+      {/* Snippet in multiple columns for realistic newspaper look */}
+      <div style={{
+        display: "flex",
+        gap: 16,
+        fontSize: 12,
+        lineHeight: 1.4,
+        color: "#2b2b2b",
+        textAlign: "justify",
+      }}>
+        <div style={{ flex: 1 }}>
+          {summary || "Informações exclusivas obtidas pela nossa mesa de análise indicam forte movimentação no mercado financeiro nacional."}
+        </div>
+      </div>
+      
+      {/* Editorial Stamp */}
+      <div style={{
+        position: "absolute",
+        bottom: 8,
+        right: 12,
+        border: "2px solid #b22222",
+        color: "#b22222",
+        padding: "2px 8px",
+        fontSize: 10,
+        fontWeight: "bold",
+        textTransform: "uppercase",
+        transform: "rotate(-12deg)",
+        opacity: 0.85,
+        borderRadius: 2,
+      }}>
+        CONFIRMADO
+      </div>
+    </div>
+  );
+};
+
+const VideoElement: React.FC<{
+  src: string;
+  sceneIndex: number;
+  frame: number;
+  durationInFrames: number;
+  fps: number;
+}> = ({ src, sceneIndex, frame, durationInFrames, fps }) => {
+  const entrance = spring({ frame, fps, config: { damping: 14, stiffness: 90 } });
+  const isFloatingFrame = sceneIndex % 2 !== 0;
+
+  if (!isFloatingFrame) {
+    return (
+      <>
+        <OffthreadVideo
+          src={src}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+          volume={0}
+        />
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          background: "linear-gradient(to top, rgba(0,0,0,0.85) 15%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.85) 85%)",
+        }} />
+      </>
+    );
+  }
+
+  const scale = interpolate(entrance, [0, 1], [0.8, 1]);
+  const translateY = interpolate(entrance, [0, 1], [150, 0]);
+  const rotate = interpolate(entrance, [0, 1], [-5, sceneIndex % 4 === 1 ? 2 : -2]);
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: "22%",
+        right: sceneIndex % 3 === 0 ? 40 : "auto",
+        left: sceneIndex % 3 !== 0 ? 40 : "auto",
+        width: "55%",
+        height: "38%",
+        borderRadius: 16,
+        border: "6px solid #ffffff",
+        boxShadow: "0 25px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(0, 0, 0, 0.1)",
+        overflow: "hidden",
+        transform: `translateY(${translateY}px) scale(${scale}) rotate(${rotate}deg)`,
+        transformOrigin: "center center",
+        zIndex: 3,
+      }}
+    >
+      <OffthreadVideo
+        src={src}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+        }}
+        volume={0}
+      />
+    </div>
+  );
+};
 
 const NewsScene: React.FC<SceneProps> = ({
   scene,
@@ -232,6 +459,28 @@ const NewsScene: React.FC<SceneProps> = ({
   const isHook = scene.visual_type === "hook";
   const isCta  = scene.visual_type === "cta";
   const isData = scene.visual_type === "data";
+
+  // Dynamic layout flags
+  const isFloatingVideo = scene.visual_type === "video" && sceneIndex % 2 !== 0;
+  const isFullVideo = scene.visual_type === "video" && !isFloatingVideo;
+
+  const hasSideAsset = (scene.visual_type === "cutout" && scene.cutout_url) ||
+                       (scene.visual_type === "illustration" && (scene.illustration_url || scene.media_url)) ||
+                       isFloatingVideo;
+
+  const assetSide = sceneIndex % 2 === 0 ? "right" : "left";
+  
+  // Align text to opposite side of asset to prevent overlap
+  const textAlignment = hasSideAsset 
+    ? (assetSide === "right" ? "left" : "right")
+    : "center";
+
+  const containerAlignItems = textAlignment === "left" 
+    ? "flex-start" 
+    : (textAlignment === "right" ? "flex-end" : "center");
+
+  // Keep colors high-contrast (dark on light gradient, white on full-bleed video)
+  const textColor = isFullVideo ? "#FFFFFF" : pal.text;
 
   // Slow dynamic camera zoom-in effect (Ken Burns)
   const cameraScale = interpolate(frame, [0, durationInFrames], [1.0, 1.06], {
@@ -303,6 +552,9 @@ const NewsScene: React.FC<SceneProps> = ({
 
   return (
     <AbsoluteFill style={{ opacity: exitOpacity, overflow: "hidden" }}>
+      {/* 🎙️ Local Scene Narration Audio */}
+      {scene.audio_url && <Audio src={scene.audio_url} volume={1.0} />}
+
       {/* ── Global Film Grain & Paper Texture Overlay ── */}
       <div style={{
         position: "absolute", inset: 0,
@@ -380,6 +632,17 @@ const NewsScene: React.FC<SceneProps> = ({
       {/* ── Content Container with camera zoom (Parallax layout) ── */}
       <AbsoluteFill style={{ transform: `scale(${cameraScale})`, transformOrigin: "center center" }}>
         
+        {/* ── Animated Sliding Grid Background ── */}
+        <div style={{
+          position: "absolute", inset: 0,
+          opacity: 0.04,
+          backgroundImage: `linear-gradient(to right, ${pal.accent} 1.5px, transparent 1.5px), linear-gradient(to bottom, ${pal.accent} 1.5px, transparent 1.5px)`,
+          backgroundSize: "60px 60px",
+          backgroundPosition: `${gridOff}px ${gridOff}px`,
+          pointerEvents: "none",
+          zIndex: 1,
+        }} />
+
         {/* Blurred background image (Hook scene only) */}
         {thumbnailUrl && isHook && (
           <>
@@ -400,26 +663,14 @@ const NewsScene: React.FC<SceneProps> = ({
         )}
 
         {/* Real YouTube cut or Stock Video Background */}
-        {(scene.background_video_url || (scene.media_url && scene.visual_type !== "illustration")) && (
-          <>
-            <OffthreadVideo
-              src={scene.background_video_url || scene.media_url || ""}
-              style={{
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-              }}
-              volume={0}
-            />
-            {/* Dark vignette to protect typography legibility */}
-            <div style={{
-              position: "absolute",
-              inset: 0,
-              background: "linear-gradient(to top, rgba(0,0,0,0.85) 15%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.85) 85%)",
-            }} />
-          </>
+        {scene.visual_type === "video" && (scene.background_video_url || scene.media_url) && (
+          <VideoElement
+            src={scene.background_video_url || scene.media_url || ""}
+            sceneIndex={sceneIndex}
+            frame={frame}
+            durationInFrames={durationInFrames}
+            fps={fps}
+          />
         )}
 
         {/* Dynamic Graphic Decorator Element (Star, arrow, stripes, circle) */}
@@ -427,36 +678,49 @@ const NewsScene: React.FC<SceneProps> = ({
           <Decorator type={scene.decorator_type} color={pal.accent} frame={frame} />
         )}
 
-        {/* Senior Motion Design Cutout Sticker (popping from bottom) */}
+        {/* Senior Motion Design Cutout Sticker (popping from bottom) or Newspaper Cutout */}
         {scene.visual_type === "cutout" && scene.cutout_url && (
-          <Img
-            src={scene.cutout_url}
-            style={{
-              position: "absolute",
-              bottom: 40,
-              right: sceneIndex % 2 === 0 ? 30 : "auto",
-              left: sceneIndex % 2 !== 0 ? 30 : "auto",
-              height: "44%",
-              maxHeight: 520,
-              objectFit: "contain",
-              transform: `translateY(${
-                interpolate(
-                  spring({ frame, fps, config: { damping: 13, stiffness: 85 } }),
-                  [0, 1],
-                  [380, 0]
-                ) + Math.cos(frame / 12) * 8
-              }px) scale(${
-                interpolate(
-                  spring({ frame, fps, config: { damping: 13, stiffness: 85 } }),
-                  [0, 1],
-                  [0.6, 1]
-                )
-              }) rotate(${Math.sin(frame / 15) * 2 + (sceneIndex % 2 === 0 ? 2 : -2)}deg)`,
-              filter: "drop-shadow(0 20px 35px rgba(0,0,0,0.85)) drop-shadow(0 0 8px rgba(255,255,255,0.05))",
-              pointerEvents: "none",
-              zIndex: 4,
-            }}
-          />
+          scene.cutout_url === "newspaper" ? (
+            <NewspaperCutout
+              title={scene.headline}
+              summary={scene.subtext || ""}
+              source={sourceName || "Noticiando"}
+              date={new Date().toLocaleDateString("pt-BR", { day: "numeric", month: "long" })}
+              frame={frame}
+              fps={fps}
+              sceneIndex={sceneIndex}
+            />
+          ) : (
+            <Img
+              src={scene.cutout_url}
+              style={{
+                position: "absolute",
+                bottom: 40,
+                right: assetSide === "right" ? 30 : "auto",
+                left: assetSide === "left" ? 30 : "auto",
+                height: "44%",
+                maxHeight: 520,
+                objectFit: "contain",
+                transform: `translateY(${
+                  interpolate(
+                    spring({ frame, fps, config: { damping: 13, stiffness: 85 } }),
+                    [0, 1],
+                    [380, 0]
+                  ) + Math.cos(frame / 12) * 8
+                }px) scale(${
+                  interpolate(
+                    spring({ frame, fps, config: { damping: 13, stiffness: 85 } }),
+                    [0, 1],
+                    [0.6, 1]
+                  )
+                }) rotate(${Math.sin(frame / 15) * 2 + (sceneIndex % 2 === 0 ? 2 : -2)}deg)`,
+                // Editorial drop shadow + crisp white sticker 4px border outline (no blur, sharp edge via feMorphology)
+                filter: "url(#sticker-outline) drop-shadow(0 20px 35px rgba(0,0,0,0.65))",
+                pointerEvents: "none",
+                zIndex: 4,
+              }}
+            />
+          )
         )}
 
         {/* Dynamic Stylized Illustration Sticker (floating on side/center) */}
@@ -466,8 +730,8 @@ const NewsScene: React.FC<SceneProps> = ({
             style={{
               position: "absolute",
               top: "22%",
-              right: sceneIndex % 2 === 0 ? 40 : "auto",
-              left: sceneIndex % 2 !== 0 ? 40 : "auto",
+              right: assetSide === "right" ? 40 : "auto",
+              left: assetSide === "left" ? 40 : "auto",
               height: "32%",
               objectFit: "contain",
               transform: `translateY(${Math.sin(frame / 10) * 10}px) scale(${
@@ -477,7 +741,8 @@ const NewsScene: React.FC<SceneProps> = ({
                   [0, 1]
                 )
               }) rotate(${interpolate(frame, [0, durationInFrames], [-4, 6])}deg)`,
-              filter: "drop-shadow(0 20px 30px rgba(0,0,0,0.8))",
+              // Editorial drop shadow + crisp white sticker 4px border outline (no blur, sharp edge via feMorphology)
+              filter: "url(#sticker-outline) drop-shadow(0 20px 30px rgba(0,0,0,0.65))",
               pointerEvents: "none",
               zIndex: 3,
             }}
@@ -518,16 +783,19 @@ const NewsScene: React.FC<SceneProps> = ({
         <div style={{
           position: "absolute", inset: 0,
           display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
+          alignItems: containerAlignItems, justifyContent: "center",
           padding: "0 48px",
+          textAlign: textAlignment,
         }}>
 
           {/* Kinetic Headline - Overshoot spring & Neon glow */}
           <div style={{
             display: "flex", flexWrap: "wrap",
-            justifyContent: "center", gap: "14px 16px",
+            justifyContent: textAlignment === "left" ? "flex-start" : (textAlignment === "right" ? "flex-end" : "center"),
+            gap: "14px 16px",
             marginBottom: 20,
             zIndex: 10,
+            maxWidth: hasSideAsset ? "60%" : "100%",
           }}>
             {words.map((word, i) => {
               const isHighlighted = accentSet.has(i);
@@ -585,6 +853,7 @@ const NewsScene: React.FC<SceneProps> = ({
                 <span
                   key={i}
                   style={{
+                    position: "relative",
                     display: "inline-block",
                     fontFamily: "'Oswald', 'Montserrat', 'Inter', sans-serif",
                     fontSize: titleFontSize,
@@ -592,33 +861,35 @@ const NewsScene: React.FC<SceneProps> = ({
                     textTransform: "uppercase",
                     letterSpacing: "-0.04em", // tight kerning
                     lineHeight: 0.95,
-                    color: isHighlighted ? pal.accent : "#FFFFFF",
+                    color: isHighlighted ? pal.accent : textColor,
                     textShadow: isHighlighted 
                       ? `0 4px 22px rgba(0,0,0,0.9), 0 0 10px ${pal.accent}60` 
-                      : "0 4px 18px rgba(0,0,0,0.85)",
+                      : (textColor === "#FFFFFF" ? "0 4px 18px rgba(0,0,0,0.85)" : "none"),
                     transform,
                     transformOrigin: "center center",
                     opacity,
                     filter,
+                    paddingBottom: isHighlighted ? 6 : 0,
                   }}
                 >
                   {word}
+                  {isHighlighted && (
+                    <WordHighlightLine
+                      color={pal.accent}
+                      width={word.length * (titleFontSize * 0.55)}
+                      frame={wordFrame}
+                    />
+                  )}
                 </span>
               );
             })}
           </div>
 
-          {/* Glassmorphic Subtext Card */}
+          {/* Clean Editorial Subtext (No card bubble balloon container wrapper) */}
           {scene.subtext && (
             <div style={{
               marginTop: 18,
-              padding: "20px 30px",
-              borderRadius: 18,
-              background: "rgba(10, 11, 22, 0.45)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-              backdropFilter: "blur(14px)",
-              boxShadow: "0 20px 45px rgba(0,0,0,0.5), inset 0 1px 0px rgba(255,255,255,0.05)",
-              maxWidth: 510,
+              maxWidth: hasSideAsset ? 550 : 700,
               opacity: interpolate(frame, [10, 18], [0, 1], {
                 extrapolateLeft: "clamp", extrapolateRight: "clamp",
               }),
@@ -629,10 +900,11 @@ const NewsScene: React.FC<SceneProps> = ({
                 fontFamily: "'Inter', 'Roboto', sans-serif",
                 fontSize: subtextFontSize, // STRICT MINIMUM: >= 48px
                 fontWeight: 600,
-                color: "rgba(255,255,255,0.95)",
-                textAlign: "center", lineHeight: 1.4,
+                color: textColor,
+                textAlign: textAlignment,
+                lineHeight: 1.4,
                 margin: 0,
-                textShadow: "0 2px 8px rgba(0,0,0,0.5)",
+                textShadow: textColor === "#FFFFFF" ? "0 2px 8px rgba(0,0,0,0.8)" : "none",
               }}>
                 {scene.subtext}
               </p>
@@ -798,4 +1070,5 @@ const NewsScene: React.FC<SceneProps> = ({
     </AbsoluteFill>
   );
 };
+
 

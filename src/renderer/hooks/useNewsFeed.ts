@@ -45,6 +45,8 @@ export function useNewsFeed() {
       sse.addEventListener("crawling", () => setCrawlerStatus("crawling"));
       sse.addEventListener("idle", () => {
         setCrawlerStatus("idle");
+        // Full sync after every crawl cycle. setNews() preserves liveCount
+        // when there are unread pending items, so the banner stays visible.
         lastFetchRef.current = 0; // bypass debounce
         fetchNews();
       });
@@ -53,11 +55,14 @@ export function useNewsFeed() {
         setCrawlerStatus("error");
         sse.close();
         sseRef.current = null;
-        // Schedule retry for SSE connection in 5s
+        // Clear cached port so reconnect probes the current sidecar port (handles
+        // cases where the sidecar died and restarted on a different port)
+        clearPortCache();
         setTimeout(() => connectSSE(), 5_000);
       };
     } catch {
       setCrawlerStatus("error");
+      clearPortCache();
       setTimeout(() => connectSSE(), 5_000);
     }
   }, [fetchNews, appendNews, setCrawlerStatus]);
@@ -76,7 +81,10 @@ export function useNewsFeed() {
     // Start fallback interval polling using the user-defined crawlInterval
     if (pollRef.current) clearInterval(pollRef.current);
     const intervalMinutes = useConfigStore.getState().crawlInterval || 2;
-    pollRef.current = setInterval(fetchNews, intervalMinutes * 60 * 1000);
+    pollRef.current = setInterval(() => {
+      lastFetchRef.current = 0; // força bypass do debounce no interval
+      fetchNews();
+    }, intervalMinutes * 60 * 1000);
   }, [fetchNews, connectSSE, setLoading]);
 
   const stopPolling = useCallback(() => {

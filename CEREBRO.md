@@ -34,7 +34,7 @@ O **CEREBRO** gerencia duas pipelines principais de forma assíncrona e resilien
 
 ### 🎬 Pipeline B: Criação de Conteúdo & Sonorização (Geração de Reels)
 1. **Geração de Cenas (LLMs):**
-   - Roda em cascata inteligente: **Gemini 2.5 Flash** (Chave 1) → **Gemini 2.5 Flash** (Chave 2) → **Groq (Llama 3.3)** → **Ollama (Local)**.
+   - Roda em cascata inteligente: **Gemini 2.5 Flash** (Chave 1) → **Gemini 2.5 Flash** (Chave 2) → **Groq (Llama 3.3)** → **OpenRouter (Llama/Gemma)** → **Ollama (Local)**.
    - Transforma a notícia em roteiro híbrido vertical 9:16: cada cena especifica `visual_type` (`hook/video/cutout/illustration/data/cta`), `youtube_search` para b-roll e `decorator_type` para elementos gráficos.
 2. **Enriquecimento de Mídia por Cena (`media_fetcher.py`):**
    - **B-Roll YouTube** (`fetch_youtube_broll`): para cenas `visual_type: "video"`, baixa clip via yt-dlp usando `youtube_search` da cena. Cache em `output/media/broll_*.mp4`. Máx 3 tentativas com queries simplificadas.
@@ -53,12 +53,16 @@ O **CEREBRO** gerencia duas pipelines principais de forma assíncrona e resilien
    - Executa `remotion render` com codec `H.264` e `yuv420p` para compatibilidade mobile/social.
 
 ### 🚨 Padrão de Qualidade Visual Obrigatório (enforce por cena)
-- **Mínimo 1 cena `visual_type: "video"`** com B-roll baixado via yt-dlp
-- **Mínimo 2 cenas `visual_type: "cutout"`** com foto da matéria posicionada e animada
-- **Narração ElevenLabs SEMPRE gerada** (nunca retornar reel sem locução se API key presente)
-- **Trilha sonora SEMPRE arquivo local** — nunca URL externa (SoundHelix, CDN) chegará ao Remotion render
-- **LLM DEVE retornar `youtube_search` e `decorator_type` em 100% das cenas**
-- Se yt-dlp falhar após 3 tentativas, cena usa `visual_type: "illustration"` como fallback (não `"video"` com media_url vazia)
+- **Não Repetição de Imagens:** É proibido repetir imagens idênticas ao longo do vídeo, exceto em casos estritamente necessários (ex: bandeiras de países, figuras públicas reconhecíveis).
+- **Recortes e Contornos de Stickers:** As imagens em cenas de recorte (`cutout` ou `illustration`) devem ter recortes limpos e nítidos, **sem feather (suavização de borda)**. O contorno/borda de sticker deve ser branco sólido com **cerca de 4px de espessura, sem blur** nas bordas.
+- **Footage Real & Downloads:** Há liberdade e obrigação de buscar e baixar footages de vídeo reais (como trechos de noticiários, pessoas ou situações de mercado que se encaixem no contexto do roteiro) para enriquecer o Reel. Também é permitido e incentivado gerar imagens adicionais caso necessário.
+- **Duração Flexível dos Vídeos:** Cenas com B-roll/vídeo podem permanecer ativas por mais tempo caso faça sentido para o ritmo da narração.
+- **Mínimo 1 cena `visual_type: "video"`** com B-roll baixado via yt-dlp.
+- **Mínimo 2 cenas `visual_type: "cutout"`** com foto da matéria posicionada e animada.
+- **Narração ElevenLabs SEMPRE gerada** (nunca retornar reel sem locução se API key presente).
+- **Trilha sonora SEMPRE arquivo local** — nunca URL externa (SoundHelix, CDN) chegará ao Remotion render.
+- **LLM DEVE retornar `youtube_search` e `decorator_type` em 100% das cenas.**
+- Se yt-dlp falhar após 3 tentativas, cena usa `visual_type: "illustration"` como fallback (não `"video"` com media_url vazia).
 
 ---
 

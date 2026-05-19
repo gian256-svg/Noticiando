@@ -343,6 +343,63 @@ async def crawl_all_sources(sources: list[Source]) -> list[dict]:
         logger.warning(f"Failed to pre-query existing hashes: {e}")
         existing_hashes = set()
 
+    # ── Phase 1.6: Filter by relevance and off-topic to avoid wasted API calls ──
+    try:
+        from crawler.scheduler import _is_off_topic
+    except ImportError:
+        _is_off_topic = lambda t, s, src=None: False
+
+    from scoring.viral_scorer import score_news
+    from models.news import NewsItem
+    from db.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        existing_active = db.query(NewsItem).filter(NewsItem.is_active == True).all()
+    except Exception as e:
+        logger.warning(f"Failed to query active items for pre-filtering: {e}")
+        existing_active = []
+    finally:
+        db.close()
+
+    filtered_items: list[dict] = []
+    seen_hashes = set()
+
+    for item in items:
+        h = item["title_hash"]
+        if h in existing_hashes:
+            # Already exists in DB, keep it so scheduler can merge sources/update thumb
+            filtered_items.append(item)
+            continue
+        if h in seen_hashes:
+            continue
+        seen_hashes.add(h)
+
+        # Off-topic check
+        if _is_off_topic(item["title"], item.get("summary", ""), item["sources"]):
+            continue
+
+        # Score check
+        temp_item = NewsItem(
+            title=item["title"],
+            title_hash=h,
+            url=item["url"],
+            summary=item.get("summary", ""),
+            sources=item["sources"],
+            source_count=1,
+            category=item["category"],
+            published_at=item["published_at"],
+        )
+        # Check score against active database items and newly accepted batch items
+        prelim_score = score_news(temp_item, existing_active + [NewsItem(title=x["title"]) for x in filtered_items if x["title_hash"] not in existing_hashes])
+        if prelim_score < 10.0:
+            continue
+
+        filtered_items.append(item)
+
+    items = filtered_items
+
+
     # ── Phase 2: og:image enrichment (NEW client — the RSS one is closed) ──
     def _og_blocked(url: str) -> bool:
         from urllib.parse import urlparse

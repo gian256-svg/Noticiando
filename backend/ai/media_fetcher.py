@@ -74,7 +74,7 @@ async def _ensure_fallback_video() -> str:
     if dest.exists() and dest.stat().st_size > 10_000:
         return f"{_get_localhost_base()}/output/assets/fallback_video.mp4"
         
-    url = "https://assets.mixkit.co/videos/preview/mixkit-financial-growth-charts-on-a-screen-41716-large.mp4"
+    url = "https://github.com/mediaelement/mediaelement-files/raw/master/big_buck_bunny.mp4"
     try:
         logger.info(f"Baixando video de fallback local em {dest}…")
         async with httpx.AsyncClient(timeout=30.0) as client:

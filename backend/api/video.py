@@ -41,6 +41,67 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _VIDEO_ENTRY  = str(_PROJECT_ROOT / "src" / "renderer" / "video" / "index.ts")
 
 
+def get_audio_duration(file_path: Path) -> float:
+    import subprocess
+    import json
+    try:
+        cmd = [
+            "ffprobe", "-v", "quiet", "-print_format", "json",
+            "-show_streams", "-show_format", str(file_path)
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        data = json.loads(result.stdout)
+        duration = float(data["format"]["duration"])
+        return duration
+    except Exception as e:
+        logger.error(f"Failed to get audio duration via ffprobe: {e}")
+        return 0.0
+
+
+def align_scenes_to_audio(scenes: list[dict], actual_audio_duration: float) -> list[dict]:
+    raw_durations = []
+    for scene in scenes:
+        v_type = scene.get("visual_type", "context")
+        subtext = scene.get("subtext", "")
+        headline = scene.get("headline", "")
+
+        text_for_weight = subtext or headline
+        words = len(text_for_weight.split()) if text_for_weight else 0
+
+        if v_type == "hook":
+            raw_dur = max(2.2, words * 0.45 + 0.4)
+        else:
+            raw_dur = max(2.0, words * 0.45 + 0.5)
+
+        raw_durations.append(raw_dur)
+
+    total_raw = sum(raw_durations)
+    if total_raw <= 0.0:
+        avg = actual_audio_duration / len(scenes) if scenes else 0.0
+        for s in scenes:
+            s["duration_seconds"] = round(avg, 1)
+        return scenes
+
+    scale = actual_audio_duration / total_raw
+    for i, s in enumerate(scenes):
+        s["duration_seconds"] = round(raw_durations[i] * scale, 1)
+
+    # Adjust rounding errors
+    curr_sum = sum(s["duration_seconds"] for s in scenes)
+    diff = round(actual_audio_duration - curr_sum, 1)
+    if diff != 0.0 and scenes:
+        max_idx = 0
+        max_val = -1.0
+        for i, s in enumerate(scenes):
+            if s["duration_seconds"] > max_val:
+                max_val = s["duration_seconds"]
+                max_idx = i
+        scenes[max_idx]["duration_seconds"] = round(scenes[max_idx]["duration_seconds"] + diff, 1)
+
+    return scenes
+
+
+
 class VideoSceneRequest(BaseModel):
     news_id: str
     title: str
@@ -146,17 +207,20 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
             # 2. Resolver cutouts (imagens de colagem recortadas)
             if v_type == "cutout":
                 kw = (scene.get("media_keyword") or "").lower()
-                static_asset = _resolve_static_asset(kw)
-                if static_asset:
-                    scene["cutout_url"] = static_asset
-                elif photo_idx < len(article_photos):
-                    scene["cutout_url"] = article_photos[photo_idx]
-                    photo_idx += 1
-                elif req.thumbnail_url:
-                    scene["cutout_url"] = req.thumbnail_url
+                if kw == "newspaper":
+                    scene["cutout_url"] = "newspaper"
                 else:
-                    # Garantir que há sempre um cutout no estilo colagem editorial
-                    scene["cutout_url"] = f"{_get_localhost()}/output/assets/cutout_money.png"
+                    static_asset = _resolve_static_asset(kw)
+                    if static_asset:
+                        scene["cutout_url"] = static_asset
+                    elif photo_idx < len(article_photos):
+                        scene["cutout_url"] = article_photos[photo_idx]
+                        photo_idx += 1
+                    elif req.thumbnail_url:
+                        scene["cutout_url"] = req.thumbnail_url
+                    else:
+                        # Garantir que há sempre um cutout no estilo colagem editorial
+                        scene["cutout_url"] = f"{_get_localhost()}/output/assets/cutout_money.png"
 
             # 3. Resolver ilustrações (gráficos ou desenhos estilizados)
             elif v_type == "illustration":
@@ -170,15 +234,57 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
                     scene["illustration_url"] = fallback_ill
                     scene["media_url"] = fallback_ill  # retrocompatibilidade
 
-        # ── Narração ElevenLabs — concatenar subtexts de todas as cenas ──
-        subtexts = [s.get("subtext") or s.get("headline", "") for s in scenes if s.get("subtext") or s.get("headline")]
-        full_script = ". ".join(subtexts)
-        narration_url = await generate_narration(full_script)
+        # ── Narração ElevenLabs por cena (paralela para alta velocidade) ──
+        from ai.voice_and_sound import ELEVENLABS_API_KEY, generate_narration
+
+        async def process_scene_audio(s):
+            text = s.get("subtext") or s.get("headline", "")
+            if not text:
+                s["duration_seconds"] = 2.5
+                return
+
+            audio_url = await generate_narration(text)
+            if audio_url:
+                s["audio_url"] = audio_url
+                filename = audio_url.split("/")[-1]
+                local_audio_path = _PROJECT_ROOT / "output" / filename
+                if local_audio_path.exists():
+                    actual_duration = get_audio_duration(local_audio_path)
+                    if actual_duration > 0.0:
+                        # Duração exata + 0.4s de respiro para evitar cortes secos e bruscos
+                        s["duration_seconds"] = round(actual_duration + 0.4, 2)
+                        return
+
+            # Fallback se ElevenLabs falhar ou estiver sem chave: estimar por palavras
+            words = len(text.split())
+            v_type = s.get("visual_type", "context")
+            if v_type == "hook":
+                s["duration_seconds"] = round(max(2.2, words * 0.45 + 0.4), 1)
+            else:
+                s["duration_seconds"] = round(max(2.0, words * 0.45 + 0.5), 1)
+
+        if ELEVENLABS_API_KEY:
+            logger.info("Gerando narrações ElevenLabs individuais por cena em paralelo...")
+            await asyncio.gather(*(process_scene_audio(s) for s in scenes))
+        else:
+            logger.info("ElevenLabs API Key não configurada. Estimando durações das cenas...")
+            for s in scenes:
+                text = s.get("subtext") or s.get("headline", "")
+                words = len(text.split()) if text else 0
+                v_type = s.get("visual_type", "context")
+                if v_type == "hook":
+                    s["duration_seconds"] = round(max(2.2, words * 0.45 + 0.4), 1)
+                else:
+                    s["duration_seconds"] = round(max(2.0, words * 0.45 + 0.5), 1)
+
+        # Atualizar a duração total no JSON gerado como a soma de todas as cenas
+        total_duration = sum(s["duration_seconds"] for s in scenes)
+        result["duration"] = round(total_duration, 1)
 
         # ── Trilha Epidemic Sound (download local garantido) ──
         music_url = await get_epidemic_soundtrack(req.category)
 
-        result["narration_url"] = narration_url
+        result["narration_url"] = None  # Áudio agora é tocado por cena via scene.audio_url
         result["music_url"] = music_url
 
         return result

@@ -1,6 +1,5 @@
 import argparse
 import os
-import sys
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
@@ -55,19 +54,34 @@ async def get_cerebro_status():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "0.1.0"}
+    from crawler.scheduler import scheduler
+    job = scheduler.get_job("crawl")
+    return {
+        "status": "ok",
+        "version": "0.1.0",
+        "scheduler_running": scheduler.running,
+        "next_crawl": str(job.next_run_time) if job else None,
+    }
+
+
+@app.post("/crawl/trigger")
+async def trigger_crawl():
+    """Manually trigger a crawl cycle (useful for debugging and forcing immediate refresh)."""
+    from crawler.scheduler import run_crawl
+    import asyncio
+    asyncio.create_task(run_crawl())
+    return {"status": "triggered"}
 
 
 from ai.cerebro import cerebro
 
 @app.on_event("startup")
 async def on_startup():
-    # Executa a auditoria geral do CEREBRO (regras, bugs e APIs) na inicialização
-    cerebro.run_startup_audit()
     init_db()
     logger.info("Database initialized")
     start_scheduler()
     logger.info("Crawler scheduler started")
+    cerebro.run_startup_audit()
 
 
 if __name__ == "__main__":

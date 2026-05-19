@@ -13,21 +13,23 @@ import { getApiBase } from "@/lib/api";
 export default function App() {
   const { isOnboarded, crawlInterval } = useConfigStore();
   const { selectedNews } = useFeedStore();
-  const { startPolling } = useNewsFeed();
+  const { startPolling, stopPolling } = useNewsFeed();
 
   useEffect(() => {
-    if (isOnboarded) {
-      startPolling();
-      // Sync crawlInterval to backend on startup or change
-      getApiBase().then((base) => {
-        fetch(`${base}/config`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ crawl_interval_minutes: crawlInterval }),
-        }).catch((err) => console.error("Failed to sync config to backend:", err));
-      });
-    }
-  }, [isOnboarded, crawlInterval]);
+    if (!isOnboarded) return;
+
+    startPolling();
+    // Sync crawlInterval to backend on startup or change
+    getApiBase().then((base) => {
+      fetch(`${base}/config`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ crawl_interval_minutes: crawlInterval }),
+      }).catch((err) => console.error("Failed to sync config to backend:", err));
+    });
+
+    return () => stopPolling();
+  }, [isOnboarded, crawlInterval, startPolling, stopPolling]);
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">

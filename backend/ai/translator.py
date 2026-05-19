@@ -22,6 +22,8 @@ GEMINI_MODEL     = "gemini-2.5-flash"
 
 GROQ_API_KEY     = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL       = "llama-3.3-70b-versatile"
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL   = os.getenv("OPENROUTER_MODEL", "openrouter/free")
 OLLAMA_BASE_URL  = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL     = os.getenv("OLLAMA_MODEL", "llama3.1")
 
@@ -115,6 +117,39 @@ async def translate_article(title: str, summary: str, source_language: str = "en
         except Exception as e:
             logger.debug(f"translate_article via Groq failed: {e}")
 
+    # 2.5 OpenRouter Fallback
+    if OPENROUTER_API_KEY:
+        try:
+            import httpx
+            headers = {
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "HTTP-Referer": "https://noticiando.app",
+                "X-Title": "Noticiando",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "model": OPENROUTER_MODEL,
+                "messages": [
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": user_msg},
+                ],
+                "temperature": 0.3,
+                "max_tokens": 512,
+            }
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                res = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
+                res.raise_for_status()
+                data = res.json()
+            if data.get("choices"):
+                content = data["choices"][0]["message"]["content"]
+                if content:
+                    result = _parse(content)
+                    t = result.get("title", "").strip() or title
+                    s = result.get("summary", "").strip() or summary
+                    return t, s
+        except Exception as e:
+            logger.debug(f"translate_article via OpenRouter failed: {e}")
+
     # 3. Ollama Fallback
     if OLLAMA_BASE_URL:
         try:
@@ -188,9 +223,18 @@ async def translate_batch(items: list[dict], max_concurrent: int = 5) -> None:
     async def _translate_one(item: dict) -> None:
         async with sem:
             lang = item.get("language", "en")
-            t, s = await translate_article(item["title"], item.get("summary", ""), source_language=lang)
-            item["title"] = t
-            item["summary"] = s
+            try:
+                t, s = await asyncio.wait_for(
+                    translate_article(item["title"], item.get("summary", ""), source_language=lang),
+                    timeout=7.0
+                )
+                item["title"] = t
+                item["summary"] = s
+            except asyncio.TimeoutError:
+                logger.warning(f"Translation timed out (7s cap) for: {item['title'][:50]}")
+            except Exception as e:
+                logger.warning(f"Translation failed for: {item['title'][:50]} - {e}")
 
     await asyncio.gather(*[_translate_one(item) for item in targets], return_exceptions=True)
     logger.info(f"Translation done — {len(targets)} articles translated to PT-BR")
+

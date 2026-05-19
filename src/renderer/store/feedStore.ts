@@ -19,6 +19,7 @@ interface FeedStore {
   newsCount: number;
   liveCount: number;
   newItemIds: Set<string>;
+  lastRefreshed: Date | null;
 
   setNews: (news: NewsItem[]) => void;
   appendNews: (news: NewsItem[]) => void;
@@ -84,17 +85,22 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   newsCount: 0,
   liveCount: 0,
   newItemIds: new Set<string>(),
+  lastRefreshed: null,
 
   setNews: (news) => {
-    // Full refresh — absorb any pending items (backend already includes them)
+    // Background sync — absorb pending items into allNews but keep the banner
+    // count so the user can still click it and scroll to the new items.
+    const { pendingNews, liveCount, newItemIds } = get();
+    const hadUnread = pendingNews.length > 0;
     const filtered = applyFilters(news, get().filters);
     set({
       allNews: news,
       filteredNews: filtered,
       newsCount: filtered.length,
       pendingNews: [],
-      liveCount: 0,
-      newItemIds: new Set<string>(),
+      liveCount: hadUnread ? liveCount : 0,
+      newItemIds: hadUnread ? newItemIds : new Set<string>(),
+      lastRefreshed: new Date(),
     });
   },
 
