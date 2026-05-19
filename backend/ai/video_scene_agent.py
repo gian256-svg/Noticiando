@@ -148,8 +148,35 @@ async def _generate_with_groq(user_msg: str) -> dict[str, Any]:
 
 async def _generate_with_ollama(user_msg: str) -> dict[str, Any]:
     import httpx
+    model_to_use = OLLAMA_MODEL
+    if OLLAMA_BASE_URL:
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                res = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
+                if res.is_success:
+                    models = [m["name"] for m in res.json().get("models", [])]
+                    if OLLAMA_MODEL in models:
+                        model_to_use = OLLAMA_MODEL
+                    elif f"{OLLAMA_MODEL}:latest" in models:
+                        model_to_use = f"{OLLAMA_MODEL}:latest"
+                    else:
+                        matched = next((m for m in models if OLLAMA_MODEL in m), None)
+                        if matched:
+                            model_to_use = matched
+                        elif models:
+                            chosen = None
+                            for pref in ["llama3.2-vision", "qwen2.5-coder", "llava", "llama3.2", "llama3", "llama", "qwen", "mistral", "phi"]:
+                                matched_pref = next((m for m in models if pref in m.lower()), None)
+                                if matched_pref:
+                                    chosen = matched_pref
+                                    break
+                            model_to_use = chosen or models[0]
+                            logger.info(f"Ollama model '{OLLAMA_MODEL}' not found. Using installed model '{model_to_use}'")
+        except Exception as e:
+            logger.warning(f"Error querying Ollama models: {e}")
+
     payload = {
-        "model": OLLAMA_MODEL,
+        "model": model_to_use,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user",   "content": user_msg},
