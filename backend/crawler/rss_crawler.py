@@ -369,6 +369,7 @@ async def crawl_all_sources(sources: list[Source]) -> list[dict]:
         h = item["title_hash"]
         if h in existing_hashes:
             # Already exists in DB, keep it so scheduler can merge sources/update thumb
+            item["prelim_score"] = 0.0
             filtered_items.append(item)
             continue
         if h in seen_hashes:
@@ -395,6 +396,7 @@ async def crawl_all_sources(sources: list[Source]) -> list[dict]:
         if prelim_score < 10.0:
             continue
 
+        item["prelim_score"] = prelim_score
         filtered_items.append(item)
 
     items = filtered_items
@@ -436,11 +438,22 @@ async def crawl_all_sources(sources: list[Source]) -> list[dict]:
         if item.get("language", "pt") != "pt"
         and item["title_hash"] not in existing_hashes
     ]
-    translate_count = len(non_pt_targets)
+    # Sort by score descending to translate the most viral/relevant items first
+    non_pt_targets.sort(key=lambda x: x.get("prelim_score", 0.0), reverse=True)
+    
+    # Cap translation list to prevent rate limit starvation, discard the rest from this crawl run
+    MAX_TRANSLATIONS = 10
+    to_translate = non_pt_targets[:MAX_TRANSLATIONS]
+    to_drop = non_pt_targets[MAX_TRANSLATIONS:]
+    
+    drop_hashes = {item["title_hash"] for item in to_drop}
+    items = [item for item in items if item["title_hash"] not in drop_hashes]
+    
+    translate_count = len(to_translate)
     if translate_count:
         try:
             from ai.translator import translate_batch
-            await translate_batch(non_pt_targets)
+            await translate_batch(to_translate)
         except Exception as e:
             logger.warning(f"Translation phase failed (non-blocking): {e}")
 

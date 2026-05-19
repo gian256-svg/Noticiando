@@ -66,7 +66,7 @@ A tipografia deve manter contraste extremo e excelente legibilidade, mesmo em te
 
 * **[0s–2s] → INTRO impactante:** O título entra com animação agressiva, a trilha sonora se inicia e o background texturizado é exibido imediatamente.
 * **[2s–Xs] → DESENVOLVIMENTO:** Narração clara sincronizada perfeitamente com elementos visuais de apoio na tela.
-* **[Xs–fim] → CALL TO ACTION / Encerramento:** Apresentação da logo e assinatura visual da marca.
+* **[Xs–fim] → CONCLUSÃO / PROLONGAMENTO:** Fechamento e conclusão didática/analítica da notícia, prolongando o vídeo sem CTA ou assinaturas de encerramento.
 * **Regra de Dinamismo (Sem Tela Estática):**
   - **Máximo de 2,5 segundos** sem mudança visual (um novo elemento entrando, corte, transição ou animação).
   - Cada frase narrada deve ter pelo menos 1 elemento visual correspondente na tela.
@@ -177,7 +177,7 @@ const scale = spring({
 - Entrada: spring `translateX` (220px → 0), delay 6 frames + float `sin(frame/35)*6px`.
 - **Obrigatório**: Filtro drop-shadow editorial de sombra projetada forte + o contorno branco nítido de 4px.
 
-### DecoratorElement (todos os `visual_type` exceto CTA)
+### DecoratorElement (em todas as cenas)
 - 4 tipos: `star` | `arrow` | `circle` | `stripes` — escolher baseado no contexto emocional da cena.
 - Tamanho 80×80px, cor `pal.accent`, `drop-shadow` glow.
 - Pulse scale `0.92–1.08` (sin/30) + rotation `±6°` (sin/50).

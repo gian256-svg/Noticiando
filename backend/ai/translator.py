@@ -207,10 +207,10 @@ async def translate_article(title: str, summary: str, source_language: str = "en
     return title, summary
 
 
-async def translate_batch(items: list[dict], max_concurrent: int = 5) -> None:
+async def translate_batch(items: list[dict], max_concurrent: int = 1) -> None:
     """
     Translates title+summary in-place for all non-PT items (any language → PT-BR).
-    Uses a semaphore to cap concurrent Gemini requests.
+    Processes items sequentially with a pacing delay to completely avoid 429 rate limits.
     """
     import asyncio
 
@@ -218,23 +218,24 @@ async def translate_batch(items: list[dict], max_concurrent: int = 5) -> None:
     if not targets:
         return
 
-    sem = asyncio.Semaphore(max_concurrent)
+    for idx, item in enumerate(targets):
+        if idx > 0:
+            # 3-second pacing delay between API calls to avoid Gemini/Groq RPM limits
+            await asyncio.sleep(3.0)
+            
+        lang = item.get("language", "en")
+        try:
+            t, s = await asyncio.wait_for(
+                translate_article(item["title"], item.get("summary", ""), source_language=lang),
+                timeout=7.0
+            )
+            item["title"] = t
+            item["summary"] = s
+        except asyncio.TimeoutError:
+            logger.warning(f"Translation timed out (7s cap) for: {item['title'][:50]}")
+        except Exception as e:
+            logger.warning(f"Translation failed for: {item['title'][:50]} - {e}")
 
-    async def _translate_one(item: dict) -> None:
-        async with sem:
-            lang = item.get("language", "en")
-            try:
-                t, s = await asyncio.wait_for(
-                    translate_article(item["title"], item.get("summary", ""), source_language=lang),
-                    timeout=7.0
-                )
-                item["title"] = t
-                item["summary"] = s
-            except asyncio.TimeoutError:
-                logger.warning(f"Translation timed out (7s cap) for: {item['title'][:50]}")
-            except Exception as e:
-                logger.warning(f"Translation failed for: {item['title'][:50]} - {e}")
-
-    await asyncio.gather(*[_translate_one(item) for item in targets], return_exceptions=True)
     logger.info(f"Translation done — {len(targets)} articles translated to PT-BR")
+
 

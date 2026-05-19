@@ -140,10 +140,10 @@ async def generate_narration(text: str, voice_id: str = DEFAULT_BR_VOICE_ID) -> 
         "text": sanitized,
         "model_id": "eleven_multilingual_v2",
         "voice_settings": {
-            "stability": 0.45,
-            "similarity_boost": 0.80,
-            "style": 0.35,
-            "use_speaker_boost": True,
+            "stability": 0.40,  # 35% a 45% (aplica emoção sem perder estabilidade)
+            "similarity_boost": 0.80,  # 75% a 85% (fidelidade sem distorções)
+            "style": 0.10,  # 0% a 15% (evita emoção artificial)
+            "use_speaker_boost": True,  # Textura natural
         },
     }
 

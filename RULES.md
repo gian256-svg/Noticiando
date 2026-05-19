@@ -178,8 +178,15 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 
 ### Configurações de Locução (ElevenLabs)
 * **Voice Model:** `eleven_multilingual_v2`
-* **Definições de Voz:** `stability: 0.45`, `similarity_boost: 0.80`, `style: 0.35`, `use_speaker_boost: true`.
-* **Pré-Processamento:** Adicionar vírgulas e reticências estratégicas no roteiro para pausas naturais e sincronização de ±0.3s.
+* **Definições de Voz:** 
+  - **Stability (Estabilidade):** Entre 35% e 45% (0.35 - 0.45). Valores menores que 30% causam instabilidade, enquanto acima de 70% deixam a voz monótona e robótica. Entre 35% e 45%, a IA consegue aplicar a emoção correta ao texto.
+  - **Similarity (Similaridade):** 75% a 85% (0.75 - 0.85). Equilibra a fidelidade da voz sem causar distorções ou artefatos digitais no áudio.
+  - **Style Exaggeration (Exagero de Estilo):** 0% a 15% (0.0 - 0.15). Mantenha próximo de zero. Um valor muito alto pode fazer a IA "forçar" a barra na emoção, gerando um resultado artificial.
+  - **Speaker Boost:** Ativado (True). Melhora a clareza e a textura natural da voz, principalmente em gravações clonadas.
+* **Pré-Processamento e Dicas de Ouro para a formatação do texto:** 
+  - A IA lê o que está escrito. Se quiser pausas mais longas, utilize sinais de pontuação adequados (como reticências) ou insira `<break time="2s" />` caso esteja usando a interface de edição avançada.
+  - Evite emojis e símbolos matemáticos misturados com as palavras, pois isso costuma confundir a pronúncia do modelo.
+  - Use abreviações (ex: "R$" em vez de "reais") de forma consistente para guiar o ritmo correto da locução.
 
 ### Configurações de Trilha (Epidemic Sound)
 * **Mixagem de Áudio:** Volume da trilha de fundo entre `0.15` e `0.25`, e volume da narração em `1.0`.

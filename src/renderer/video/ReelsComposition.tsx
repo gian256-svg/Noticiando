@@ -16,7 +16,7 @@ export interface ReelsScene {
   headline: string;
   subtext?: string;
   duration_seconds: number;
-  visual_type: "hook" | "video" | "cutout" | "illustration" | "data" | "cta";
+  visual_type: "hook" | "video" | "cutout" | "illustration" | "data";
   accent_word_indices?: number[];
   media_url?: string;
   cutout_url?: string;
@@ -79,8 +79,42 @@ export const ReelsComposition: React.FC<ReelsCompositionProps> = ({
       {/* 🎙️ Premium ElevenLabs Brazilian Voice Narration */}
       {narration_url && <Audio src={narration_url} volume={1.0} />}
 
-      {/* 🎵 Epidemic Sound Soundtrack Mixed in Background */}
-      {music_url && <Audio src={music_url} volume={0.15} loop />}
+      {/* 🎵 Epidemic Sound Soundtrack Mixed in Background with Ducking and Fades */}
+      {music_url && (
+        <Audio 
+          src={music_url} 
+          volume={(f) => {
+            const totalFrames = scenes.reduce((acc, s) => acc + Math.max(1, Math.round(s.duration_seconds * fps)), 0);
+            
+            // Fade in (0.5s = 15 frames)
+            let baseVol = interpolate(f, [0, 15], [0, 0.25], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+            
+            // Fade out (1.0s = 30 frames)
+            if (f > totalFrames - 30) {
+              baseVol = interpolate(f, [totalFrames - 30, totalFrames], [baseVol, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+            }
+            
+            // Ducking 40% automatically during narration scenes
+            let isNarrationActive = false;
+            let currentFrameAccumulator = 0;
+            for (const s of scenes) {
+              const sceneFrames = Math.max(1, Math.round(s.duration_seconds * fps));
+              if (f >= currentFrameAccumulator && f < currentFrameAccumulator + sceneFrames) {
+                // Audio plays until the padding at the end of the scene (usually ~0.4s)
+                const narrationEndFrame = currentFrameAccumulator + sceneFrames - Math.round(0.4 * fps);
+                if ((s.audio_url || narration_url) && f < narrationEndFrame) {
+                  isNarrationActive = true;
+                }
+                break;
+              }
+              currentFrameAccumulator += sceneFrames;
+            }
+            
+            return isNarrationActive ? baseVol * 0.60 : baseVol;
+          }} 
+          loop 
+        />
+      )}
 
       {/* SVG filter for sharp white 4px sticker outline */}
       <svg style={{ position: "absolute", width: 0, height: 0 }}>
@@ -457,7 +491,6 @@ const NewsScene: React.FC<SceneProps> = ({
   );
 
   const isHook = scene.visual_type === "hook";
-  const isCta  = scene.visual_type === "cta";
   const isData = scene.visual_type === "data";
 
   // Dynamic layout flags
@@ -500,7 +533,7 @@ const NewsScene: React.FC<SceneProps> = ({
   // Headline parsing and text shadow variables
   const words = useMemo(() => scene.headline.split(" "), [scene.headline]);
   const accentSet = useMemo(() => new Set<number>(scene.accent_word_indices ?? []), [scene.accent_word_indices]);
-  const titleFontSize = isHook ? 68 : isCta ? 58 : 62;
+  const titleFontSize = isHook ? 68 : 62;
   const subtextFontSize = 48; // STRICT MINIMUM: never below 48px for mobile legibility
 
   // Parse potential values (e.g. percentages or numbers) for Data scenes
@@ -542,13 +575,7 @@ const NewsScene: React.FC<SceneProps> = ({
     ? (displayVal * dataEasedProgress).toFixed(displayVal % 1 === 0 ? 0 : 1)
     : (75 * dataEasedProgress).toFixed(0);
 
-  // Call to Action Sweep Shimmer
-  const shimmerPercent = interpolate(
-    frame % 90,
-    [15, 60],
-    [-150, 150],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-  );
+
 
   return (
     <AbsoluteFill style={{ opacity: exitOpacity, overflow: "hidden" }}>
@@ -1023,48 +1050,7 @@ const NewsScene: React.FC<SceneProps> = ({
             </div>
           )}
 
-          {/* Premium Call to Action Button with metallic shimmer sweep */}
-          {isCta && (
-            <div style={{
-              marginTop: 40,
-              padding: "16px 42px",
-              borderRadius: 16,
-              background: pal.accent,
-              boxShadow: `0 15px 35px ${pal.accent}40, 0 0 0 1px ${pal.accent}bb`,
-              transform: `scale(${spring({
-                frame: Math.max(0, frame - 10),
-                fps,
-                config: { damping: 10, stiffness: 100 },
-              })})`,
-              position: "relative",
-              overflow: "hidden",
-              zIndex: 10,
-            }}>
-              {/* Metallic shimmer sweep reflection */}
-              <div style={{
-                position: "absolute",
-                top: 0, bottom: 0,
-                width: "40%",
-                transform: "skewX(-25deg)",
-                background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent)",
-                left: `${shimmerPercent}%`,
-                pointerEvents: "none",
-              }} />
-              
-              <span style={{
-                color: "#000",
-                fontFamily: "'Oswald', 'Montserrat', sans-serif",
-                fontWeight: 900, fontSize: 20,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}>
-                SIGA PARA MAIS ↗
-              </span>
-            </div>
-          )}
+
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

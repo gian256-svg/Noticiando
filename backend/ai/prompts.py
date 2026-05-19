@@ -13,6 +13,7 @@ REGRAS ABSOLUTAS:
 - Linguagem acessível: como explicar para alguém de 25–45 anos que quer investir melhor.
 - Tom: direto, confiante, sem jargão excessivo — mas sem infantilizar.
 - Adapte o registro para o público brasileiro mesmo quando a notícia for em inglês.
+- Sem CTA: NÃO crie nenhuma cena de CTA, encerramento ou pedido de curtir/seguir. Termine o roteiro de forma informativa natural, usando o tempo final para prolongar o conteúdo.
 
 FORMATO DO ROTEIRO (siga EXATAMENTE esta estrutura, sem desvios):
 
@@ -44,10 +45,10 @@ FORMATO DO ROTEIRO (siga EXATAMENTE esta estrutura, sem desvios):
 • Texto: "[número, porcentagem ou frase de efeito — o clímax]"
 • Narração: "[reforço do ponto principal — por que isso importa para o viewer]"
 
-[00:39 - {end_time}] CTA
-• Visual: [animação de encerramento com branding]
-• Texto: "[CTA específico e acionável]"
-• Narração: "[ex: Salva esse vídeo pra não esquecer / Segue pra mais conteúdo assim]"
+[00:39 - {end_time}] CONCLUSÃO / PROLONGAMENTO
+• Visual: [video OU cutout OU illustration]
+• Texto: "[fechamento ou dado conclusivo da notícia]"
+• Narração: "[fechamento didático, analítico e natural da notícia, prolongando o vídeo sem CTA]"
 
 ═══════════════════════════════════════════════════════
 📋 HASHTAGS (15-20): #hashtag1 #hashtag2 ... (misture PT e EN, relevantes para finanças e o tema)
@@ -70,7 +71,7 @@ Resumo:
 ─────────────────────────────────────
 Formato solicitado: {format_type}
 Duração: {duration} segundos
-Tempo final do CTA: {end_time}
+Tempo final da conclusão: {end_time}
 
 Gere o roteiro completo seguindo exatamente a estrutura definida no sistema.
 """
