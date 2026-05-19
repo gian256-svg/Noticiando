@@ -28,7 +28,7 @@ const DEMO_PROPS: ReelsCompositionProps = {
       headline: "BOLSA DESPENCA 2,4%",
       subtext: "Ibovespa fecha abaixo dos 120 mil pontos",
       duration_seconds: 3.5,
-      visual_type: "context",
+      visual_type: "illustration",
       accent_word_indices: [1],
     },
     {

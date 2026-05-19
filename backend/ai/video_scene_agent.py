@@ -27,8 +27,8 @@ GEMINI_MODEL = "gemini-2.5-flash"
 GROQ_MODEL   = "llama-3.3-70b-versatile"
 
 SYSTEM_PROMPT = """\
-Você é um diretor criativo especializado em Reels virais de finanças e economia.
-Sua missão: transformar uma notícia em roteiro de cenas para vídeo vertical 9:16.
+Você é um diretor criativo de motion design sênior especializado em Reels virais de finanças e economia (estilo editorial The Economist / Paulo Guedes Reels).
+Sua missão: transformar uma notícia de mercado financeiro em um roteiro híbrido vertical 9:16 altamente dinâmico.
 
 Retorne APENAS JSON válido, sem markdown, sem explicações.
 
@@ -37,23 +37,32 @@ Schema obrigatório:
   "scenes": [
     {
       "id": "scene_1",
-      "headline": "TEXTO IMPACTANTE",
-      "subtext": "texto de suporte curto",
+      "headline": "TEXTO CURTO IMPACTANTE EM CAIXA ALTA",
+      "subtext": "Texto completo que será narrado nesta cena. Deve ser fluído, informativo e conter dados.",
       "duration_seconds": 3.0,
-      "visual_type": "hook",
-      "accent_word_indices": [0, 2]
+      "visual_type": "hook" | "video" | "cutout" | "illustration" | "data" | "cta",
+      "accent_word_indices": [0, 2],
+      "decorator_type": "star" | "arrow" | "circle" | "stripes" | "none",
+      "youtube_search": "Termo de busca bem curto para extrair um corte de vídeo do YouTube no yt-dlp (ex: 'bolsa de valores caindo', 'primo rico investimentos', 'empresa fabrica')",
+      "media_keyword": "money" | "growth" | "crypto" | "nigro" | "perini"
     }
   ]
 }
 
-Regras:
-- visual_type: "hook" (1ª cena, 2-2.5s) | "context" (3-4s) | "data" (3s) | "cta" (última, 2.5s)
-- headline: TUDO MAIÚSCULAS, máx 6 palavras, sem pontuação final
-- subtext: caixa normal, máx 12 palavras
-- accent_word_indices: índices (base 0) das palavras a destacar em laranja — max 2
-- Total de cenas: 8-10 para 45s, proporcional para outras durações
-- A soma de duration_seconds deve ser aproximadamente o total solicitado
-- Prefira números concretos, percentuais e nomes de empresas nos subtextos"""
+Regras Cruciais de Direção de Arte:
+- visual_type:
+  * "hook": Sempre a primeira cena (0s a 2s). Título e gancho ultra agressivo.
+  * "video": Cena com reprodução de vídeo real ao fundo (forneça um 'youtube_search' preciso e curto).
+  * "cutout": Colagem estilo editorial com recorte de pessoa (ex: Thiago Nigro, Bruno Perini) ou de objeto financeiro flutuando.
+  * "illustration": Desenho estilizado ou gráficos animados (use 'media_keyword' correspondente).
+  * "data": Gráfico de métrica, percentuais, números grandes com barras animadas.
+  * "cta": Sempre a última cena. Chamada para ação clara ("Siga para mais").
+- Pelo menos 1 cena do tipo "video".
+- Pelo menos 2 cenas do tipo "cutout".
+- Pelo menos 1 cena do tipo "illustration".
+- Cada subtext deve ser envolvente e narrável. O subtext total somado constituirá o roteiro da locução do ElevenLabs.
+- As durações das cenas devem somar aproximadamente a duração solicitada. Máximo de 3.5 segundos por cena para garantir dinamismo e cortes rápidos.
+- decorator_type: Forma geométrica ou ícone de destaque desenhado na tela para ornamentação."""
 
 
 def _build_user_msg(title: str, summary: str, category: str, duration: int) -> str:

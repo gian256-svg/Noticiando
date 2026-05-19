@@ -17,3 +17,6 @@ backend/venv/
 *.sqlite
 *.sqlite3
 noticiando.db
+output/*
+!output/assets/
+.claude/

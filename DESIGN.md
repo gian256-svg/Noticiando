@@ -10,33 +10,36 @@
                                               
 ```
 
-Este é o manual do **Diretor de Arte (DESIGN.md)** do **Noticiando**. Ele estabelece as diretrizes estéticas premium, regras de motion design, tipografia, paletas de cores por nicho e sincronização visual para todos os vídeos verticais (Reels 9:16) gerados na pipeline.
+Este é o manual definitivo do **Diretor de Arte (DESIGN.md)** do **Noticiando**. Ele estabelece as diretrizes estéticas premium, regras estritas de motion design, tipografia, paletas de cores adaptativas, processamento de áudio/locução e distribuição de elementos na tela para gerar vídeos verticais (Reels 9:16) no mesmo padrão visual de veículos premium como *The Economist*.
 
 ---
 
-## 💎 1. Direção Estética Geral (Premium Minimalist)
+## 💎 1. Direção Estética Geral (Estilo Editorial The Economist)
 
-Para garantir que cada Reels se destaque no feed com uma identidade sofisticada e profissional, aplicamos os seguintes conceitos estéticos:
+Para garantir que cada Reels se destaque no feed com uma identidade altamente sofisticada, aplicamos as seguintes regras:
 
+* **Backgrounds Texturizados (Obrigatório):** Toda a timeline deve possuir fundo texturizado (grain, papel, ruído cinematográfico de textura fina) — **nunca** fundos lisos e sem vida.
+* **Colagem de Estilo "Editorial Impresso Digitalizado":**
+  - Recortes de pessoas/objetos (silhuetas/cutouts) sobrepostos em backgrounds coloridos texturizados. Nunca usar a foto inteira crua.
+  - Estrelas, formas geométricas, listras e elementos gráficos minimalistas decorando o layout.
+  - Fotos em preto e branco combinadas com cores de fundo vibrantes para contraste extremo.
+  - Sombras suaves (`box-shadow` ou `filter: drop-shadow`) nos recortes para criar sensação real de profundidade tridimensional.
 * **Fundo Dinâmico (Dynamic Backgrounds):** Gradientes lineares escuros e sutis (ângulos de 170deg) que dão profundidade ao vídeo, evitando fundos pretos chapados.
-* **Textura de Grão Global (Film Grain Overlay):** Uma camada sutil de ruído/grão analógico por cima da composição, agregando textura cinematográfica.
-* **Efeito Glassmorphism:** Cards de texto com fundo translúcido (`rgba(255,255,255,0.03)`), bordas extremamente sutis (`rgba(255,255,255,0.08)`) e desfoque de fundo (`backdrop-filter: blur(16px)`).
-* **Varredura de Luz (Ambient Glow Sweeps):** Um círculo desfocado de cor vibrante com animação oscilante lenta em posições randômicas no fundo para simular iluminação de estúdio profissional.
 
 ---
 
-## 🎨 2. Paletas de Cores por Nicho de Conteúdo
+## 🎨 2. Paletas de Cores por Tema de Notícia
 
-Cada categoria de notícia possui uma paleta de cores curada, gerando reconhecimento visual instantâneo pelo espectador:
+A paleta de cores deve ser coesa e se adaptar instantaneamente conforme o tema da notícia:
 
-| Categoria | Identidade Visual | Fundo (`bg`) | Gradiente (`grad`) | Destaque (`accent`) | Brilho Dim (`dim`) |
+| Categoria / Tema | Identidade Visual | Fundo (`bg`) | Gradiente (`grad`) | Destaque (`accent`) | Brilho Dim (`dim`) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Investimentos** | Deep Blue & Orange | `#060A12` | `#0C172A` | `#F97316` (Laranja) | `#F9731620` |
-| **Economia BR** | Forest Green & Emerald | `#040D0A` | `#0A1F18` | `#10B981` (Verde Esmeralda) | `#10B98120` |
-| **Mercado INT** | Indigo & Cyber Blue | `#07070C` | `#0F112D` | `#6366F1` (Indigo Neon) | `#6366F120` |
-| **Geopolítica** | Crimson & Blood Red | `#0E0505` | `#220909` | `#EF4444` (Vermelho) | `#EF444420` |
-| **Cripto** | Cyberpunk Gold & Amber | `#070B06` | `#0D1A0B` | `#F59E0B` (Amber Gold) | `#F59E0B20` |
-| **Geral** | Dark Slate & Bright Coral | `#07070C` | `#10101B` | `#F97316` (Laranja Coral) | `#F9731620` |
+| **Investimentos / Finanças** | Deep Blue & Orange | `#060A12` | `#0C172A` | `#F97316` (Laranja) | `#F9731620` |
+| **Economia BR (Quente)** | Forest Green & Emerald | `#040D0A` | `#0A1F18` | `#10B981` (Verde Esmeralda) | `#10B98120` |
+| **Mercado INT / Política (Frio)** | Indigo & Cyber Blue | `#07070C` | `#0F112D` | `#6366F1` (Indigo Neon) | `#6366F120` |
+| **Geopolítica / Tensões** | Crimson & Blood Red | `#0E0505` | `#220909` | `#EF4444` (Vermelho) | `#EF444420` |
+| **Cripto / Tecnologia** | Cyberpunk Gold & Amber | `#070B06` | `#0D1A0B` | `#F59E0B` (Amber Gold) | `#F59E0B20` |
+| **Geral / Outros** | Beige & Textured Charcoal | `#07070C` | `#10101B` | `#FFFFFF` (Branco Puro) | `#F5F0E840` |
 
 ---
 
@@ -44,34 +47,108 @@ Cada categoria de notícia possui uma paleta de cores curada, gerando reconhecim
 
 A tipografia deve manter contraste extremo e excelente legibilidade, mesmo em telas menores de celulares:
 
-1. **Título da Notícia (News Title):** 
-   - Fonte: **Montserrat** (ou sans-serif condensada) em caixa alta (uppercase).
-   - Peso: `ExtraBold (800)` ou `Black (900)`.
-   - Propósito: Estabelecer impacto instantâneo no gancho (hook) inicial do vídeo.
-2. **Subtexto / Narrativa (Subtext):**
-   - Fonte: **Inter** ou **Outfit**.
-   - Peso: `Medium (500)` ou `SemiBold (600)`.
-   - Propósito: Legendar a voz do narrador com suavidade.
+1. **Título Principal (Gancho / Hook):**
+   - Fonte: **Oswald** (Bold ou SemiBold) em caixa alta (uppercase), com kerning (espaçamento de letras) apertado.
+   - Tamanho mínimo na tela: **Nunca abaixo de 48px** para leitura rápida no mobile.
+2. **Subtexto / Narrativa / Legendas:**
+   - Fonte: **Inter** ou **Roboto** (Regular ou Light).
+   - Tamanho mínimo na tela: **48px** (para legendas principais do Reels).
 3. **Keyword Highlighting (Destaque de Palavras-Chave):**
    - Palavras com score de engajamento alto ou de foco recebem a cor `accent` da paleta do nicho correspondente e um leve efeito de brilho (`text-shadow`).
 
 ---
 
-## 🎬 4. Regras de Motion Design & Câmera
+## 🎬 4. Estrutura do Reel & Regras de Dinamismo
 
-A fluidez dos vídeos é ditada por transições e movimentos contínuos (nunca estáticos):
-
-* **Efeito Ken Burns (Slow Camera Zoom):**
-   - Cada cena executa um zoom-in ultra lento e contínuo, iniciando em `scale: 1.0` e terminando em `scale: 1.06` ao fim do tempo da cena.
-* **Transições por Mola (Spring Transitions):**
-   - Entradas de elementos gráficos (cards, logos, fontes de notícias) usam equações de mola física (`spring` da Remotion) com amortecimento (`damping: 16`) e rigidez (`stiffness: 130`) para uma sensação tátil orgânica.
-* **Exit Opacity:**
-   - Nos últimos `0.25` segundos de cada cena, a opacidade dos elementos gráficos faz um fade-out rápido para `0` para que a próxima cena surja de forma limpa.
+* **[0s–2s] → INTRO impactante:** O título entra com animação agressiva, a trilha sonora se inicia e o background texturizado é exibido imediatamente.
+* **[2s–Xs] → DESENVOLVIMENTO:** Narração clara sincronizada perfeitamente com elementos visuais de apoio na tela.
+* **[Xs–fim] → CALL TO ACTION / Encerramento:** Apresentação da logo e assinatura visual da marca.
+* **Regra de Dinamismo (Sem Tela Estática):**
+  - **Máximo de 2,5 segundos** sem mudança visual (um novo elemento entrando, corte, transição ou animação).
+  - Cada frase narrada deve ter pelo menos 1 elemento visual correspondente na tela.
+  - **Elementos Obrigatórios por Reel:**
+    - Pelo menos **1 vídeo real** ou corte curto do YouTube (máx 5s por trecho, uso editorial).
+    - Pelo menos **2 recortes fotográficos** animados (cutouts).
+    - Pelo menos **1 elemento gráfico decorativo** animado (linha, forma, estrela, ou ícone).
 
 ---
 
-## 🏁 5. Checklist para Modificações de Roteiro e Cenas
-Ao atualizar ou expandir o renderizador dos Reels (`ReelsComposition.tsx` ou scripts de compilação Remotion), o desenvolvedor deve:
-- [ ] Validar o contraste das paletas de cores.
-- [ ] Garantir que o grão de filme (`film grain`) esteja rodando de forma fluida a 30fps.
-- [ ] Verificar a centralização e espaçamento de segurança inferior das legendas (evitando sobreposição com a barra de progresso do Instagram/TikTok).
+## ✍️ 5. Animações de Texto (Motion Design Sênior)
+
+Nunca usar texto estático simplesmente "aparecendo" (fade simples sem movimento). Variar entre os seguintes estilos de animação:
+
+### 1. Slide Up com Fade
+```javascript
+const translateY = interpolate(frame, [0, 15], [60, 0], { extrapolateRight: "clamp" });
+const opacity = interpolate(frame, [0, 10], [0, 1], { extrapolateRight: "clamp" });
+```
+
+### 2. Scale In com Bounce
+```javascript
+const scale = spring({ 
+  frame, 
+  fps, 
+  config: { stiffness: 200, damping: 15 } 
+});
+```
+
+### 3. Letra por Letra (Stagger)
+- Cada caractere entra individualmente com delay progressivo de 2 a 3 frames.
+
+### 4. Wipe Horizontal
+- O texto é revelado gradualmente usando uma máscara deslizante da esquerda para a direita.
+
+### 5. Glitch / Distorção
+- Um frame breve de ruído visual/glitch antes do texto se assentar na posição final.
+
+### 6. Split Line
+- A linha superior sobe enquanto a inferior desce, revelando o texto a partir do centro.
+
+---
+
+## 🎙️ 6. Processamento de Áudio & Trilha Sonora
+
+### Narração (ElevenLabs)
+* **Model ID:** `eleven_multilingual_v2`
+* **Configurações recomendadas:**
+  ```javascript
+  {
+    stability: 0.45,        // mais expressiva, menos robótica
+    similarity_boost: 0.80,
+    style: 0.35,            // leve estilo jornalístico
+    use_speaker_boost: true
+  }
+  ```
+* **Roteiro:** Adicionar vírgulas estratégicas para pausas naturais e reticências (`...`) para pausas dramáticas. Separar em chunks por cena para sincronização de ±0.3s com os elementos visuais.
+
+### Trilha Sonora (Epidemic Sound)
+* **Temas e Estilos de Trilha:**
+  - *Política/Tensão:* `["cinematic tension", "news documentary", "investigative"]`
+  - *Economia:* `["corporate upbeat", "data driven", "modern news"]`
+  - *Ciência/Tecnologia:* `["futuristic ambient", "discovery", "tech minimal"]`
+  - *Geral/Viral:* `["energetic news", "breaking news beat", "short form energy"]`
+* **Configuração de Mixagem e Ducking:**
+  - Volume da Trilha de fundo: `0.15` a `0.25` (não sobrepor narração).
+  - Volume da Narração: `1.0`.
+  - Fade-in da Trilha: `0.5s` no início.
+  - **Duck Automático:** O volume da trilha deve diminuir automaticamente em **40%** sempre que a narração estiver ativa.
+  - Fade-out da Trilha: `1.0s` antes do encerramento completo do vídeo.
+
+---
+
+## ✅ 7. Checklist Antes de Renderizar (Filtro do Diretor de Arte)
+
+- [ ] **Nenhum trecho com mais de 2.5s** sem movimento visual ou nova entrada.
+- [ ] **Todos os textos** em tela com tamanho **≥ 48px** e perfeitamente legíveis em celulares.
+- [ ] Fonte **Oswald** ativa nos títulos principais.
+- [ ] **Animações de texto variadas** (usando no mínimo 3 estilos de entrada diferentes).
+- [ ] Narração sincronizada com elementos visuais de apoio com tolerância máxima de **±0.3s**.
+- [ ] Trilha sonora mixada corretamente (narração cristalina + ducking de 40% na música de fundo).
+- [ ] Paleta de cores coesa correspondente ao tema da notícia.
+- [ ] Background texturizado contínuo ativo durante todo o vídeo.
+- [ ] Pelo menos **1 corte de vídeo real** ou de YouTube incluído no Reel.
+- [ ] Pelo menos **2 recortes fotográficos** animados com sombra suave aplicados.
+- [ ] Pelo menos **1 elemento gráfico decorativo** animado presente.
+- [ ] Transições fluidas aplicadas entre as cenas (evitando corte seco).
+- [ ] Nenhuma marca d'água ou logo de terceiros visível.
+- [ ] Resolução de exportação final em **1080x1920 @ 30fps**.

@@ -160,6 +160,26 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 
 **Arquivo:** `backend/ai/video_scene_agent.py`
 
+### Diretrizes Gráficas e Tipografia (Diretor de Arte DESIGN.md)
+* **Tipografia:** Fonte principal **Oswald** (Bold/SemiBold) para títulos; **Inter** ou **Roboto** para legendas e textos de apoio.
+* **Tamanho de Fonte Mínimo:** **Nunca inferior a 48px** na tela para assegurar legibilidade em dispositivos móveis.
+* **Regra de Dinamismo:** Máximo de **2,5 segundos** sem mudança visual. Cada frase narrada deve apresentar pelo menos um elemento visual correspondente em tela.
+* **Elementos Obrigatórios por Reel:**
+  - Pelo menos **1 corte de vídeo real** ou YouTube (máx. 5s por corte, fins informativos/editoriais).
+  - Pelo menos **2 recortes fotográficos** animados (estilo colagem/cutout com sombras suaves).
+  - Pelo menos **1 elemento gráfico decorativo** animado.
+  - Background texturizado contínuo (film grain, papel ou ruído cinematográfico).
+
+### Configurações de Locução (ElevenLabs)
+* **Voice Model:** `eleven_multilingual_v2`
+* **Definições de Voz:** `stability: 0.45`, `similarity_boost: 0.80`, `style: 0.35`, `use_speaker_boost: true`.
+* **Pré-Processamento:** Adicionar vírgulas e reticências estratégicas no roteiro para pausas naturais e sincronização de ±0.3s.
+
+### Configurações de Trilha (Epidemic Sound)
+* **Mixagem de Áudio:** Volume da trilha de fundo entre `0.15` e `0.25`, e volume da narração em `1.0`.
+* **Duck Automático:** Reduzir o volume da música de fundo em **40%** automaticamente durante os períodos em que a narração do áudio estiver ativa.
+* **Fades:** Fade-in de `0.5s` no início da música e fade-out de `1.0s` antes do encerramento completo do vídeo.
+
 ### Composição Remotion
 - Resolução obrigatória: **1080×1920** (vertical 9:16)
 - FPS: **30**
@@ -188,7 +208,12 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 
 ---
 
-## 8. Evolução Planejada (Backlog Prioritário)
+## 8. Evolução Planejada (Backlog Concluído e Futuro)
+
+### 🟢 Funcionalidades Ativadas e Concluídas
+- [x] **Integração ElevenLabs e Epidemic Sound:** Locução profissional brasileira e sonorização de fundo com ducking de 40% na pipeline de Reels.
+- [x] **Cortes de YouTube via yt-dlp:** Busca e download de trechos de 5s no YouTube em tempo real na pipeline backend.
+- [x] **Recortes (Cutouts) e Ilustrações:** Imagens de sticker transparentes (Nigro, Perini, dinheiro, cripto) servidas e orquestradas pela pipeline do sidecar Python.
 
 ### 🔴 Alta prioridade
 - [ ] Filtro de nicho no backend: aplicar penalidade −50 em artigos fora do nicho antes de salvar
@@ -201,8 +226,7 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 - [ ] Multi-idioma: tradução automática de notícias EN → PT antes de exibir
 
 ### 🟢 Baixa prioridade / Futuro
-- [ ] Integração ElevenLabs para locução automática do roteiro
-- [ ] Remove.bg para recortes de personagens no estilo colagem
+- [ ] Remove.bg para recortes automatizados adicionais de personagens no estilo colagem
 - [ ] Painel de analytics: quais categorias geram mais engajamento
 - [ ] Modo dark/light toggle
 
@@ -210,15 +234,7 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 
 ---
 
-## 9. Dependências Python
+## 9. Dependências Python e Sistema
 
-- `feedparser>=6.0.0` é obrigatório — usado pelo crawler RSS; fácil de esquecer pois não aparece nos imports do entry point.
-- `anthropic` não deve estar no `requirements.txt` nem no código.
-- Ao adicionar um novo provider de IA, adicionar a dependência correspondente ao `requirements.txt` imediatamente.
-
-**Arquivo:** `backend/requirements.txt`
-
----
-
-*Última atualização: 2026-05-18*
-*Mantenedor: Antigravity AI + Grupo Primo*
+- `yt-dlp` é obrigatório para corte automático de vídeos do YouTube.
+- `feedparser>=6.0.0` é obrigatório — usado pelo crawler RSS.

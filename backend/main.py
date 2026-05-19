@@ -2,6 +2,11 @@ import argparse
 import os
 import sys
 import logging
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Carrega as variaveis do arquivo .env na raiz do backend
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 import uvicorn
 from fastapi import FastAPI

@@ -6,6 +6,8 @@ import {
   interpolate,
   Series,
   Audio,
+  Img,
+  OffthreadVideo,
 } from "remotion";
 import React, { useMemo } from "react";
 
@@ -14,8 +16,11 @@ export interface ReelsScene {
   headline: string;
   subtext?: string;
   duration_seconds: number;
-  visual_type: "hook" | "context" | "data" | "cta";
+  visual_type: "hook" | "video" | "cutout" | "illustration" | "data" | "cta";
   accent_word_indices?: number[];
+  media_url?: string;
+  cutout_url?: string;
+  decorator_type?: "star" | "arrow" | "circle" | "stripes" | "none";
 }
 
 export interface ReelsCompositionProps {
@@ -93,8 +98,97 @@ export const ReelsComposition: React.FC<ReelsCompositionProps> = ({
 };
 
 // ─────────────────────────────────────────────
-// Single scene component with high-fidelity visuals
-// ─────────────────────────────────────────────
+const Decorator: React.FC<{ type: string; color: string; frame: number }> = ({ type, color, frame }) => {
+  if (type === "none" || !type) return null;
+  const pulse = Math.sin(frame / 6) * 0.05 + 0.95;
+  
+  if (type === "star") {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        style={{
+          position: "absolute",
+          top: 180,
+          right: 80,
+          width: 80,
+          height: 80,
+          fill: color,
+          filter: `drop-shadow(0 0 16px ${color})`,
+          transform: `scale(${pulse}) rotate(${frame * 0.4}deg)`,
+          zIndex: 6,
+        }}
+      >
+        <path d="M50 0 L58 35 L90 20 L65 45 L100 50 L65 55 L90 80 L58 65 L50 100 L42 65 L10 80 L35 55 L0 50 L35 45 L10 20 L42 35 Z" />
+      </svg>
+    );
+  }
+  
+  if (type === "arrow") {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        style={{
+          position: "absolute",
+          bottom: 240,
+          left: 60,
+          width: 90,
+          height: 90,
+          stroke: color,
+          strokeWidth: 8,
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          fill: "none",
+          filter: `drop-shadow(0 0 12px ${color})`,
+          transform: `scale(${pulse}) rotate(${-15 + Math.sin(frame / 8) * 5}deg)`,
+          zIndex: 6,
+        }}
+      >
+        <path d="M20 20 C40 30 70 50 60 80 M40 70 L60 80 L70 60" />
+      </svg>
+    );
+  }
+
+  if (type === "circle") {
+    return (
+      <div style={{
+        position: "absolute",
+        top: "35%",
+        left: "15%",
+        width: 160,
+        height: 160,
+        borderRadius: "50%",
+        border: `4px dashed ${color}b3`,
+        filter: `drop-shadow(0 0 12px ${color}40)`,
+        transform: `scale(${pulse}) rotate(${frame * -0.2}deg)`,
+        zIndex: 1,
+      }} />
+    );
+  }
+
+  if (type === "stripes") {
+    return (
+      <div style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: 140,
+        height: 140,
+        overflow: "hidden",
+        zIndex: 2,
+        opacity: 0.18,
+      }}>
+        <div style={{
+          width: 250,
+          height: 250,
+          background: `repeating-linear-gradient(-45deg, ${color}, ${color} 15px, transparent 15px, transparent 30px)`,
+          transform: "translate(-60px, -60px)",
+        }} />
+      </div>
+    );
+  }
+
+  return null;
+};
 
 interface Palette { bg: string; grad: string; accent: string; dim: string }
 
@@ -151,7 +245,8 @@ const NewsScene: React.FC<SceneProps> = ({
   // Headline parsing and text shadow variables
   const words = useMemo(() => scene.headline.split(" "), [scene.headline]);
   const accentSet = useMemo(() => new Set<number>(scene.accent_word_indices ?? []), [scene.accent_word_indices]);
-  const fontSize = isHook ? 64 : isCta ? 52 : 56;
+  const titleFontSize = isHook ? 68 : isCta ? 58 : 62;
+  const subtextFontSize = 48; // STRICT MINIMUM: never below 48px for mobile legibility
 
   // Parse potential values (e.g. percentages or numbers) for Data scenes
   const dataMetric = useMemo(() => {
@@ -202,14 +297,14 @@ const NewsScene: React.FC<SceneProps> = ({
 
   return (
     <AbsoluteFill style={{ opacity: exitOpacity, overflow: "hidden" }}>
-      {/* ── Global Film Grain Overlay ── */}
+      {/* ── Global Film Grain Overlay (Cinematic Noise / Paper Texture) ── */}
       <div style={{
         position: "absolute", inset: 0,
-        opacity: 0.08,
+        opacity: 0.12,
         mixBlendMode: "overlay",
         pointerEvents: "none",
         backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-        backgroundSize: "250px 250px",
+        backgroundSize: "220px 220px",
         zIndex: 99,
       }} />
 
@@ -222,7 +317,7 @@ const NewsScene: React.FC<SceneProps> = ({
         height: 700,
         borderRadius: "50%",
         background: `radial-gradient(circle, ${pal.accent} 0%, transparent 70%)`,
-        opacity: 0.14,
+        opacity: 0.16,
         filter: "blur(110px)",
         pointerEvents: "none",
       }} />
@@ -234,7 +329,7 @@ const NewsScene: React.FC<SceneProps> = ({
         height: 900,
         borderRadius: "50%",
         background: `radial-gradient(circle, ${pal.accent === '#10B981' ? '#3B82F6' : '#6366F1'} 0%, transparent 70%)`,
-        opacity: 0.09,
+        opacity: 0.11,
         filter: "blur(130px)",
         pointerEvents: "none",
       }} />
@@ -297,11 +392,11 @@ const NewsScene: React.FC<SceneProps> = ({
         {/* Blurred background image (Hook scene only) */}
         {thumbnailUrl && isHook && (
           <>
-            <img
+            <Img
               src={thumbnailUrl}
               style={{
                 position: "absolute", inset: 0, width: "100%", height: "100%",
-                objectFit: "cover", opacity: 0.22, filter: "blur(5px) saturate(1.8)",
+                objectFit: "cover", opacity: 0.28, filter: "blur(5px) saturate(1.8)",
                 transform: `scale(${cameraScale * 1.05})`,
                 transformOrigin: "center center",
               }}
@@ -311,6 +406,91 @@ const NewsScene: React.FC<SceneProps> = ({
               background: `linear-gradient(to top, ${pal.bg} 35%, transparent 70%, ${pal.bg} 100%)`,
             }} />
           </>
+        )}
+
+        {/* Real YouTube cut or Stock Video Background */}
+        {scene.visual_type === "video" && scene.media_url && (
+          <>
+            <OffthreadVideo
+              src={scene.media_url}
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
+              volume={0}
+            />
+            {/* Dark vignette to protect typography legibility */}
+            <div style={{
+              position: "absolute",
+              inset: 0,
+              background: "linear-gradient(to top, rgba(0,0,0,0.92) 15%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.92) 85%)",
+            }} />
+          </>
+        )}
+
+        {/* Dynamic Graphic Decorator Element (Star, arrow, stripes, circle) */}
+        {scene.decorator_type && scene.decorator_type !== "none" && (
+          <Decorator type={scene.decorator_type} color={pal.accent} frame={frame} />
+        )}
+
+        {/* Senior Motion Design Cutout Sticker (popping from bottom) */}
+        {scene.visual_type === "cutout" && scene.cutout_url && (
+          <Img
+            src={scene.cutout_url}
+            style={{
+              position: "absolute",
+              bottom: 40,
+              right: sceneIndex % 2 === 0 ? 30 : "auto",
+              left: sceneIndex % 2 !== 0 ? 30 : "auto",
+              height: "44%",
+              maxHeight: 520,
+              objectFit: "contain",
+              transform: `translateY(${
+                interpolate(
+                  spring({ frame, fps, config: { damping: 13, stiffness: 85 } }),
+                  [0, 1],
+                  [380, 0]
+                ) + Math.cos(frame / 12) * 8
+              }px) scale(${
+                interpolate(
+                  spring({ frame, fps, config: { damping: 13, stiffness: 85 } }),
+                  [0, 1],
+                  [0.6, 1]
+                )
+              }) rotate(${Math.sin(frame / 15) * 2 + (sceneIndex % 2 === 0 ? 2 : -2)}deg)`,
+              filter: "drop-shadow(0 20px 35px rgba(0,0,0,0.85)) drop-shadow(0 0 8px rgba(255,255,255,0.05))",
+              pointerEvents: "none",
+              zIndex: 4,
+            }}
+          />
+        )}
+
+        {/* Dynamic Stylized Illustration Sticker (floating on side/center) */}
+        {scene.visual_type === "illustration" && scene.media_url && (
+          <Img
+            src={scene.media_url}
+            style={{
+              position: "absolute",
+              top: "22%",
+              right: sceneIndex % 2 === 0 ? 40 : "auto",
+              left: sceneIndex % 2 !== 0 ? 40 : "auto",
+              height: "32%",
+              objectFit: "contain",
+              transform: `translateY(${Math.sin(frame / 10) * 10}px) scale(${
+                interpolate(
+                  spring({ frame, fps, config: { damping: 14, stiffness: 95 } }),
+                  [0, 1],
+                  [0, 1]
+                )
+              }) rotate(${interpolate(frame, [0, durationInFrames], [-4, 6])}deg)`,
+              filter: "drop-shadow(0 20px 30px rgba(0,0,0,0.8))",
+              pointerEvents: "none",
+              zIndex: 3,
+            }}
+          />
         )}
 
         {/* Top visual category pill/logo (Hook scene) */}
@@ -335,7 +515,7 @@ const NewsScene: React.FC<SceneProps> = ({
               <span style={{
                 color: pal.accent, fontSize: 11, fontWeight: 900,
                 letterSpacing: "0.22em", textTransform: "uppercase",
-                fontFamily: "'Montserrat', 'Inter', sans-serif",
+                fontFamily: "'Oswald', 'Montserrat', 'Inter', sans-serif",
               }}>
                 BREAKING
               </span>
@@ -348,7 +528,7 @@ const NewsScene: React.FC<SceneProps> = ({
           position: "absolute", inset: 0,
           display: "flex", flexDirection: "column",
           alignItems: "center", justifyContent: "center",
-          padding: "0 64px",
+          padding: "0 48px",
         }}>
 
           {/* Kinetic Headline - Overshoot spring & Neon glow */}
@@ -378,11 +558,11 @@ const NewsScene: React.FC<SceneProps> = ({
                   key={i}
                   style={{
                     display: "inline-block",
-                    fontFamily: "'Montserrat', 'Inter', 'Helvetica Neue', sans-serif",
-                    fontSize,
+                    fontFamily: "'Oswald', 'Montserrat', 'Inter', sans-serif",
+                    fontSize: titleFontSize,
                     fontWeight: 900,
                     textTransform: "uppercase",
-                    letterSpacing: "-0.03em",
+                    letterSpacing: "-0.04em", // tight kerning
                     lineHeight: 0.95,
                     color: isHighlighted ? pal.accent : "#FFFFFF",
                     textShadow: isHighlighted 
@@ -403,7 +583,7 @@ const NewsScene: React.FC<SceneProps> = ({
           {scene.subtext && (
             <div style={{
               marginTop: 18,
-              padding: "16px 26px",
+              padding: "20px 30px",
               borderRadius: 18,
               background: "rgba(10, 11, 22, 0.45)",
               border: "1px solid rgba(255, 255, 255, 0.08)",
@@ -417,11 +597,13 @@ const NewsScene: React.FC<SceneProps> = ({
               zIndex: 5,
             }}>
               <p style={{
-                fontFamily: "'Inter', 'Helvetica Neue', sans-serif",
-                fontSize: 20, fontWeight: 500,
-                color: "rgba(255,255,255,0.85)",
-                textAlign: "center", lineHeight: 1.5,
+                fontFamily: "'Inter', 'Roboto', sans-serif",
+                fontSize: subtextFontSize, // STRICT MINIMUM: >= 48px
+                fontWeight: 600,
+                color: "rgba(255,255,255,0.95)",
+                textAlign: "center", lineHeight: 1.4,
                 margin: 0,
+                textShadow: "0 2px 8px rgba(0,0,0,0.5)",
               }}>
                 {scene.subtext}
               </p>
@@ -569,8 +751,8 @@ const NewsScene: React.FC<SceneProps> = ({
               
               <span style={{
                 color: "#000",
-                fontFamily: "'Montserrat', 'Helvetica Neue', sans-serif",
-                fontWeight: 900, fontSize: 18,
+                fontFamily: "'Oswald', 'Montserrat', sans-serif",
+                fontWeight: 900, fontSize: 20,
                 textTransform: "uppercase",
                 letterSpacing: "0.08em",
                 display: "flex",

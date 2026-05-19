@@ -1,140 +1,264 @@
 """
-voice_and_sound.py — Integração de APIs de locução (ElevenLabs), trilhas (Epidemic Sound) e assets (Envato Elements)
+voice_and_sound.py — Locução (ElevenLabs), trilhas (Epidemic Sound) e assets (Envato Elements)
 """
 
+import hashlib
+import logging
 import os
 import time
-import logging
-import httpx
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any, Optional
+
+import httpx
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 logger = logging.getLogger(__name__)
 
-# Configurações lidas do backend/.env
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
-ENVATO_API_KEY = os.getenv("ENVATO_API_KEY", "")
-EPIDEMIC_SOUND_TOKEN = os.getenv("EPIDEMIC_SOUND_TOKEN", "")
+ELEVENLABS_API_KEY    = os.getenv("ELEVENLABS_API_KEY", "")
+ENVATO_API_KEY        = os.getenv("ENVATO_API_KEY", "")
+EPIDEMIC_SOUND_TOKEN  = os.getenv("EPIDEMIC_SOUND_TOKEN", "")
 
-# Diretório de output para salvar mídias geradas
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR   = PROJECT_ROOT / "output"
+MEDIA_DIR    = PROJECT_ROOT / "output" / "media"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
-# Vozes recomendadas em ElevenLabs (Antoni é excelente para narrações financeiras e fala ótimo Português BR)
-# voice_id do Antoni: ErXwobaYiN019PkySvjV
-DEFAULT_BR_VOICE_ID = "ErXwobaYiN019PkySvjV" 
+LOCALHOST_BASE = "http://localhost:8765"
 
-# Músicas fallback do Epidemic Sound (premium, curadas por categoria de notícia)
-CATEGORY_MUSIC: Dict[str, str] = {
-    "investments": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", # Substituir por links de trilhas do Epidemic
-    "economy_br": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-    "economy_int": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-    "geopolitics": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
-    "crypto": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
-    "general": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
+# Voz premium para português brasileiro
+DEFAULT_BR_VOICE_ID = "ErXwobaYiN019PkySvjV"  # Antoni
+
+# Mapeamento de categorias para tags Epidemic Sound e queries de fallback YouTube
+CATEGORY_MUSIC_CONFIG: dict[str, dict[str, Any]] = {
+    "investments": {
+        "tags": ["corporate", "upbeat", "motivational"],
+        "mood": "uplifting",
+        "yt_fallback": "ytsearch1:corporate upbeat background music no copyright",
+    },
+    "economy_br": {
+        "tags": ["cinematic", "news", "documentary"],
+        "mood": "neutral",
+        "yt_fallback": "ytsearch1:news documentary background music no copyright cinematic",
+    },
+    "economy_int": {
+        "tags": ["investigative", "tension", "documentary"],
+        "mood": "serious",
+        "yt_fallback": "ytsearch1:investigative journalism background music no copyright",
+    },
+    "geopolitics": {
+        "tags": ["cinematic", "tension", "dramatic"],
+        "mood": "dramatic",
+        "yt_fallback": "ytsearch1:cinematic tension background music no copyright dramatic",
+    },
+    "crypto": {
+        "tags": ["futuristic", "electronic", "minimal"],
+        "mood": "tech",
+        "yt_fallback": "ytsearch1:futuristic electronic ambient background music no copyright",
+    },
+    "general": {
+        "tags": ["corporate", "modern", "news"],
+        "mood": "neutral",
+        "yt_fallback": "ytsearch1:modern corporate background music no copyright",
+    },
 }
+
+MUSIC_CACHE_DAYS = 7
+
 
 async def generate_narration(text: str, voice_id: str = DEFAULT_BR_VOICE_ID) -> Optional[str]:
     """
-    Gera narração via ElevenLabs API para o roteiro completo.
-    Retorna o caminho da URL estática (/output/...) do arquivo de áudio gerado.
+    Gera narração via ElevenLabs API.
+    Retorna URL localhost do arquivo MP3 gerado ou None em falha.
     """
     if not ELEVENLABS_API_KEY:
         logger.warning("ELEVENLABS_API_KEY não configurada. Pulando locução.")
         return None
 
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-    headers = {
-        "xi-api-key": ELEVENLABS_API_KEY,
-        "Content-Type": "application/json",
-    }
-    
-    # Payload otimizado para português brasileiro (ElevenLabs Multilingual v2)
+    url     = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    headers = {"xi-api-key": ELEVENLABS_API_KEY, "Content-Type": "application/json"}
     payload = {
         "text": text,
         "model_id": "eleven_multilingual_v2",
         "voice_settings": {
-            "stability": 0.50,
-            "similarity_boost": 0.75,
-            "style": 0.06,
-            "use_speaker_boost": True
-        }
+            "stability": 0.45,
+            "similarity_boost": 0.80,
+            "style": 0.35,
+            "use_speaker_boost": True,
+        },
     }
 
     try:
-        logger.info("Solicitando narração em português brasileiro ao ElevenLabs...")
+        logger.info("Gerando narração no ElevenLabs (Multilingual v2, voz Antoni)...")
         async with httpx.AsyncClient() as client:
-            resp = await client.post(url, json=payload, headers=headers, timeout=45.0)
-            
+            resp = await client.post(url, json=payload, headers=headers, timeout=60.0)
             if resp.status_code != 200:
-                logger.error(f"Erro no ElevenLabs: {resp.status_code} - {resp.text}")
+                logger.error(f"ElevenLabs erro {resp.status_code}: {resp.text[:300]}")
                 return None
-                
-            audio_data = resp.content
-            
-            # Salvar arquivo de áudio na pasta output
             filename = f"narration_{int(time.time())}.mp3"
             filepath = OUTPUT_DIR / filename
-            with open(filepath, "wb") as f:
-                f.write(audio_data)
-                
-            logger.info(f"Áudio de narração salvo com sucesso em {filepath}")
-            return f"http://localhost:8765/output/{filename}"
-            
+            filepath.write_bytes(resp.content)
+            logger.info(f"Narração salva: {filepath.name} ({len(resp.content) // 1024}KB)")
+            return f"{LOCALHOST_BASE}/output/{filename}"
     except Exception as e:
-        logger.error(f"Falha ao gerar áudio no ElevenLabs: {e}", exc_info=True)
+        logger.error(f"ElevenLabs falhou: {e}", exc_info=True)
         return None
 
 
-async def get_epidemic_soundtrack(category: str) -> str:
+async def get_epidemic_soundtrack(category: str) -> Optional[str]:
     """
-    Busca uma trilha sonora licenciada no Epidemic Sound baseada na categoria.
-    Se o token for válido, tenta consumir a API do Epidemic, caso contrário,
-    retorna um link curado premium do pool estático.
+    Busca trilha no Epidemic Sound (Bearer JWT parceiro).
+    Fallback: download via yt-dlp de música royalty-free.
+    Retorna URL localhost do arquivo local ou None.
     """
+    cfg = CATEGORY_MUSIC_CONFIG.get(category, CATEGORY_MUSIC_CONFIG["general"])
+
+    # Verificar cache recente (< 7 dias)
+    cached = _find_cached_music(category)
+    if cached:
+        logger.info(f"Trilha em cache para '{category}': {cached.name}")
+        return f"{LOCALHOST_BASE}/output/media/{cached.name}"
+
+    # 1. Tentar Epidemic Sound API real
     if EPIDEMIC_SOUND_TOKEN:
+        result = await _fetch_epidemic_track(category, cfg)
+        if result:
+            return result
+
+    # 2. Fallback: yt-dlp download de música royalty-free
+    return await _download_music_ytdlp(category, cfg)
+
+
+def _find_cached_music(category: str) -> Optional[Path]:
+    cutoff = time.time() - MUSIC_CACHE_DAYS * 86400
+    for p in MEDIA_DIR.glob(f"music_{category}_*.mp3"):
+        if p.stat().st_mtime > cutoff:
+            return p
+    return None
+
+
+async def _fetch_epidemic_track(category: str, cfg: dict) -> Optional[str]:
+    """Tenta buscar e baixar uma trilha da API do Epidemic Sound."""
+    tags = ",".join(cfg["tags"])
+    endpoints_to_try = [
+        f"https://api.epidemicsound.com/v2/tracks?soundTypes=MUSIC&tags={tags}&pageSize=5&page=1",
+        f"https://api.epidemicsound.com/api/v2/tracks?soundTypes=MUSIC&tags={tags}&pageSize=5",
+        f"https://api.epidemicsound.com/v2/search?q={cfg['mood']}&type=track&pageSize=5",
+    ]
+    headers = {"Authorization": f"Bearer {EPIDEMIC_SOUND_TOKEN}", "Accept": "application/json"}
+
+    for endpoint in endpoints_to_try:
         try:
-            logger.info(f"Buscando trilha no Epidemic Sound para categoria: {category}...")
-            # Exemplo de chamada à API oficial do Epidemic Sound
-            # Substitua com as especificações da API conforme necessário
-            headers = {"Authorization": f"Bearer {EPIDEMIC_SOUND_TOKEN}"}
-            async with httpx.AsyncClient() as client:
-                # Mock ou chamada real de pesquisa de música
-                # resp = await client.get("https://api.epidemicsound.com/v1/tracks", headers=headers)
-                pass
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(endpoint, headers=headers)
+                logger.debug(f"Epidemic Sound {endpoint}: HTTP {resp.status_code}")
+                if resp.status_code != 200:
+                    continue
+
+                data = resp.json()
+                tracks = (
+                    data.get("tracks")
+                    or data.get("results")
+                    or data.get("data", {}).get("tracks")
+                    or []
+                )
+                if not tracks:
+                    continue
+
+                track = tracks[0]
+                audio_url = (
+                    track.get("audioUrl")
+                    or track.get("downloadUrl")
+                    or track.get("streamUrl")
+                    or (track.get("stems", [{}])[0] if track.get("stems") else {}).get("audioUrl")
+                )
+                if not audio_url:
+                    logger.warning("Epidemic Sound track sem audioUrl.")
+                    continue
+
+                track_id = str(track.get("id", "track"))[:8]
+                filename  = f"music_{category}_{track_id}.mp3"
+                dest      = MEDIA_DIR / filename
+                dl_resp   = await client.get(audio_url, headers=headers, timeout=30.0)
+                if dl_resp.status_code == 200 and len(dl_resp.content) > 50_000:
+                    dest.write_bytes(dl_resp.content)
+                    logger.info(f"Trilha Epidemic Sound salva: {filename} ({len(dl_resp.content) // 1024}KB)")
+                    return f"{LOCALHOST_BASE}/output/media/{filename}"
+
         except Exception as e:
-            logger.debug(f"Epidemic Sound API call failed: {e}. Usando trilha premium integrada.")
-            
-    # Fallback seguro para trilha de altíssima qualidade
-    return CATEGORY_MUSIC.get(category, CATEGORY_MUSIC["general"])
+            logger.debug(f"Epidemic Sound {endpoint} falhou: {e}")
+
+    logger.warning("Epidemic Sound API sem trilha utilizável. Usando fallback yt-dlp.")
+    return None
 
 
-async def search_envato_footage(query: str) -> List[Dict[str, Any]]:
+async def _download_music_ytdlp(category: str, cfg: dict) -> Optional[str]:
+    """Baixa música royalty-free do YouTube como fallback."""
+    try:
+        import yt_dlp  # noqa: PLC0415
+    except ImportError:
+        logger.warning("yt-dlp não disponível para fallback de música.")
+        return None
+
+    search_url = cfg["yt_fallback"]
+    cat_hash   = hashlib.md5(category.encode()).hexdigest()[:8]
+    filename   = f"music_{category}_{cat_hash}"
+    output_tpl = str(MEDIA_DIR / f"{filename}.%(ext)s")
+    dest_mp3   = MEDIA_DIR / f"{filename}.mp3"
+
+    ydl_opts = {
+        "format": "bestaudio[ext=m4a]/bestaudio/best",
+        "outtmpl": output_tpl,
+        "noplaylist": True,
+        "quiet": True,
+        "no_warnings": True,
+        "max_filesize": 20 * 1024 * 1024,
+        "match_filter": yt_dlp.utils.match_filter_func("duration > 60 & duration < 600"),
+        "postprocessors": [
+            {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}
+        ],
+    }
+
+    try:
+        logger.info(f"Baixando trilha via yt-dlp para categoria '{category}'...")
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([search_url])
+
+        if dest_mp3.exists() and dest_mp3.stat().st_size > 50_000:
+            logger.info(f"Trilha fallback salva: {dest_mp3.name}")
+            return f"{LOCALHOST_BASE}/output/media/{dest_mp3.name}"
+
+        for p in MEDIA_DIR.glob(f"{filename}.*"):
+            if p.suffix in (".mp3", ".m4a", ".webm") and p.stat().st_size > 50_000:
+                logger.info(f"Trilha fallback (formato alternativo): {p.name}")
+                return f"{LOCALHOST_BASE}/output/media/{p.name}"
+
+    except Exception as e:
+        logger.error(f"yt-dlp fallback de música falhou para '{category}': {e}")
+
+    return None
+
+
+async def search_envato_footage(query: str = "") -> list[dict[str, Any]]:  # noqa: ARG001
     """
-    Busca templates e stock videos no Envato Elements usando a chave configurada.
-    Retorna uma lista de links de b-roll ou templates de alta qualidade.
+    Busca stock footage no Envato Elements.
+    Retorna lista de assets (skeleton — mídia principal agora vem do media_fetcher).
     """
     if not ENVATO_API_KEY:
-        logger.warning("ENVATO_API_KEY não configurada. Pulando busca no Envato.")
         return []
 
-    url = "https://api.envato.com/v1/market/categories" # Endpoint de categorias ou de pesquisa
     headers = {"Authorization": f"Bearer {ENVATO_API_KEY}"}
-    
     try:
-        logger.info(f"Pesquisando stock footage no Envato para: '{query}'...")
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url, headers=headers, timeout=10.0)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://api.envato.com/v1/market/categories",
+                headers=headers,
+            )
             if resp.status_code == 200:
-                logger.info("Pesquisa no Envato retornou com sucesso.")
-                # Retornaria os assets correspondentes
-                
+                logger.info("Envato API acessível.")
     except Exception as e:
-        logger.error(f"Erro ao acessar API do Envato: {e}")
-        
-    # Retorna b-rolls simulados ou fallbacks premium elegantes para preenchimento visual
-    return [
-        {"type": "video", "url": "https://assets.mixkit.co/videos/preview/mixkit-financial-growth-charts-on-a-screen-41716-large.mp4"},
-        {"type": "video", "url": "https://assets.mixkit.co/videos/preview/mixkit-business-woman-analyzing-financial-charts-on-tablet-40742-large.mp4"}
-    ]
+        logger.debug(f"Envato API: {e}")
+
+    return []

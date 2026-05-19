@@ -14,7 +14,6 @@ from ai.video_scene_agent import generate_video_scenes
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Project root = parent of backend/
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _VIDEO_ENTRY  = str(_PROJECT_ROOT / "src" / "renderer" / "video" / "index.ts")
 
@@ -26,7 +25,7 @@ class VideoSceneRequest(BaseModel):
     category: str = "general"
     duration: int = 45
     thumbnail_url: str | None = None
-    # api_key removed — keys are loaded from backend/.env
+    article_url: str | None = None
 
 
 class RenderVideoRequest(BaseModel):
@@ -37,7 +36,7 @@ class RenderVideoRequest(BaseModel):
 
 @router.post("/render-video")
 async def render_video_endpoint(req: RenderVideoRequest):
-    """Render a Reels MP4 via the Remotion CLI — zero Claude tokens involved."""
+    """Render a Reels MP4 via the Remotion CLI."""
     safe = re.sub(r"[^\w\s]", "", req.news_title).strip()
     safe = re.sub(r"\s+", "_", safe)[:40]
     output_path = str(_PROJECT_ROOT / "output" / f"Reels_{safe}_{int(time.time())}.mp4")
@@ -68,7 +67,6 @@ async def render_video_endpoint(req: RenderVideoRequest):
         )
         _, stderr = await proc.communicate()
 
-        # Clean up temp props file
         try:
             os.unlink(props_file)
         except OSError:
@@ -97,29 +95,53 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
         if req.thumbnail_url:
             result["thumbnail_url"] = req.thumbnail_url
 
-        # ── Pipeline Integration: Locução (ElevenLabs), Trilha (Epidemic) e Footages (Envato) ──
-        from ai.voice_and_sound import generate_narration, get_epidemic_soundtrack, search_envato_footage
-        
-        # Concatenar os subtextos de todas as cenas para criar o áudio corrido da locução
-        subtexts = []
-        for s in result.get("scenes", []):
-            txt = s.get("subtext") or s.get("headline")
-            if txt:
-                subtexts.append(txt)
-        
+        from ai.media_fetcher import fetch_article_photos, fetch_youtube_broll
+        from ai.voice_and_sound import generate_narration, get_epidemic_soundtrack
+
+        scenes = result.get("scenes", [])
+
+        # ── Enriquecer cenas com fotos da matéria para cutouts ──
+        article_photos = await fetch_article_photos(
+            article_url=req.article_url,
+            thumbnail_url=req.thumbnail_url,
+        )
+        photo_idx = 0
+
+        # ── Resolver mídia por cena (video B-roll, cutout foto, ilustração) ──
+        for scene in scenes:
+            v_type = scene.get("visual_type", "context")
+
+            if not scene.get("decorator_type"):
+                scene["decorator_type"] = "none"
+
+            if v_type == "video":
+                yt_query = scene.get("youtube_search") or scene.get("media_search_query") or req.title
+                media_url = await fetch_youtube_broll(yt_query, req.category)
+                scene["media_url"] = media_url
+
+            elif v_type == "cutout":
+                # Priorizar foto da matéria; fallback para thumbnail
+                if photo_idx < len(article_photos):
+                    scene["cutout_url"] = article_photos[photo_idx]
+                    photo_idx += 1
+                elif req.thumbnail_url:
+                    scene["cutout_url"] = req.thumbnail_url
+
+            elif v_type == "illustration":
+                # Ilustrações ficam como None; o frontend usa o fallback SVG interno
+                scene.setdefault("media_url", None)
+
+        # ── Narração ElevenLabs — concatenar subtexts de todas as cenas ──
+        subtexts = [s.get("subtext") or s.get("headline", "") for s in scenes if s.get("subtext") or s.get("headline")]
         full_script = ". ".join(subtexts)
         narration_url = await generate_narration(full_script)
-        
-        # Obter trilha sonora licenciada do Epidemic Sound
+
+        # ── Trilha Epidemic Sound (download local garantido) ──
         music_url = await get_epidemic_soundtrack(req.category)
-        
-        # Obter vídeos de b-roll recomendados do Envato Elements
-        envato_assets = await search_envato_footage(req.title)
-        
+
         result["narration_url"] = narration_url
         result["music_url"] = music_url
-        result["envato_assets"] = envato_assets
-        
+
         return result
 
     except Exception as e:

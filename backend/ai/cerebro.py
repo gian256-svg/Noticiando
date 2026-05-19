@@ -7,6 +7,10 @@ import os
 import logging
 from pathlib import Path
 from typing import Dict, Any, List
+from dotenv import load_dotenv
+
+# Carregar variáveis do arquivo .env
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 logger = logging.getLogger("noticiando.cerebro")
 
