@@ -8,15 +8,26 @@ import { OnboardingModal } from "@/components/onboarding/OnboardingModal";
 import { useConfigStore } from "@/store/configStore";
 import { useFeedStore } from "@/store/feedStore";
 import { useNewsFeed } from "@/hooks/useNewsFeed";
+import { getApiBase } from "@/lib/api";
 
 export default function App() {
-  const { isOnboarded } = useConfigStore();
+  const { isOnboarded, crawlInterval } = useConfigStore();
   const { selectedNews } = useFeedStore();
   const { startPolling } = useNewsFeed();
 
   useEffect(() => {
-    if (isOnboarded) startPolling();
-  }, [isOnboarded]);
+    if (isOnboarded) {
+      startPolling();
+      // Sync crawlInterval to backend on startup or change
+      getApiBase().then((base) => {
+        fetch(`${base}/config`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ crawl_interval_minutes: crawlInterval }),
+        }).catch((err) => console.error("Failed to sync config to backend:", err));
+      });
+    }
+  }, [isOnboarded, crawlInterval]);
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">

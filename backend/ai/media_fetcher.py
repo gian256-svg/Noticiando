@@ -3,6 +3,7 @@ media_fetcher.py — Download de B-roll (YouTube via yt-dlp) e fotos (artigo + f
 para enriquecer visualmente as cenas dos Reels.
 """
 
+import asyncio
 import hashlib
 import logging
 import time

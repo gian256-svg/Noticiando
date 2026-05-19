@@ -1,8 +1,8 @@
 import { useRef, useCallback } from "react";
 import { useFeedStore } from "@/store/feedStore";
+import { useConfigStore } from "@/store/configStore";
 import { getApiBase } from "@/lib/api";
 
-const POLL_INTERVAL_MS = 2 * 60 * 1000;
 const FETCH_DEBOUNCE_MS = 30_000;
 
 export function useNewsFeed() {
@@ -26,42 +26,66 @@ export function useNewsFeed() {
     }
   }, [setNews, setCrawlerStatus]);
 
-  const startPolling = useCallback(async () => {
-    setLoading(true);
-    await fetchNews();
-    setLoading(false);
+  const connectSSE = useCallback(async () => {
+    if (sseRef.current) return;
+    try {
+      const base = await getApiBase();
+      const sse = new EventSource(`${base}/news/feed`);
+      sseRef.current = sse;
 
-    const base = await getApiBase();
-    const sse = new EventSource(`${base}/news/feed`);
-    sseRef.current = sse;
+      sse.onmessage = (e) => {
+        try {
+          const items = JSON.parse(e.data);
+          appendNews(Array.isArray(items) ? items : [items]);
+        } catch {}
+      };
 
-    sse.onmessage = (e) => {
-      try {
-        const items = JSON.parse(e.data);
-        appendNews(Array.isArray(items) ? items : [items]);
-      } catch {}
-    };
+      sse.addEventListener("crawling", () => setCrawlerStatus("crawling"));
+      sse.addEventListener("idle", () => {
+        setCrawlerStatus("idle");
+        lastFetchRef.current = 0; // bypass debounce
+        fetchNews();
+      });
 
-    sse.addEventListener("crawling", () => setCrawlerStatus("crawling"));
-    sse.addEventListener("idle", () => {
-      setCrawlerStatus("idle");
-      lastFetchRef.current = 0; // bypass debounce — sempre re-fetch após ciclo do crawler
-      fetchNews();
-    });
-    sse.onerror = () => {
+      sse.onerror = () => {
+        setCrawlerStatus("error");
+        sse.close();
+        sseRef.current = null;
+        // Schedule retry for SSE connection in 5s
+        setTimeout(() => connectSSE(), 5_000);
+      };
+    } catch {
       setCrawlerStatus("error");
-      sse.close();
-      sseRef.current = null;
-      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-      setTimeout(() => startPolling(), 5_000);
-    };
+      setTimeout(() => connectSSE(), 5_000);
+    }
+  }, [fetchNews, appendNews, setCrawlerStatus]);
 
-    pollRef.current = setInterval(fetchNews, POLL_INTERVAL_MS);
-  }, [fetchNews, appendNews, setCrawlerStatus, setLoading]);
+  const startPolling = useCallback(async () => {
+    // Only show loading spinner on initial load if we don't have news items yet
+    const currentNews = useFeedStore.getState().allNews;
+    const isInitial = currentNews.length === 0;
+    if (isInitial) setLoading(true);
+    await fetchNews();
+    if (isInitial) setLoading(false);
+
+    // Connect to Server-Sent Events
+    connectSSE();
+
+    // Start fallback interval polling using the user-defined crawlInterval
+    if (pollRef.current) clearInterval(pollRef.current);
+    const intervalMinutes = useConfigStore.getState().crawlInterval || 2;
+    pollRef.current = setInterval(fetchNews, intervalMinutes * 60 * 1000);
+  }, [fetchNews, connectSSE, setLoading]);
 
   const stopPolling = useCallback(() => {
-    sseRef.current?.close();
-    if (pollRef.current) clearInterval(pollRef.current);
+    if (sseRef.current) {
+      sseRef.current.close();
+      sseRef.current = null;
+    }
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
   }, []);
 
   return { startPolling, stopPolling, fetchNews };

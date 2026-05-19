@@ -318,5 +318,32 @@ Agora após cada ciclo de crawl o frontend re-fetcha o feed completo.
 
 ---
 
-*Última atualização: 2026-05-18*
+## BUG-011 — Notícias param de atualizar após abrir Roteiro / gerar Reels devido a bloqueios e dessincronização de intervalo
+
+**Data:** 2026-05-19
+**Área:** Backend + Frontend — `useNewsFeed.ts`, `configStore.ts`, `scheduler.py`, `config.py`
+**Severidade:** Alta
+
+### Sintoma
+Ao abrir o painel de roteiro ou gerar Reels, as notícias no feed paravam de atualizar. Além disso, a frequência de atualização (ex: 5 min) configurada pelo usuário na interface não era aplicada no backend.
+
+### Causa Raiz
+1. **Dessincronização de Intervalo**: O frontend armazenava `crawlInterval` localmente, mas nunca enviava essa configuração ao backend via endpoint `PUT /config`. O backend continuava executando com o intervalo padrão (2 min).
+2. **Loop de Erro no SSE**: No frontend, quando ocorria um erro no SSE (por exemplo, devido a instabilidade de conexão), a função `startPolling()` era recriada integralmente a cada 5 segundos. Isso causava chamadas excessivas a `setLoading(true)` (travando a UI com spinner) e criava loops de requisições que podiam travar a fila.
+3. **Bloqueio de Thread**: O download do B-roll no backend via `yt-dlp` era síncrono e bloqueava o loop principal da API, fazendo com que requisições de status do SSE expirassem no frontend, derrubando o stream. (Embora threads tenham sido introduzidas na sessão anterior, a instabilidade da conexão por conta de reconexões agressivas do frontend ainda persistia).
+
+### Solução Aplicada
+1. **Sincronização de Configuração**: Modificada a ação `setCrawlInterval` no Zustand `configStore.ts` e o `useEffect` de inicialização no `App.tsx` para sincronizar o intervalo de crawl via chamada HTTP `PUT /config` ao backend.
+2. **Rescheduling no Backend**: Implementada a função `reschedule_crawler(minutes)` no `scheduler.py` do backend, que é acionada pelo endpoint `PUT /config` para atualizar dinamicamente a frequência do APScheduler.
+3. **Refatoração Resiliente do Frontend**:
+   - Isolada a conexão do SSE (`connectSSE`) para rodar e reconectar de forma silenciosa no background sem disparar `setLoading(true)` repetidamente.
+   - O spinner de carregamento global só é ativado se o feed estiver completamente vazio (carregamento inicial).
+   - O fallback de polling de notícias agora lê dinamicamente do `crawlInterval` do usuário e limpa o intervalo anterior corretamente antes de agendar o novo, evitando vazamento de timers.
+
+### Regra Para Nunca Repetir
+> Toda configuração alterada pelo usuário na interface (Settings) que afete processos do backend (frequência de crawl, caminhos, etc.) deve ser imediatamente propagada para a API e refletida em tempo de execução nos schedulers do servidor.
+
+---
+
+*Última atualização: 2026-05-19*
 *Mantenedor: Antigravity AI + Grupo Primo*

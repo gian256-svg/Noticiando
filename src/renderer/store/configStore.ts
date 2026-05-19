@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { getApiBase } from "@/lib/api";
 
 export interface NewsSource {
   name: string;
@@ -67,7 +68,16 @@ export const useConfigStore = create<ConfigStore>()(
           ),
         })),
 
-      setCrawlInterval: (crawlInterval) => set({ crawlInterval }),
+      setCrawlInterval: (crawlInterval) => {
+        set({ crawlInterval });
+        getApiBase().then((base) => {
+          fetch(`${base}/config`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ crawl_interval_minutes: crawlInterval }),
+          }).catch((err) => console.error("Failed to sync crawl interval to backend:", err));
+        });
+      },
       setActiveCategories: (activeCategories) => set({ activeCategories }),
       setOnboarded: (isOnboarded) => set({ isOnboarded }),
       setSettingsOpen: (settingsOpen) => set({ settingsOpen }),

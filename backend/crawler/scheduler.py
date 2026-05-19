@@ -206,6 +206,14 @@ async def run_crawl():
         db.close()
 
 
+def reschedule_crawler(minutes: int):
+    scheduler.reschedule_job(
+        "crawl",
+        trigger=IntervalTrigger(minutes=minutes),
+    )
+    logger.info(f"Rescheduled crawler to run every {minutes} minutes")
+
+
 def start_scheduler():
     interval = int(os.getenv("CRAWL_INTERVAL_MINUTES", "2"))
     scheduler.add_job(

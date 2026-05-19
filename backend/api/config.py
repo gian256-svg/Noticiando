@@ -23,5 +23,9 @@ async def get_config():
 async def update_config(body: ConfigUpdate):
     if body.crawl_interval_minutes is not None:
         os.environ["CRAWL_INTERVAL_MINUTES"] = str(body.crawl_interval_minutes)
-        # TODO: reschedule crawler with new interval
+        from crawler.scheduler import reschedule_crawler
+        try:
+            reschedule_crawler(body.crawl_interval_minutes)
+        except Exception as e:
+            logger.error(f"Failed to reschedule crawler: {e}", exc_info=True)
     return {"status": "updated"}
