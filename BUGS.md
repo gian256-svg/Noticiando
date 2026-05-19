@@ -345,5 +345,36 @@ Ao abrir o painel de roteiro ou gerar Reels, as notícias no feed paravam de atu
 
 ---
 
+## BUG-012 — Botão "N novas notícias" não mostra as notícias ao clicar
+
+**Data:** 2026-05-19
+**Área:** Frontend — `feedStore.ts`, `NewsFeed.tsx`
+**Severidade:** Alta (UX)
+
+### Sintoma
+O botão "↑ N novas notícias" aparecia corretamente quando o SSE empurrava itens novos, mas clicar nele não produzia nenhuma mudança visível. As notícias exibidas no feed permaneciam as mesmas.
+
+### Causa Raiz
+`appendNews` adicionava os novos itens diretamente em `filteredNews` **imediatamente** ao receber o SSE — antes do usuário clicar. O botão servia apenas como atalho de scroll (`scrollToTop`). Se o usuário já estava no topo da timeline, `scrollTo({ top: 0 })` era um no-op silencioso, e a ação de `clearLiveCount` apenas apagava o contador sem nenhuma mudança perceptível no feed.
+
+O padrão esperado (Twitter/X-style) era: novos itens ficam **em espera** e só entram na timeline após o clique.
+
+### Solução Aplicada
+Implementado buffer `pendingNews` no store:
+- `appendNews` agora guarda itens genuinamente novos em `pendingNews` em vez de adicioná-los a `filteredNews`
+- `liveCount` reflete `pendingNews.length`
+- Nova ação `flushPendingNews()`: move `pendingNews` para `allNews`/`filteredNews` + zera contador
+- `setNews` (full-refresh periódico) limpa `pendingNews` e `liveCount`, pois o backend já retorna todos os itens na resposta completa
+- `NewsFeed.tsx`: `onClick` do botão chama `flushPendingNews()` e usa `requestAnimationFrame` para garantir que o scroll só acontece após o React inserir os novos cards no DOM
+
+### Regra Para Nunca Repetir
+> Nunca usar `appendNews` para adicionar itens diretamente ao feed e depois mostrar
+> um botão de "novos itens". Novos itens chegados por push (SSE/WebSocket) devem
+> sempre ir para um **buffer pendente** e ser promovidos ao feed somente por ação
+> explícita do usuário (clique) ou por full-refresh. O botão deve ser uma ação
+> de "flush", não um atalho de scroll.
+
+---
+
 *Última atualização: 2026-05-19*
 *Mantenedor: Antigravity AI + Grupo Primo*

@@ -34,4 +34,5 @@ class NewsItem(Base):
             "viral_score": round(self.viral_score, 1),
             "thumbnail_url": self.thumbnail_url,
             "published_at": (self.published_at.isoformat() + "Z") if self.published_at else None,
+            "created_at": (self.created_at.isoformat() + "Z") if self.created_at else None,
         }

@@ -11,6 +11,7 @@ interface FeedFilters {
 interface FeedStore {
   allNews: NewsItem[];
   filteredNews: NewsItem[];
+  pendingNews: NewsItem[];   // buffer — not yet shown in timeline
   selectedNews: NewsItem | null;
   filters: FeedFilters;
   crawlerStatus: "idle" | "crawling" | "error";
@@ -21,6 +22,7 @@ interface FeedStore {
 
   setNews: (news: NewsItem[]) => void;
   appendNews: (news: NewsItem[]) => void;
+  flushPendingNews: () => void;
   setSelectedNews: (news: NewsItem | null) => void;
   setFilters: (filters: Partial<FeedFilters>) => void;
   setCrawlerStatus: (status: "idle" | "crawling" | "error") => void;
@@ -49,7 +51,7 @@ function applyFilters(news: NewsItem[], filters: FeedFilters): NewsItem[] {
   if (filters.period !== "7d") {
     const hours = { "1h": 1, "6h": 6, "24h": 24, "7d": 168 }[filters.period] ?? 6;
     const cutoff = new Date(Date.now() - hours * 3600 * 1000);
-    result = result.filter((n) => new Date(n.published_at) >= cutoff);
+    result = result.filter((n) => new Date(n.created_at || n.published_at) >= cutoff);
   }
 
   if (filters.search.trim()) {
@@ -63,7 +65,9 @@ function applyFilters(news: NewsItem[], filters: FeedFilters): NewsItem[] {
 
   // Timeline: newest first, viral score as tiebreaker within the same minute
   return result.sort((a, b) => {
-    const tDiff = new Date(b.published_at).getTime() - new Date(a.published_at).getTime();
+    const timeA = new Date(a.created_at || a.published_at).getTime();
+    const timeB = new Date(b.created_at || b.published_at).getTime();
+    const tDiff = timeB - timeA;
     if (Math.abs(tDiff) > 60_000) return tDiff;
     return b.viral_score - a.viral_score;
   });
@@ -72,6 +76,7 @@ function applyFilters(news: NewsItem[], filters: FeedFilters): NewsItem[] {
 export const useFeedStore = create<FeedStore>((set, get) => ({
   allNews: [],
   filteredNews: [],
+  pendingNews: [],
   selectedNews: null,
   filters: DEFAULT_FILTERS,
   crawlerStatus: "idle",
@@ -81,37 +86,70 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   newItemIds: new Set<string>(),
 
   setNews: (news) => {
+    // Full refresh — absorb any pending items (backend already includes them)
     const filtered = applyFilters(news, get().filters);
-    set({ allNews: news, filteredNews: filtered, newsCount: filtered.length });
+    set({
+      allNews: news,
+      filteredNews: filtered,
+      newsCount: filtered.length,
+      pendingNews: [],
+      liveCount: 0,
+      newItemIds: new Set<string>(),
+    });
   },
 
   appendNews: (incoming) => {
     const existing = get().allNews;
+    const pending = get().pendingNews;
+    const allKnownIds = new Set([...existing.map((n) => n.id), ...pending.map((n) => n.id)]);
+    const truly_new = incoming.filter((n) => !allKnownIds.has(n.id));
+
+    // Backfill thumbnails for items already in the visible feed
     const existingIds = new Set(existing.map((n) => n.id));
-    const newItems = incoming.filter((n) => !existingIds.has(n.id));
-    // Backfill thumbnails for items that now have og:image but didn't before
     const thumbUpdates = new Map(
       incoming
         .filter((n) => existingIds.has(n.id) && n.thumbnail_url)
         .map((n) => [n.id, n.thumbnail_url!])
     );
-    if (!newItems.length && !thumbUpdates.size) return;
-    const merged = thumbUpdates.size
+
+    if (!truly_new.length && !thumbUpdates.size) return;
+
+    // Apply thumbnail updates to already-visible items
+    const updatedAll = thumbUpdates.size
       ? existing.map((n) =>
           thumbUpdates.has(n.id) && !n.thumbnail_url
             ? { ...n, thumbnail_url: thumbUpdates.get(n.id) }
             : n
         )
       : existing;
-    const all = [...newItems, ...merged];
+
+    const newIds = new Set([...get().newItemIds, ...truly_new.map((n) => n.id)]);
+    set({
+      allNews: updatedAll,
+      filteredNews: thumbUpdates.size ? applyFilters(updatedAll, get().filters) : get().filteredNews,
+      // Hold new items in pending buffer — NOT added to feed yet
+      pendingNews: [...pending, ...truly_new],
+      liveCount: pending.length + truly_new.length,
+      newItemIds: newIds,
+    });
+  },
+
+  // Flush pending buffer into the visible feed and reset counter
+  flushPendingNews: () => {
+    const pending = get().pendingNews;
+    if (!pending.length) {
+      set({ liveCount: 0, newItemIds: new Set<string>() });
+      return;
+    }
+    const all = [...pending, ...get().allNews];
     const filtered = applyFilters(all, get().filters);
-    const newIds = new Set([...get().newItemIds, ...newItems.map((n) => n.id)]);
     set({
       allNews: all,
       filteredNews: filtered,
       newsCount: filtered.length,
-      liveCount: get().liveCount + newItems.length,
-      newItemIds: newIds,
+      pendingNews: [],
+      liveCount: 0,
+      newItemIds: new Set<string>(),
     });
   },
 
@@ -125,5 +163,5 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
 
   setCrawlerStatus: (crawlerStatus) => set({ crawlerStatus }),
   setLoading: (isLoading) => set({ isLoading }),
-  clearLiveCount: () => set({ liveCount: 0, newItemIds: new Set<string>() }),
+  clearLiveCount: () => set({ liveCount: 0, pendingNews: [], newItemIds: new Set<string>() }),
 }));

@@ -1,7 +1,7 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import { useFeedStore } from "@/store/feedStore";
 import { useConfigStore } from "@/store/configStore";
-import { getApiBase } from "@/lib/api";
+import { getApiBase, clearPortCache } from "@/lib/api";
 
 const FETCH_DEBOUNCE_MS = 30_000;
 
@@ -22,6 +22,8 @@ export function useNewsFeed() {
       const data = await res.json();
       setNews(data.items ?? []);
     } catch {
+      // Reset debounce so the next poll cycle or backend:ready can retry immediately
+      lastFetchRef.current = 0;
       setCrawlerStatus("error");
     }
   }, [setNews, setCrawlerStatus]);
@@ -87,6 +89,19 @@ export function useNewsFeed() {
       pollRef.current = null;
     }
   }, []);
+
+  // When the sidecar finishes starting (backend:ready), clear the cached port
+  // and retry fetch+SSE so a race-condition early load always recovers automatically
+  useEffect(() => {
+    if (!window.noticiando?.on) return;
+    const unsub = window.noticiando.on("backend:ready", () => {
+      clearPortCache();
+      lastFetchRef.current = 0;
+      fetchNews();
+      if (!sseRef.current) connectSSE();
+    });
+    return unsub;
+  }, [fetchNews, connectSSE]);
 
   return { startPolling, stopPolling, fetchNews };
 }

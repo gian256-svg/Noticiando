@@ -325,6 +325,24 @@ async def crawl_all_sources(sources: list[Source]) -> list[dict]:
         if isinstance(result, list):
             items.extend(result)
 
+    # ── Phase 1.5: Query existing DB hashes to prevent redundant work ───────
+    try:
+        from db.database import SessionLocal
+        from models.news import NewsItem
+        from datetime import datetime, timedelta
+        db = SessionLocal()
+        # Query existing hashes from the last 7 days
+        cutoff = datetime.now() - timedelta(days=7)
+        existing_hashes = {
+            h[0] for h in db.query(NewsItem.title_hash)
+            .filter(NewsItem.published_at >= cutoff)
+            .all()
+        }
+        db.close()
+    except Exception as e:
+        logger.warning(f"Failed to pre-query existing hashes: {e}")
+        existing_hashes = set()
+
     # ── Phase 2: og:image enrichment (NEW client — the RSS one is closed) ──
     def _og_blocked(url: str) -> bool:
         from urllib.parse import urlparse
@@ -335,9 +353,13 @@ async def crawl_all_sources(sources: list[Source]) -> list[dict]:
         }
         return any(netloc == base or netloc.endswith("." + base) for base in blocked_bases)
 
+    # Only attempt og:image enrichment for genuinely new items (not in DB)
     missing = [
         item for item in items
-        if not item.get("thumbnail_url") and item.get("url") and not _og_blocked(item["url"])
+        if not item.get("thumbnail_url")
+        and item.get("url")
+        and not _og_blocked(item["url"])
+        and item["title_hash"] not in existing_hashes
     ]
     if missing:
         sem = asyncio.Semaphore(8)
@@ -350,17 +372,23 @@ async def crawl_all_sources(sources: list[Source]) -> list[dict]:
 
             await asyncio.gather(*[enrich(item) for item in missing], return_exceptions=True)
 
-    # ── Phase 3: EN→PT-BR translation ──────────────────────────────────────
-    en_count = sum(1 for i in items if i.get("language") == "en")
-    if en_count:
+    # ── Phase 3: any-lang→PT-BR translation ────────────────────────────────
+    # Translate all genuinely new items that are not already in PT-BR
+    non_pt_targets = [
+        item for item in items
+        if item.get("language", "pt") != "pt"
+        and item["title_hash"] not in existing_hashes
+    ]
+    translate_count = len(non_pt_targets)
+    if translate_count:
         try:
             from ai.translator import translate_batch
-            await translate_batch(items)
+            await translate_batch(non_pt_targets)
         except Exception as e:
             logger.warning(f"Translation phase failed (non-blocking): {e}")
 
-    logger.info(f"crawl_all_sources done — {len(items)} items, "
+    logger.info(f"crawl_all_sources done — {len(items)} items ({len(items) - len(existing_hashes)} new), "
                 f"{sum(1 for i in items if i.get('thumbnail_url'))} with thumbnails, "
-                f"{en_count} EN translated")
+                f"{translate_count} translated to PT-BR")
     return items
 

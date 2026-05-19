@@ -16,6 +16,7 @@ export interface NewsItem {
   viral_score: number;
   category: string;
   published_at: string;
+  created_at?: string;
   thumbnail_url?: string;
   source_count: number;
   url: string;
@@ -51,7 +52,7 @@ function categoryClass(cat: string) {
 export function NewsCard({ news, isSelected, featured = false }: NewsCardProps) {
   const { setSelectedNews } = useFeedStore();
   useRelativeTimeTick(); // re-render every 60s so timestamps stay fresh
-  const isNew = isWithinMinutes(news.published_at, 30);
+  const isNew = isWithinMinutes(news.created_at || news.published_at, 30);
 
   if (featured) return <FeaturedCard news={news} isSelected={isSelected} />;
 
@@ -85,7 +86,7 @@ export function NewsCard({ news, isSelected, featured = false }: NewsCardProps) 
           <SourceChips sources={news.sources} maxVisible={2} />
           <div className="flex items-center gap-1 text-[9px] text-text-muted shrink-0">
             <Clock size={9} />
-            {formatDistanceToNow(news.published_at)}
+            {formatDistanceToNow(news.created_at || news.published_at)}
           </div>
         </div>
       </div>
@@ -96,7 +97,7 @@ export function NewsCard({ news, isSelected, featured = false }: NewsCardProps) 
 function FeaturedCard({ news, isSelected }: { news: NewsItem; isSelected: boolean }) {
   const { setSelectedNews } = useFeedStore();
   useRelativeTimeTick(); // re-render every 60s so timestamps stay fresh
-  const isNew = isWithinMinutes(news.published_at, 30);
+  const isNew = isWithinMinutes(news.created_at || news.published_at, 30);
 
   return (
     <div

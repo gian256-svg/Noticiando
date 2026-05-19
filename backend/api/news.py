@@ -34,7 +34,7 @@ async def list_news(
 
     q = db.query(NewsItem).filter(
         NewsItem.is_active == True,
-        NewsItem.published_at >= cutoff,
+        NewsItem.created_at >= cutoff,
         NewsItem.viral_score >= min_score,
     )
 
@@ -44,7 +44,7 @@ async def list_news(
     if sort == "viral_score":
         q = q.order_by(NewsItem.viral_score.desc())
     else:
-        q = q.order_by(NewsItem.published_at.desc())
+        q = q.order_by(NewsItem.created_at.desc())
 
     total = q.count()
     items = q.offset(offset).limit(limit).all()

@@ -184,7 +184,7 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
               {CATEGORY_LABELS[news.category] ?? news.category}
             </span>
             <span className="text-[10px] text-text-secondary ml-auto">
-              {formatDistanceToNow(news.published_at)}
+              {formatDistanceToNow(news.created_at || news.published_at)}
             </span>
           </div>
 

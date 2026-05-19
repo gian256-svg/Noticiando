@@ -1,4 +1,5 @@
 export function formatDistanceToNow(dateStr: string): string {
+  if (!dateStr) return "";
   const date = new Date(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -8,7 +9,9 @@ export function formatDistanceToNow(dateStr: string): string {
   const diffD = Math.floor(diffH / 24);
 
   if (diffSec < 60) return "agora";
-  if (diffMin < 60) return `${diffMin}min`;
-  if (diffH < 24) return `${diffH}h`;
-  return `${diffD}d`;
+  if (diffMin < 60) return `${diffMin} min atrás`;
+  if (diffH < 24) return `${diffH} h atrás`;
+  return `${diffD} d atrás`;
 }
+
+

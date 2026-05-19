@@ -5,15 +5,18 @@ import { useFeedStore } from "@/store/feedStore";
 import { useConfigStore } from "@/store/configStore";
 
 export function NewsFeed() {
-  const { filteredNews, selectedNews, isLoading, newsCount, liveCount, clearLiveCount } =
+  const { filteredNews, selectedNews, isLoading, newsCount, liveCount, flushPendingNews } =
     useFeedStore();
   const { isOnboarded } = useConfigStore();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scrollToTop = useCallback(() => {
-    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-    clearLiveCount();
-  }, [clearLiveCount]);
+    // Flush pending items into the feed first, then scroll to top so user sees them
+    flushPendingNews();
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }, [flushPendingNews]);
 
   const scrollToBottom = useCallback(() => {
     if (!scrollRef.current) return;

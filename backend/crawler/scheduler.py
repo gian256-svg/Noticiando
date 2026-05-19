@@ -92,6 +92,30 @@ async def run_crawl():
         new_items: list[NewsItem] = []
         updated_items: list[NewsItem] = []
 
+        # Pre-fetch all active news items once to avoid querying in the loop
+        existing_active = db.query(NewsItem).filter(NewsItem.is_active == True).all()
+
+        # Pre-calculate normalized titles / bigrams of the active database items with thumbnails
+        from crawler.deduplicator import normalize_title
+        active_candidates = []
+        for item in existing_active:
+            if item.thumbnail_url:
+                norm = normalize_title(item.title)
+                words = norm.split()
+                bg = {f"{words[i]} {words[i+1]}" for i in range(len(words) - 1)} if len(words) > 1 else set(words)
+                if bg:
+                    active_candidates.append((item.thumbnail_url, bg))
+
+        # Pre-calculate bigrams of raw crawled items that have thumbnails
+        raw_with_thumb_candidates = []
+        for other_item in raw_items:
+            if other_item.get("thumbnail_url"):
+                norm = normalize_title(other_item["title"])
+                words = norm.split()
+                bg = {f"{words[i]} {words[i+1]}" for i in range(len(words) - 1)} if len(words) > 1 else set(words)
+                if bg:
+                    raw_with_thumb_candidates.append((other_item["thumbnail_url"], bg))
+
         for h, group in hash_groups.items():
             existing = db.query(NewsItem).filter_by(title_hash=h).first()
             merged_sources = list({s for item in group for s in item["sources"]})
@@ -104,27 +128,30 @@ async def run_crawl():
 
             # 2. Se ainda não temos thumbnail, buscar por similaridade com outros itens
             if not best_thumb:
-                from crawler.deduplicator import titles_are_similar
                 base_title = existing.title if existing else group[0]["title"]
+                norm_a = normalize_title(base_title)
+                words_a = norm_a.split()
+                bg_a = {f"{words_a[i]} {words_a[i+1]}" for i in range(len(words_a) - 1)} if len(words_a) > 1 else set(words_a)
                 
-                # Buscar nos outros itens recém-coletados
-                for other_item in raw_items:
-                    if other_item.get("thumbnail_url") and titles_are_similar(base_title, other_item["title"]):
-                        best_thumb = other_item["thumbnail_url"]
-                        logger.info(f"Borrowed thumbnail from similar raw item: '{other_item['title'][:50]}' -> '{base_title[:50]}'")
-                        break
-                
-                # Se não encontrou, buscar no banco (itens ativos com miniatura)
-                if not best_thumb:
-                    active_with_thumb = db.query(NewsItem).filter(
-                        NewsItem.is_active == True,
-                        NewsItem.thumbnail_url != None
-                    ).all()
-                    for other_item in active_with_thumb:
-                        if titles_are_similar(base_title, other_item.title):
-                            best_thumb = other_item.thumbnail_url
-                            logger.info(f"Borrowed thumbnail from similar DB item: '{other_item.title[:50]}' -> '{base_title[:50]}'")
+                if bg_a:
+                    # Buscar nos outros itens recém-coletados
+                    for thumb_url, bg_b in raw_with_thumb_candidates:
+                        intersection = len(bg_a & bg_b)
+                        union = len(bg_a | bg_b)
+                        if union > 0 and (intersection / union) >= 0.75:
+                            best_thumb = thumb_url
+                            logger.info(f"Borrowed thumbnail from similar raw item: '{base_title[:50]}'")
                             break
+                    
+                    # Se não encontrou, buscar no banco (itens ativos com miniatura)
+                    if not best_thumb:
+                        for thumb_url, bg_b in active_candidates:
+                            intersection = len(bg_a & bg_b)
+                            union = len(bg_a | bg_b)
+                            if union > 0 and (intersection / union) >= 0.75:
+                                best_thumb = thumb_url
+                                logger.info(f"Borrowed thumbnail from similar DB item: '{base_title[:50]}'")
+                                break
 
             if existing:
                 changed = False
@@ -163,7 +190,6 @@ async def run_crawl():
 
                 # Verifica relevância calculando score prévio
                 from scoring.viral_scorer import score_news
-                existing_active = db.query(NewsItem).filter(NewsItem.is_active == True).all()
                 prelim_score = score_news(temp_item, existing_active + new_items)
 
                 if prelim_score < 10.0:

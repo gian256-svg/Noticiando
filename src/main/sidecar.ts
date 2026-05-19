@@ -85,7 +85,7 @@ export function getBackendPort(): number {
   return backendPort;
 }
 
-async function waitForBackend(port: number, retries = 30, delayMs = 500): Promise<void> {
+async function waitForBackend(port: number, retries = 60, delayMs = 1000): Promise<void> {
   for (let i = 0; i < retries; i++) {
     try {
       const response = await fetch(`http://localhost:${port}/health`);
