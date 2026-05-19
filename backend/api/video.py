@@ -14,6 +14,29 @@ from ai.video_scene_agent import generate_video_scenes
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+def _get_localhost() -> str:
+    port = os.getenv("PORT", "8765")
+    return f"http://localhost:{port}"
+
+
+def _resolve_static_asset(keyword: str) -> str | None:
+    local_base = _get_localhost()
+    assets = {
+        "nigro":   f"{local_base}/output/assets/cutout_nigro.png",
+        "primo":   f"{local_base}/output/assets/cutout_nigro.png",
+        "perini":  f"{local_base}/output/assets/cutout_perini.png",
+        "money":   f"{local_base}/output/assets/cutout_money.png",
+        "briefcase": f"{local_base}/output/assets/cutout_money.png",
+        "growth":  f"{local_base}/output/assets/illustration_growth.png",
+        "chart":   f"{local_base}/output/assets/illustration_growth.png",
+        "crypto":  f"{local_base}/output/assets/illustration_crypto.png",
+        "bitcoin": f"{local_base}/output/assets/illustration_crypto.png",
+    }
+    for key, url in assets.items():
+        if key in keyword:
+            return url
+    return None
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _VIDEO_ENTRY  = str(_PROJECT_ROOT / "src" / "renderer" / "video" / "index.ts")
 
@@ -114,22 +137,38 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
             if not scene.get("decorator_type"):
                 scene["decorator_type"] = "none"
 
-            if v_type == "video":
-                yt_query = scene.get("youtube_search") or scene.get("media_search_query") or req.title
-                media_url = await fetch_youtube_broll(yt_query, req.category)
-                scene["media_url"] = media_url
+            # 1. Resolver vídeo de fundo (background_video_url) para todas as cenas para garantir dinamismo e movimento contínuo
+            yt_query = scene.get("youtube_search") or scene.get("media_search_query") or req.title
+            bg_video = await fetch_youtube_broll(yt_query, req.category)
+            scene["background_video_url"] = bg_video
+            scene["media_url"] = bg_video  # retrocompatibilidade
 
-            elif v_type == "cutout":
-                # Priorizar foto da matéria; fallback para thumbnail
-                if photo_idx < len(article_photos):
+            # 2. Resolver cutouts (imagens de colagem recortadas)
+            if v_type == "cutout":
+                kw = (scene.get("media_keyword") or "").lower()
+                static_asset = _resolve_static_asset(kw)
+                if static_asset:
+                    scene["cutout_url"] = static_asset
+                elif photo_idx < len(article_photos):
                     scene["cutout_url"] = article_photos[photo_idx]
                     photo_idx += 1
                 elif req.thumbnail_url:
                     scene["cutout_url"] = req.thumbnail_url
+                else:
+                    # Garantir que há sempre um cutout no estilo colagem editorial
+                    scene["cutout_url"] = f"{_get_localhost()}/output/assets/cutout_money.png"
 
+            # 3. Resolver ilustrações (gráficos ou desenhos estilizados)
             elif v_type == "illustration":
-                # Ilustrações ficam como None; o frontend usa o fallback SVG interno
-                scene.setdefault("media_url", None)
+                kw = (scene.get("media_keyword") or "").lower()
+                static_asset = _resolve_static_asset(kw)
+                if static_asset:
+                    scene["illustration_url"] = static_asset
+                    scene["media_url"] = static_asset  # retrocompatibilidade
+                else:
+                    fallback_ill = f"{_get_localhost()}/output/assets/illustration_growth.png"
+                    scene["illustration_url"] = fallback_ill
+                    scene["media_url"] = fallback_ill  # retrocompatibilidade
 
         # ── Narração ElevenLabs — concatenar subtexts de todas as cenas ──
         subtexts = [s.get("subtext") or s.get("headline", "") for s in scenes if s.get("subtext") or s.get("headline")]

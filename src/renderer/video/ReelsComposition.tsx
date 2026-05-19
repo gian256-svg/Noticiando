@@ -21,6 +21,10 @@ export interface ReelsScene {
   media_url?: string;
   cutout_url?: string;
   decorator_type?: "star" | "arrow" | "circle" | "stripes" | "none";
+  youtube_search?: string;
+  media_keyword?: string;
+  background_video_url?: string;
+  illustration_url?: string;
 }
 
 export interface ReelsCompositionProps {
@@ -33,13 +37,15 @@ export interface ReelsCompositionProps {
   music_url?: string;
 }
 
-const CATEGORY_PALETTE: Record<string, { bg: string; grad: string; accent: string; dim: string }> = {
-  investments:  { bg: "#060A12", grad: "#0C172A", accent: "#F97316", dim: "#F9731620" },
-  economy_br:   { bg: "#040D0A", grad: "#0A1F18", accent: "#10B981", dim: "#10B98120" },
-  economy_int:  { bg: "#07070C", grad: "#0F112D", accent: "#6366F1", dim: "#6366F120" },
-  geopolitics:  { bg: "#0E0505", grad: "#220909", accent: "#EF4444", dim: "#EF444420" },
-  crypto:       { bg: "#070B06", grad: "#0D1A0B", accent: "#F59E0B", dim: "#F59E0B20" },
-  general:      { bg: "#07070C", grad: "#10101B", accent: "#F97316", dim: "#F9731620" },
+interface Palette { bg: string; grad: string; accent: string; text: string; dim: string }
+
+const CATEGORY_PALETTE: Record<string, Palette> = {
+  investments:  { bg: "#F5F0E8", grad: "#EFEBE1", accent: "#1A3A6B", text: "#1E293B", dim: "rgba(26,58,107,0.09)" },  // Creme & Deep Blue (The Economist)
+  economy_br:   { bg: "#EAF2EC", grad: "#DFEAE2", accent: "#0F5132", text: "#112E21", dim: "rgba(15,81,50,0.09)" },   // Sage Green
+  economy_int:  { bg: "#121824", grad: "#0B0E17", accent: "#E0A96D", text: "#FFFFFF", dim: "rgba(224,169,109,0.12)" }, // Deep Blue (Dark)
+  geopolitics:  { bg: "#F4EBEB", grad: "#EAE0E0", accent: "#D32F2F", text: "#2B1111", dim: "rgba(211,47,47,0.09)" },   // Crimson Red
+  crypto:       { bg: "#1A1A1E", grad: "#121215", accent: "#F59E0B", text: "#FFFFFF", dim: "rgba(245,158,11,0.12)" },  // Slate & Gold
+  general:      { bg: "#F5F0E8", grad: "#EFEBE1", accent: "#1A3A6B", text: "#1E293B", dim: "rgba(26,58,107,0.09)" },
 };
 
 function getPalette(category?: string) {
@@ -297,53 +303,38 @@ const NewsScene: React.FC<SceneProps> = ({
 
   return (
     <AbsoluteFill style={{ opacity: exitOpacity, overflow: "hidden" }}>
-      {/* ── Global Film Grain Overlay (Cinematic Noise / Paper Texture) ── */}
+      {/* ── Global Film Grain & Paper Texture Overlay ── */}
       <div style={{
         position: "absolute", inset: 0,
-        opacity: 0.12,
-        mixBlendMode: "overlay",
+        opacity: 0.16,
+        mixBlendMode: "multiply",
         pointerEvents: "none",
-        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-        backgroundSize: "220px 220px",
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+        backgroundSize: "240px 240px",
         zIndex: 99,
       }} />
 
-      {/* ── Slow Dynamic Ambient Glows ── */}
-      <div style={{
-        position: "absolute",
-        left: glow1X - 350,
-        top: glow1Y - 350,
-        width: 700,
-        height: 700,
-        borderRadius: "50%",
-        background: `radial-gradient(circle, ${pal.accent} 0%, transparent 70%)`,
-        opacity: 0.16,
-        filter: "blur(110px)",
-        pointerEvents: "none",
-      }} />
-      <div style={{
-        position: "absolute",
-        left: glow2X - 450,
-        top: glow2Y - 450,
-        width: 900,
-        height: 900,
-        borderRadius: "50%",
-        background: `radial-gradient(circle, ${pal.accent === '#10B981' ? '#3B82F6' : '#6366F1'} 0%, transparent 70%)`,
-        opacity: 0.11,
-        filter: "blur(130px)",
-        pointerEvents: "none",
-      }} />
-
-      {/* ── Diagonal Grid Texture ── */}
+      {/* ── Vintage Soft Vignette & Editorial Border ── */}
       <div style={{
         position: "absolute", inset: 0,
-        backgroundImage: [
-          `linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px)`,
-          `linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px)`,
-        ].join(","),
-        backgroundSize: "80px 80px",
-        backgroundPosition: `${gridOff}px ${gridOff}px`,
+        boxShadow: "inset 0 0 120px rgba(0, 0, 0, 0.25)",
+        border: "10px solid rgba(0, 0, 0, 0.05)",
         pointerEvents: "none",
+        zIndex: 98,
+      }} />
+
+      {/* ── Editorial Soft Warm Lighting Spotlight ── */}
+      <div style={{
+        position: "absolute",
+        left: "50%",
+        top: "40%",
+        width: 800,
+        height: 800,
+        transform: "translate(-50%, -50%)",
+        borderRadius: "50%",
+        background: `radial-gradient(circle, rgba(255, 253, 245, 0.25) 0%, transparent 80%)`,
+        pointerEvents: "none",
+        zIndex: 1,
       }} />
 
       {/* ── Segmented Top Progress Indicators (Instagram style) ── */}
@@ -409,10 +400,10 @@ const NewsScene: React.FC<SceneProps> = ({
         )}
 
         {/* Real YouTube cut or Stock Video Background */}
-        {scene.visual_type === "video" && scene.media_url && (
+        {(scene.background_video_url || (scene.media_url && scene.visual_type !== "illustration")) && (
           <>
             <OffthreadVideo
-              src={scene.media_url}
+              src={scene.background_video_url || scene.media_url || ""}
               style={{
                 position: "absolute",
                 inset: 0,
@@ -426,7 +417,7 @@ const NewsScene: React.FC<SceneProps> = ({
             <div style={{
               position: "absolute",
               inset: 0,
-              background: "linear-gradient(to top, rgba(0,0,0,0.92) 15%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.92) 85%)",
+              background: "linear-gradient(to top, rgba(0,0,0,0.85) 15%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.85) 85%)",
             }} />
           </>
         )}
@@ -469,9 +460,9 @@ const NewsScene: React.FC<SceneProps> = ({
         )}
 
         {/* Dynamic Stylized Illustration Sticker (floating on side/center) */}
-        {scene.visual_type === "illustration" && scene.media_url && (
+        {(scene.illustration_url || (scene.visual_type === "illustration" && scene.media_url)) && (
           <Img
-            src={scene.media_url}
+            src={scene.illustration_url || scene.media_url || ""}
             style={{
               position: "absolute",
               top: "22%",
@@ -539,19 +530,56 @@ const NewsScene: React.FC<SceneProps> = ({
             zIndex: 10,
           }}>
             {words.map((word, i) => {
-              const delay = i * 2.5;
-              const ws = spring({
-                frame: Math.max(0, frame - delay),
-                fps,
-                config: { damping: 11, stiffness: 160 },
-              });
-              const wy = interpolate(ws, [0, 1], [30, 0]);
-              const rotate = interpolate(ws, [0, 1], [-8, 0]);
-              const wo = interpolate(Math.max(0, frame - delay), [0, 5], [0, 1], {
-                extrapolateLeft: "clamp", extrapolateRight: "clamp",
-              });
-
               const isHighlighted = accentSet.has(i);
+              const delay = i * 2.5;
+              const wordFrame = Math.max(0, frame - delay);
+
+              let transform = "";
+              let opacity = 0;
+              let filter = "";
+
+              const animStyle = sceneIndex % 3;
+
+              if (animStyle === 0) {
+                // Style 0: Slide Up + Rotate Stagger
+                const s = spring({
+                  frame: wordFrame,
+                  fps,
+                  config: { damping: 12, stiffness: 140 },
+                });
+                const y = interpolate(s, [0, 1], [40, 0]);
+                const rot = interpolate(s, [0, 1], [-6, 0]);
+                const o = interpolate(wordFrame, [0, 5], [0, 1], { extrapolateRight: "clamp" });
+                
+                transform = `scale(${s * (isHighlighted ? 1.12 : 1.0)}) translateY(${y}px) rotate(${rot + (isHighlighted ? 1.5 : 0)}deg)`;
+                opacity = o;
+              } else if (animStyle === 1) {
+                // Style 1: Punchy Pop (Scale In with Bounce)
+                const s = spring({
+                  frame: wordFrame,
+                  fps,
+                  config: { damping: 10, stiffness: 180 },
+                });
+                const rot = interpolate(s, [0, 1], [8, 0]);
+                const o = interpolate(wordFrame, [0, 4], [0, 1], { extrapolateRight: "clamp" });
+
+                transform = `scale(${s * (isHighlighted ? 1.15 : 1.0)}) rotate(${rot}deg)`;
+                opacity = o;
+              } else {
+                // Style 2: Smooth Slide-in + Blur Reveal
+                const s = spring({
+                  frame: wordFrame,
+                  fps,
+                  config: { damping: 14, stiffness: 120 },
+                });
+                const x = interpolate(s, [0, 1], [-25, 0]);
+                const blurVal = interpolate(s, [0, 1], [8, 0]);
+                const o = interpolate(wordFrame, [0, 6], [0, 1], { extrapolateRight: "clamp" });
+
+                transform = `scale(${s * (isHighlighted ? 1.12 : 1.0)}) translateX(${x}px)`;
+                opacity = o;
+                filter = `blur(${blurVal}px)`;
+              }
 
               return (
                 <span
@@ -566,11 +594,12 @@ const NewsScene: React.FC<SceneProps> = ({
                     lineHeight: 0.95,
                     color: isHighlighted ? pal.accent : "#FFFFFF",
                     textShadow: isHighlighted 
-                      ? `0 0 16px ${pal.accent}b3, 0 4px 28px rgba(0,0,0,0.95)` 
-                      : "0 4px 24px rgba(0,0,0,0.85)",
-                    transform: `scale(${ws * (isHighlighted ? 1.12 : 1.0)}) translateY(${wy}px) rotate(${rotate + (isHighlighted ? 1.5 : 0)}deg)`,
+                      ? `0 4px 22px rgba(0,0,0,0.9), 0 0 10px ${pal.accent}60` 
+                      : "0 4px 18px rgba(0,0,0,0.85)",
+                    transform,
                     transformOrigin: "center center",
-                    opacity: wo,
+                    opacity,
+                    filter,
                   }}
                 >
                   {word}
@@ -610,113 +639,114 @@ const NewsScene: React.FC<SceneProps> = ({
             </div>
           )}
 
-          {/* High-Fidelity Data Visualization (Circular Gauge + Pulsing Mini-Bars) */}
+          {/* High-Fidelity Data Visualization (Editorial Publication-Style Chart) */}
           {isData && (
             <div style={{
-              marginTop: 34,
-              display: "flex",
-              alignItems: "center",
-              gap: 32,
-              padding: "20px 28px",
-              borderRadius: 20,
-              background: "rgba(255, 255, 255, 0.02)",
-              border: "1px solid rgba(255, 255, 255, 0.06)",
-              backdropFilter: "blur(8px)",
-              boxShadow: "0 15px 35px rgba(0,0,0,0.3)",
+              marginTop: 30,
+              padding: "20px 24px",
+              borderRadius: 4, // rectangular editorial card
+              background: "#FBF9F5", // pure book page creme
+              border: "1.5px solid #1E293B",
+              boxShadow: "6px 6px 0px rgba(30, 41, 59, 0.9)", // solid flat drop shadow
               width: "100%",
-              maxWidth: 460,
+              maxWidth: 440,
               opacity: interpolate(frame, [12, 22], [0, 1], {
                 extrapolateLeft: "clamp", extrapolateRight: "clamp",
               }),
-              transform: `scale(${interpolate(entrance, [0, 1], [0.95, 1.0])})`,
+              transform: `scale(${interpolate(entrance, [0, 1], [0.96, 1.0])}) rotate(${sceneIndex % 2 === 0 ? 0.8 : -0.8}deg)`,
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
             }}>
-              {/* Left Side: Glowing Ring Gauge */}
-              <div style={{ position: "relative", width: 90, height: 90, flexShrink: 0 }}>
-                <svg width="90" height="90" viewBox="0 0 90 90" style={{ transform: "rotate(-90deg)" }}>
-                  {/* Outer circle track */}
-                  <circle
-                    cx="45" cy="45" r={radius}
-                    fill="transparent"
-                    stroke="rgba(255, 255, 255, 0.07)"
-                    strokeWidth={strokeWidth}
-                  />
-                  {/* Animated gauge circle fill */}
-                  <circle
-                    cx="45" cy="45" r={radius}
-                    fill="transparent"
-                    stroke={pal.accent}
-                    strokeWidth={strokeWidth}
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    strokeLinecap="round"
-                    style={{
-                      filter: `drop-shadow(0 0 8px ${pal.accent}cc)`
-                    }}
-                  />
-                </svg>
-                {/* Internal percentage text */}
-                <div style={{
-                  position: "absolute", inset: 0,
-                  display: "flex", flexDirection: "column",
-                  alignItems: "center", justifyContent: "center",
-                }}>
-                  <span style={{
-                    color: "#FFFFFF",
-                    fontFamily: "'Montserrat', sans-serif",
-                    fontSize: 16, fontWeight: 800,
-                    lineHeight: 1,
-                  }}>
-                    {currentCountText}
-                  </span>
-                  <span style={{
-                    color: "rgba(255,255,255,0.4)",
-                    fontFamily: "'Inter', sans-serif",
-                    fontSize: 10, fontWeight: 700,
-                    textTransform: "uppercase",
-                    marginTop: 2,
-                  }}>
-                    {displayUnit || "VAL"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Right Side: Mini Bar Dashboard */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, flexGrow: 1 }}>
-                <div style={{
-                  fontFamily: "'Montserrat', sans-serif",
-                  fontSize: 10, fontWeight: 800,
-                  color: pal.accent,
-                  letterSpacing: "0.08em",
+              {/* Header */}
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                borderBottom: "1.5px solid #1E293B",
+                paddingBottom: 6,
+              }}>
+                <span style={{
+                  fontFamily: "'Oswald', sans-serif",
+                  fontSize: 14,
+                  fontWeight: 900,
+                  color: "#1E293B",
+                  letterSpacing: "0.05em",
                   textTransform: "uppercase",
                 }}>
-                  Métrica de Mercado
-                </div>
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 50, paddingBottom: 4 }}>
-                  <div style={{
-                    flex: 1,
-                    height: `${dataEasedProgress * 55}%`,
-                    background: `linear-gradient(to top, rgba(255,255,255,0.05), ${pal.accent}aa)`,
-                    borderRadius: "4px 4px 2px 2px",
-                    border: `1px solid ${pal.accent}40`,
-                    boxShadow: `0 0 10px ${pal.accent}33`,
-                  }} />
-                  <div style={{
-                    flex: 1,
-                    height: `${dataEasedProgress * 95}%`,
-                    background: `linear-gradient(to top, rgba(255,255,255,0.05), ${pal.accent})`,
-                    borderRadius: "4px 4px 2px 2px",
-                    border: `1px solid ${pal.accent}80`,
-                    boxShadow: `0 0 15px ${pal.accent}66`,
-                  }} />
-                  <div style={{
-                    flex: 1,
-                    height: `${dataEasedProgress * 70}%`,
-                    background: `linear-gradient(to top, rgba(255,255,255,0.05), ${pal.accent}aa)`,
-                    borderRadius: "4px 4px 2px 2px",
-                    border: `1px solid ${pal.accent}40`,
-                    boxShadow: `0 0 10px ${pal.accent}33`,
-                  }} />
-                </div>
+                  INDICADOR ECONOMIA / NOTICIANDO
+                </span>
+                <span style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: pal.accent,
+                }}>
+                  ● ATUALIZADO
+                </span>
+              </div>
+
+              {/* Grid / Bars */}
+              <div style={{
+                display: "flex",
+                alignItems: "flex-end",
+                justifyContent: "space-between",
+                height: 120,
+                padding: "10px 10px 0 10px",
+                position: "relative",
+              }}>
+                {/* 4 elegant bars */}
+                {[
+                  { label: "Q1", val: Math.round(parsedValue * 0.45) },
+                  { label: "Q2", val: Math.round(parsedValue * 0.7) },
+                  { label: "Q3", val: Math.round(parsedValue * 0.9) },
+                  { label: "HOJE", val: Math.round(parsedValue), highlight: true },
+                ].map((item, idx) => {
+                  const h = dataEasedProgress * item.val;
+                  return (
+                    <div key={idx} style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      width: "18%",
+                      height: "100%",
+                      justifyContent: "flex-end",
+                    }}>
+                      {/* Value text above bar */}
+                      <span style={{
+                        fontFamily: "'Oswald', sans-serif",
+                        fontSize: 13,
+                        fontWeight: 900,
+                        color: item.highlight ? pal.accent : "#475569",
+                        marginBottom: 4,
+                      }}>
+                        {item.highlight ? currentCountText : item.val}{displayUnit}
+                      </span>
+
+                      {/* Bar itself */}
+                      <div style={{
+                        width: "100%",
+                        height: `${h * 0.8}%`,
+                        background: item.highlight ? pal.accent : "#94A3B8",
+                        border: "1.5px solid #1E293B",
+                        borderRadius: "2px 2px 0 0",
+                        boxShadow: item.highlight ? "2px -2px 0px rgba(30, 41, 59, 0.4)" : undefined,
+                      }} />
+
+                      {/* X label */}
+                      <span style={{
+                        fontFamily: "'Inter', sans-serif",
+                        fontSize: 9,
+                        fontWeight: 800,
+                        color: "#475569",
+                        marginTop: 6,
+                        textTransform: "uppercase",
+                      }}>
+                        {item.label}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

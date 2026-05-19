@@ -35,17 +35,30 @@ O **CEREBRO** gerencia duas pipelines principais de forma assíncrona e resilien
 ### 🎬 Pipeline B: Criação de Conteúdo & Sonorização (Geração de Reels)
 1. **Geração de Cenas (LLMs):**
    - Roda em cascata inteligente: **Gemini 2.5 Flash** (Chave 1) → **Gemini 2.5 Flash** (Chave 2) → **Groq (Llama 3.3)** → **Ollama (Local)**.
-   - Transforma a notícia em um roteiro de vídeo vertical 9:16 estruturado em JSON com indexação de palavras-chave para destaque visual.
-2. **Locução Brasileira (ElevenLabs):**
-   - Consolida os subtextos do roteiro de cenas.
-   - Envia para a API ElevenLabs usando o modelo **Multilingual v2** com a voz premium **Antoni** (`ErXwobaYiN019PkySvjV`), gerando uma narração em português brasileiro fluida e profissional.
-3. **Sonorização por Nicho (Epidemic Sound):**
-   - Seleciona automaticamente uma trilha de fundo licenciada do Epidemic Sound correspondente à categoria do vídeo (ex: eletrônico para cripto, dinâmico para investimentos).
-4. **Footage / B-Roll Matcher (Envato Elements):**
-   - Busca no catálogo do Envato Elements assets de stock footage relacionados ao tópico da notícia para enriquecer o visual do vídeo.
+   - Transforma a notícia em roteiro híbrido vertical 9:16: cada cena especifica `visual_type` (`hook/video/cutout/illustration/data/cta`), `youtube_search` para b-roll e `decorator_type` para elementos gráficos.
+2. **Enriquecimento de Mídia por Cena (`media_fetcher.py`):**
+   - **B-Roll YouTube** (`fetch_youtube_broll`): para cenas `visual_type: "video"`, baixa clip via yt-dlp usando `youtube_search` da cena. Cache em `output/media/broll_*.mp4`. Máx 3 tentativas com queries simplificadas.
+   - **Fotos da Matéria** (`fetch_article_photos`): extrai og:image / imagens do artigo para usar em cenas `cutout`. Salvo em `output/media/photo_*.jpg`. Máximo 2 fotos por reel.
+3. **Locução Brasileira (ElevenLabs):**
+   - Consolida os subtextos do roteiro de cenas em script corrido.
+   - Envia para ElevenLabs **Multilingual v2**, voz **Antoni** (`ErXwobaYiN019PkySvjV`). **SEMPRE chamada** — nunca pular mesmo que o script seja curto.
+   - Salvo localmente em `output/narration_*.mp3` e servido via `http://localhost:8765`.
+4. **Trilha Sonora por Nicho (Epidemic Sound + fallback yt-dlp):**
+   - Tenta buscar e baixar track via **Epidemic Sound API** (Bearer JWT). Endpoints: `/v2/tracks?tags={category_tags}`.
+   - Fallback automático: download via yt-dlp de música royalty-free do YouTube Audio Library.
+   - **OBRIGATÓRIO: trilha SEMPRE baixada localmente** em `output/media/music_*.mp3` antes do render — nunca usar URL externa no Remotion.
+   - Cache por categoria, válido por 7 dias.
 5. **Renderização de MP4 (Remotion CLI):**
-   - Agrega as cenas, imagem de destaque, narração ElevenLabs e trilha Epidemic Sound.
-   - Executa `remotion render` de forma assíncrona com codec `H.264` e compatibilidade de pixels `yuv420p` para perfeita reprodução em dispositivos móveis e redes sociais.
+   - Agrega todas as cenas com `media_url` / `cutout_url` / `decorator_type` preenchidos, narração e trilha locais.
+   - Executa `remotion render` com codec `H.264` e `yuv420p` para compatibilidade mobile/social.
+
+### 🚨 Padrão de Qualidade Visual Obrigatório (enforce por cena)
+- **Mínimo 1 cena `visual_type: "video"`** com B-roll baixado via yt-dlp
+- **Mínimo 2 cenas `visual_type: "cutout"`** com foto da matéria posicionada e animada
+- **Narração ElevenLabs SEMPRE gerada** (nunca retornar reel sem locução se API key presente)
+- **Trilha sonora SEMPRE arquivo local** — nunca URL externa (SoundHelix, CDN) chegará ao Remotion render
+- **LLM DEVE retornar `youtube_search` e `decorator_type` em 100% das cenas**
+- Se yt-dlp falhar após 3 tentativas, cena usa `visual_type: "illustration"` como fallback (não `"video"` com media_url vazia)
 
 ---
 

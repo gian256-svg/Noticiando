@@ -44,25 +44,35 @@ Schema obrigatório:
       "accent_word_indices": [0, 2],
       "decorator_type": "star" | "arrow" | "circle" | "stripes" | "none",
       "youtube_search": "Termo de busca bem curto para extrair um corte de vídeo do YouTube no yt-dlp (ex: 'bolsa de valores caindo', 'primo rico investimentos', 'empresa fabrica')",
-      "media_keyword": "money" | "growth" | "crypto" | "nigro" | "perini"
+      "media_keyword": "money" | "growth" | "crypto" | "nigro" | "perini" | "chart" | "bitcoin" | "briefcase" | "primo"
     }
   ]
 }
 
-Regras Cruciais de Direção de Arte:
-- visual_type:
-  * "hook": Sempre a primeira cena (0s a 2s). Título e gancho ultra agressivo.
-  * "video": Cena com reprodução de vídeo real ao fundo (forneça um 'youtube_search' preciso e curto).
-  * "cutout": Colagem estilo editorial com recorte de pessoa (ex: Thiago Nigro, Bruno Perini) ou de objeto financeiro flutuando.
-  * "illustration": Desenho estilizado ou gráficos animados (use 'media_keyword' correspondente).
-  * "data": Gráfico de métrica, percentuais, números grandes com barras animadas.
-  * "cta": Sempre a última cena. Chamada para ação clara ("Siga para mais").
-- Pelo menos 1 cena do tipo "video".
-- Pelo menos 2 cenas do tipo "cutout".
-- Pelo menos 1 cena do tipo "illustration".
-- Cada subtext deve ser envolvente e narrável. O subtext total somado constituirá o roteiro da locução do ElevenLabs.
-- As durações das cenas devem somar aproximadamente a duração solicitada. Máximo de 3.5 segundos por cena para garantir dinamismo e cortes rápidos.
-- decorator_type: Forma geométrica ou ícone de destaque desenhado na tela para ornamentação."""
+REGRAS OBRIGATÓRIAS DE DIREÇÃO DE ARTE — VIOLÁ-LAS INVALIDA O OUTPUT:
+
+VISUAL_TYPE — distribuição mínima obrigatória por reel:
+  * "hook": Sempre a cena 1 (2 a 2,5s). Gancho agressivo, 3-5 palavras na headline.
+  * "video": MÍNIMO 2 cenas. B-roll de vídeo ao fundo. OBRIGATÓRIO: preencher "youtube_search" em inglês (4-6 palavras).
+  * "cutout": MÍNIMO 2 cenas. Foto editorial flutuante. OBRIGATÓRIO: preencher "media_keyword".
+  * "illustration": MÍNIMO 1 cena. Gráfico animado. OBRIGATÓRIO: preencher "media_keyword".
+  * "data": 1 cena. Métrica, percentual ou número com barra animada.
+  * "cta": Sempre a cena final (2,5s). "SIGA PARA MAIS".
+
+DECORATOR_TYPE — OBRIGATÓRIO EM TODA CENA, PROIBIDO "none" (exceto cta):
+  * "star"   → breaking news, choque, urgência
+  * "arrow"  → crescimento, direção, tendência
+  * "circle" → análise, contexto, dado circular
+  * "stripes" → energia, momentum, impacto visual
+
+MEDIA_KEYWORD — obrigatório em cenas cutout e illustration:
+  * "nigro" | "perini" | "money" | "briefcase" | "growth" | "chart" | "crypto" | "bitcoin"
+
+YOUTUBE_SEARCH — obrigatório em cenas video:
+  * Em inglês, 4-6 palavras, ex: "brazil stock market trading", "federal reserve interest rates", "bitcoin price surge"
+
+- Cada subtext deve ser envolvente e narrável em voz alta. O conjunto dos subtexts forma o roteiro da locução ElevenLabs.
+- Máximo 3.5 segundos por cena para garantir dinamismo. Somar aproximadamente a duração pedida."""
 
 
 def _build_user_msg(title: str, summary: str, category: str, duration: int) -> str:

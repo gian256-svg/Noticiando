@@ -18,7 +18,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MEDIA_DIR = PROJECT_ROOT / "output" / "media"
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
-LOCALHOST_BASE = "http://localhost:8765"
+import os
+
+def _get_localhost_base() -> str:
+    port = os.getenv("PORT", "8765")
+    return f"http://localhost:{port}"
 
 BROWSER_HEADERS = {
     "User-Agent": (
@@ -59,16 +63,40 @@ def _find_cached_photo(url_hash: str) -> Optional[Path]:
     return None
 
 
+
+
+
+
+async def _ensure_fallback_video() -> str:
+    dest = PROJECT_ROOT / "output" / "assets" / "fallback_video.mp4"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists() and dest.stat().st_size > 10_000:
+        return f"{_get_localhost_base()}/output/assets/fallback_video.mp4"
+        
+    url = "https://assets.mixkit.co/videos/preview/mixkit-financial-growth-charts-on-a-screen-41716-large.mp4"
+    try:
+        logger.info(f"Baixando video de fallback local em {dest}…")
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                dest.write_bytes(resp.content)
+                return f"{_get_localhost_base()}/output/assets/fallback_video.mp4"
+    except Exception as e:
+        logger.warning(f"Falha ao baixar video de fallback local: {e}")
+        
+    return url
+
+
 async def fetch_youtube_broll(search_query: str, category: str = "general") -> Optional[str]:
     """
     Baixa um clip de B-roll do YouTube via yt-dlp para uso como fundo de cena.
-    Retorna URL localhost ou None em falha total.
+    Retorna URL localhost ou URL de fallback.
     """
     try:
         import yt_dlp  # noqa: PLC0415
     except ImportError:
         logger.warning("yt-dlp não instalado. Pulando download de B-roll.")
-        return None
+        return await _ensure_fallback_video()
 
     queries_to_try = [search_query] + CATEGORY_FALLBACK_QUERIES.get(category, CATEGORY_FALLBACK_QUERIES["general"])
 
@@ -77,9 +105,10 @@ async def fetch_youtube_broll(search_query: str, category: str = "general") -> O
         cached = _find_cached_video(qhash)
         if cached:
             logger.info(f"B-roll em cache: {cached.name}")
-            return f"{LOCALHOST_BASE}/output/media/{cached.name}"
+            return f"{_get_localhost_base()}/output/media/{cached.name}"
 
         output_template = str(MEDIA_DIR / f"broll_{qhash}.%(ext)s")
+        # Usar --download-sections para pegar apenas 5 segundos (segundos 15 a 20) de forma super rápida!
         ydl_opts = {
             "format": "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best[height<=720]",
             "outtmpl": output_template,
@@ -87,27 +116,31 @@ async def fetch_youtube_broll(search_query: str, category: str = "general") -> O
             "quiet": True,
             "no_warnings": True,
             "max_filesize": 40 * 1024 * 1024,  # 40 MB
-            "match_filter": yt_dlp.utils.match_filter_func("duration < 90"),
+            "download_ranges": lambda info_dict, self: [{"start_time": 15, "end_time": 20}],
+            "match_filter": yt_dlp.utils.match_filter_func("duration < 120"),
             "postprocessors": [{"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}],
         }
 
         search_url = f"ytsearch1:{query} -playlist"
         try:
+            import asyncio
             logger.info(f"Baixando B-roll do YouTube (tentativa {attempt + 1}): '{query}'")
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([search_url])
+            def _run_ydl():
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([search_url])
+            await asyncio.to_thread(_run_ydl)
 
-            # Procurar arquivo baixado (yt-dlp pode usar extensão diferente)
+            # Procurar arquivo baixado
             result_file = _find_cached_video(qhash)
             if result_file and result_file.stat().st_size > 10_000:
                 logger.info(f"B-roll baixado: {result_file.name} ({result_file.stat().st_size // 1024}KB)")
-                return f"{LOCALHOST_BASE}/output/media/{result_file.name}"
+                return f"{_get_localhost_base()}/output/media/{result_file.name}"
             logger.warning(f"Arquivo B-roll muito pequeno ou não encontrado para '{query}'")
         except Exception as e:
             logger.warning(f"yt-dlp falhou para '{query}': {e}")
 
-    logger.error("Todas as tentativas de B-roll falharam.")
-    return None
+    logger.error("Todas as tentativas de B-roll falharam. Retornando fallback video.")
+    return await _ensure_fallback_video()
 
 
 async def fetch_article_photos(
@@ -139,7 +172,7 @@ async def fetch_article_photos(
     for url in candidates[:2]:
         local_path = await _download_image(url)
         if local_path:
-            downloaded.append(f"{LOCALHOST_BASE}/output/media/{local_path.name}")
+            downloaded.append(f"{_get_localhost_base()}/output/media/{local_path.name}")
 
     return downloaded
 

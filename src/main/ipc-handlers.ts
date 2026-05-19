@@ -53,6 +53,7 @@ export function setupIpcHandlers() {
     category: string;
     duration: number;
     thumbnail_url: string | null;
+    article_url?: string | null;
   }) => {
     const port = getBackendPort();
     if (!port) return { error: "Backend ainda não iniciou. Aguarde alguns segundos e tente novamente." };

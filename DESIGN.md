@@ -152,3 +152,42 @@ const scale = spring({
 - [ ] Transições fluidas aplicadas entre as cenas (evitando corte seco).
 - [ ] Nenhuma marca d'água ou logo de terceiros visível.
 - [ ] Resolução de exportação final em **1080x1920 @ 30fps**.
+
+---
+
+## 🎬 9. Regras de Mídia Híbrida (Video + Photo + Decorator)
+
+### VideoBackground (`visual_type: "video"`)
+- Usar `<OffthreadVideo>` do Remotion — necessário para render CLI; `<Video>` não funciona server-side
+- Overlay mínimo **60% de opacidade** sobre o vídeo: `linear-gradient(170deg, bg#99 0%, grad#cc 100%)` + vinheta superior/inferior
+- `volume={0}` sempre — áudio vem exclusivamente da narração ElevenLabs e trilha Epidemic
+- Fallback: se `media_url` ausente, cena usa gradient + glow normalmente
+
+### PhotoCutout (`visual_type: "cutout"`)
+- Fonte: `og:image` da matéria → thumbnail → fallback gradient
+- Posicionamento alternado: cenas pares → `right: -20px`; ímpares → `left: -20px`
+- Tamanho: largura **52%** da tela, `height: auto`, `objectPosition: bottom center`
+- Entrada: spring `translateX` (220px → 0), delay 6 frames + float `sin(frame/35)*6px`
+- **Obrigatório**: `filter: drop-shadow(0 16px 48px rgba(0,0,0,0.9))` — sem sombra = sem profundidade
+- Headline e subtext com `maxWidth: 60%` para não sobrepor a foto
+
+### DecoratorElement (todos os `visual_type` exceto CTA)
+- 4 tipos: `star` | `arrow` | `circle` | `stripes` — escolher baseado no contexto emocional da cena
+- Tamanho 80×80px, cor `pal.accent`, `drop-shadow` glow
+- Pulse scale `0.92–1.08` (sin/30) + rotation `±6°` (sin/50)
+- Alternado por `sceneIndex`: par → `top:100 right:40`; ímpar → `bottom:180 left:40`
+- Opacidade `enterSpring * 0.7` — sutil, não compete com headline
+
+### Pipeline de Áudio
+- **Narração ElevenLabs**: `volume={1.0}`, arquivo local `output/narration_*.mp3`
+- **Trilha Epidemic Sound**: `volume={0.18}`, arquivo local `output/media/music_*.mp3`, `loop`
+- **NUNCA** usar URLs externas (SoundHelix, CDNs) no render — somente arquivos `localhost:8765`
+- Ducking de 40% durante narração: implementar via pre-processamento no backend antes do render
+
+---
+
+## 🎬 9. Regras de Mídia Híbrida (Video + Photo + Decorator)
+
+### VideoBackground (`visual_type: "video"`)
+- Usar `<OffthreadVideo>` do Remotion (não `<Video>`) — necessário para render CLI funcionar corretamente
+- Overlay mínimo de **60

@@ -26,7 +26,9 @@ MEDIA_DIR    = PROJECT_ROOT / "output" / "media"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
-LOCALHOST_BASE = "http://localhost:8765"
+def _get_localhost_base() -> str:
+    port = os.getenv("PORT", "8765")
+    return f"http://localhost:{port}"
 
 # Voz premium para português brasileiro
 DEFAULT_BR_VOICE_ID = "ErXwobaYiN019PkySvjV"  # Antoni
@@ -101,7 +103,7 @@ async def generate_narration(text: str, voice_id: str = DEFAULT_BR_VOICE_ID) -> 
             filepath = OUTPUT_DIR / filename
             filepath.write_bytes(resp.content)
             logger.info(f"Narração salva: {filepath.name} ({len(resp.content) // 1024}KB)")
-            return f"{LOCALHOST_BASE}/output/{filename}"
+            return f"{_get_localhost_base()}/output/{filename}"
     except Exception as e:
         logger.error(f"ElevenLabs falhou: {e}", exc_info=True)
         return None
@@ -119,7 +121,7 @@ async def get_epidemic_soundtrack(category: str) -> Optional[str]:
     cached = _find_cached_music(category)
     if cached:
         logger.info(f"Trilha em cache para '{category}': {cached.name}")
-        return f"{LOCALHOST_BASE}/output/media/{cached.name}"
+        return f"{_get_localhost_base()}/output/media/{cached.name}"
 
     # 1. Tentar Epidemic Sound API real
     if EPIDEMIC_SOUND_TOKEN:
@@ -185,7 +187,7 @@ async def _fetch_epidemic_track(category: str, cfg: dict) -> Optional[str]:
                 if dl_resp.status_code == 200 and len(dl_resp.content) > 50_000:
                     dest.write_bytes(dl_resp.content)
                     logger.info(f"Trilha Epidemic Sound salva: {filename} ({len(dl_resp.content) // 1024}KB)")
-                    return f"{LOCALHOST_BASE}/output/media/{filename}"
+                    return f"{_get_localhost_base()}/output/media/{filename}"
 
         except Exception as e:
             logger.debug(f"Epidemic Sound {endpoint} falhou: {e}")
@@ -222,18 +224,21 @@ async def _download_music_ytdlp(category: str, cfg: dict) -> Optional[str]:
     }
 
     try:
+        import asyncio
         logger.info(f"Baixando trilha via yt-dlp para categoria '{category}'...")
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([search_url])
+        def _run_ydl():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([search_url])
+        await asyncio.to_thread(_run_ydl)
 
         if dest_mp3.exists() and dest_mp3.stat().st_size > 50_000:
             logger.info(f"Trilha fallback salva: {dest_mp3.name}")
-            return f"{LOCALHOST_BASE}/output/media/{dest_mp3.name}"
+            return f"{_get_localhost_base()}/output/media/{dest_mp3.name}"
 
         for p in MEDIA_DIR.glob(f"{filename}.*"):
             if p.suffix in (".mp3", ".m4a", ".webm") and p.stat().st_size > 50_000:
                 logger.info(f"Trilha fallback (formato alternativo): {p.name}")
-                return f"{LOCALHOST_BASE}/output/media/{p.name}"
+                return f"{_get_localhost_base()}/output/media/{p.name}"
 
     except Exception as e:
         logger.error(f"yt-dlp fallback de música falhou para '{category}': {e}")

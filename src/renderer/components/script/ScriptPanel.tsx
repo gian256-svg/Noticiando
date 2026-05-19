@@ -109,6 +109,7 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
         category: news.category,
         duration,
         thumbnail_url: news.thumbnail_url ?? null,
+        article_url: news.url ?? null,
       };
 
       if (window.noticiando?.invoke) {
