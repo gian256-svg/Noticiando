@@ -20,6 +20,11 @@ GEMINI_API_KEY   = os.getenv("GEMINI_API_KEY", "")
 GEMINI_API_KEY_2 = os.getenv("GEMINI_API_KEY_2", "")
 GEMINI_MODEL     = "gemini-2.5-flash"
 
+GROQ_API_KEY     = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL       = "llama-3.3-70b-versatile"
+OLLAMA_BASE_URL  = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL     = os.getenv("OLLAMA_MODEL", "llama3.1")
+
 _LANG_NAMES = {
     "en": "inglês",
     "fr": "francês",
@@ -37,7 +42,7 @@ _PROMPT_TEMPLATE = (
     "Traduza o texto abaixo do {source_lang} para português brasileiro natural e fluente, "
     "mantendo termos técnicos financeiros e geopolíticos (ex: Fed, yield, S&P 500, IPO, OTAN, G7). "
     "Retorne APENAS JSON válido, sem markdown:\n"
-    '{"title": "...", "summary": "..."}'
+    '{{"title": "...", "summary": "..."}}'
 )
 
 
@@ -53,7 +58,7 @@ def _parse(text: str) -> dict:
 async def translate_article(title: str, summary: str, source_language: str = "en") -> tuple[str, str]:
     """
     Returns (translated_title, translated_summary) in PT-BR.
-    On any failure returns the originals unchanged.
+    Cascade fallback: Gemini (Key 1) -> Gemini (Key 2) -> Groq -> Ollama -> Original
     """
     if not title:
         return title, summary
@@ -62,6 +67,7 @@ async def translate_article(title: str, summary: str, source_language: str = "en
     prompt = _PROMPT_TEMPLATE.format(source_lang=lang_name)
     user_msg = f'Título: "{title}"\nResumo: "{summary or title}"'
 
+    # 1. Gemini
     for key in (GEMINI_API_KEY, GEMINI_API_KEY_2):
         if not key:
             continue
@@ -85,7 +91,56 @@ async def translate_article(title: str, summary: str, source_language: str = "en
             s = result.get("summary", "").strip() or summary
             return t, s
         except Exception as e:
-            logger.debug(f"translate_article failed (lang={source_language}, key={key[:8]}…): {e}")
+            logger.debug(f"translate_article via Gemini failed (key={key[:8]}…): {e}")
+
+    # 2. Groq Fallback
+    if GROQ_API_KEY:
+        try:
+            from groq import AsyncGroq
+            client = AsyncGroq(api_key=GROQ_API_KEY)
+            response = await client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": user_msg},
+                ],
+                max_tokens=512,
+                temperature=0.3,
+                response_format={"type": "json_object"},
+            )
+            result = _parse(response.choices[0].message.content or "")
+            t = result.get("title", "").strip() or title
+            s = result.get("summary", "").strip() or summary
+            return t, s
+        except Exception as e:
+            logger.debug(f"translate_article via Groq failed: {e}")
+
+    # 3. Ollama Fallback
+    if OLLAMA_BASE_URL:
+        try:
+            import httpx
+            payload = {
+                "model": OLLAMA_MODEL,
+                "messages": [
+                    {"role": "system", "content": prompt},
+                    {"role": "user",   "content": user_msg},
+                ],
+                "stream": False,
+                "format": "json",
+                "options": {"temperature": 0.3, "num_predict": 512},
+            }
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                res = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
+                res.raise_for_status()
+                data = res.json()
+            content = data.get("message", {}).get("content", "")
+            if content:
+                result = _parse(content)
+                t = result.get("title", "").strip() or title
+                s = result.get("summary", "").strip() or summary
+                return t, s
+        except Exception as e:
+            logger.debug(f"translate_article via Ollama failed: {e}")
 
     # Fallback: originals unchanged
     return title, summary

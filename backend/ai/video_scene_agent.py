@@ -72,6 +72,7 @@ YOUTUBE_SEARCH — obrigatório em cenas video:
   * Em inglês, 4-6 palavras, ex: "brazil stock market trading", "federal reserve interest rates", "bitcoin price surge"
 
 - Cada subtext deve ser envolvente e narrável em voz alta. O conjunto dos subtexts forma o roteiro da locução ElevenLabs.
+- TODAS as headlines e subtexts DEVEM ser geradas em português brasileiro natural, envolvente e fluente para o público brasileiro, mesmo que o Título ou Resumo originais estejam em inglês. A única exceção é o campo 'youtube_search', que deve ser escrito em inglês para melhor busca no YouTube.
 - Máximo 3.5 segundos por cena para garantir dinamismo. Somar aproximadamente a duração pedida."""
 
 
