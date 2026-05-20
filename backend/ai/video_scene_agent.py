@@ -42,11 +42,12 @@ Schema obrigatório:
       "headline": "TEXTO CURTO IMPACTANTE EM CAIXA ALTA",
       "subtext": "Texto completo que será narrado nesta cena. Deve ser fluído, informativo e conter dados.",
       "duration_seconds": 3.0,
-      "visual_type": "hook" | "video" | "cutout" | "illustration" | "data",
+      "visual_type": "hook" | "video" | "cutout" | "illustration" | "data" | "map" | "timeline" | "collage" | "split_video" | "newspaper_clip",
       "accent_word_indices": [0, 2],
       "decorator_type": "star" | "arrow" | "circle" | "stripes",
-      "youtube_search": "Termo de busca bem curto para extrair um corte de vídeo do YouTube no yt-dlp (ex: 'bolsa de valores caindo', 'primo rico investimentos', 'empresa fabrica')",
-      "media_keyword": "money" | "growth" | "crypto" | "nigro" | "perini" | "chart" | "bitcoin" | "briefcase" | "primo" | "newspaper"
+      "youtube_search": "Termo de busca bem curto para extrair um corte de vídeo do YouTube no yt-dlp (ex: 'bolsa de valores caindo', 'investimentos grafico', 'empresa fabrica')",
+      "media_keyword": "money" | "growth" | "crypto" | "chart" | "bitcoin" | "briefcase" | "newspaper",
+      "person_name": "Nome da figura pública a ser gerada ou null"
     }
   ]
 }
@@ -54,15 +55,26 @@ Schema obrigatório:
 REGRAS OBRIGATÓRIAS DE DIREÇÃO DE ARTE — VIOLÁ-LAS INVALIDA O OUTPUT:
 
 VISUAL_TYPE — distribuição mínima obrigatória por reel:
-  * "hook": Sempre a cena 1 (2 a 2,5s). Gancho agressivo, 3-5 palavras na headline.
-  * "video": MÍNIMO 2 cenas. B-roll de vídeo ao fundo. OBRIGATÓRIO: preencher "youtube_search" em inglês (4-6 palavras) buscando footages REAIS relevantes (noticiários, pessoas, ações ou situações reais que se encaixem no roteiro e momento exato da narração).
-  * "cutout": MÍNIMO 2 cenas. Foto editorial flutuante. OBRIGATÓRIO: preencher "media_keyword".
-  * "illustration": MÍNIMO 1 cena. Gráfico animado. OBRIGATÓRIO: preencher "media_keyword".
+  * "hook": Sempre a cena 1 (2 a 2,5s). Gancho agressivo, 3-5 palavras na headline. OBRIGATÓRIO: preencher o "subtext" com o início da locução (ex: a frase introdutória do vídeo).
+  * "video": MÍNIMO 2 cenas. B-roll de vídeo ao fundo. OBRIGATÓRIO: preencher "youtube_search" em inglês com queries mais específicas e contextuais (pessoa + evento + ano quando possível). Ex: "Gabriel Galipolo Banco Central audiencia senado 2025", "oil pump jack field aerial", "Dubai skyline night aerial 4k". A youtube_search DEVE descrever exatamente o que aparece na narração naquele momento — não um tema geral.
+  * "cutout": MÍNIMO 2 cenas. Foto editorial flutuante. OBRIGATÓRIO: preencher "media_keyword" com o nome exato da pessoa, corporação, logo ou objeto (ex: "Elon Musk", "Petrobras logo", "Saudi Arabia flag", "dollar bills"). Evite termos genéricos como "money" ou "briefcase" repetidamente.
+  * "illustration": MÍNIMO 1 cena. Gráfico animado. OBRIGATÓRIO: preencher "media_keyword" detalhando o tipo de gráfico (ex: "bar chart inflation", "line chart stock price", "pie chart budget").
+  * "newspaper_clip": MÍNIMO 1 cena. Recorte de jornal impresso tradicional exibindo uma notícia de veracidade. OBRIGATÓRIO: preencher "headline" com o título do jornal simulado (ex: "THE WALL STREET JOURNAL", "VALOR ECONÔMICO") e "media_keyword" com a frase exata da narração que deve ser grifada com marca-texto amarelo.
   * "data": MÍNIMO 1 cena. Métrica, percentual ou número com barra animada.
+  * "map": USE quando a notícia envolver países, conflitos internacionais, rotas de exportação/petróleo ou regiões geográficas específicas.
+  * "timeline": USE quando a narração referenciar um ano marcante (ex: 1840, 2024), marcos temporais históricos ou prazos futuros. Na `headline` escreva apenas o ano numérico ou um valor de alto impacto (ex: "1840" ou "$5B").
+  * "collage": USE quando quiser destacar múltiplas pessoas ou grupos (ex: milionários da IA, corporações), compondo um estilo jornalístico sujo.
+  * "split_video": USE quando a narração enumerar 3 coisas, lugares ou conceitos diferentes simultâneos (ex: "Dubai, Doha, Riyadh" ou "Inflação, Desemprego, Juros"). Requer `youtube_search` válido assim como a cena de `video`.
   * NÃO crie nenhuma cena de CTA (Call to Action), encerramento, agradecimento ou pedido de curtir/seguir no final. O roteiro deve focar 100% no conteúdo da notícia e terminar de forma informativa natural.
 
-NÃO REPETIR MÍDIAS/IMAGENS:
-  * É expressamente proibido repetir a mesma media_keyword ou imagens similares em várias cenas (exceto se for extremamente necessário, como uma bandeira nacional ou uma figura pública central da matéria). Garanta que cada cena de cutout ou illustration traga elementos novos para manter o interesse.
+PERSON_NAME — obrigatório em cenas "cutout" com figuras públicas:
+  * Preencher com o nome completo + cargo/empresa da figura pública real citada (ex: "Jerome Powell Federal Reserve chairman", "Elon Musk Tesla CEO", "Lula presidente do Brasil").
+  * Para cutouts sem figura humana ou com temas abstratos, preencher como null ou omitir.
+  * O campo person_name será utilizado diretamente para alimentar o gerador de retratos com IA.
+
+NUNCA REPETIR FRASES OU MÍDIAS:
+  * É expressamente proibido repetir a mesma frase de narração (`subtext`) ou a mesma `headline` in várias cenas. Cada cena DEVE ter um texto de narração único que progride linearmente na história. Se a cena anterior terminou com "o mercado desabou", a próxima cena deve dar sequência, por exemplo "com as ações caindo 12%".
+  * É expressamente proibido repetir a mesma media_keyword ou imagens similares em várias cenas. Garanta que cada cena de cutout ou illustration traga elements novos para manter o interesse.
 
 TEXTOS CURTOS E GRAMÁTICA DINÂMICA:
   * As headlines e textos em tela devem ser extremamente curtos e dinâmicos para não poluir a tela.
@@ -74,15 +86,17 @@ DECORATOR_TYPE — OBRIGATÓRIO EM TODA CENA, PROIBIDO "none":
   * "circle" → análise, contexto, dado circular
   * "stripes" → energia, momentum, impacto visual
 
-MEDIA_KEYWORD — obrigatório em cenas cutout e illustration:
-  * "nigro" | "perini" | "money" | "briefcase" | "growth" | "chart" | "crypto" | "bitcoin" | "newspaper"
+MEDIA_KEYWORD — obrigatório em cenas cutout, newspaper_clip e illustration:
+  * Detalhe exatamente o que deve ser buscado ou exibido (ex: "Elon Musk", "Nvidia logo", "American flag", "bar chart inflation").
 
 YOUTUBE_SEARCH — obrigatório em cenas video:
-  * Em inglês, 4-6 palavras, buscando trechos reais e precisos de noticiários, mercado financeiro, pessoas ou locais específicos da notícia. Ex: "brazil stock market trading", "federal reserve interest rates", "bitcoin price surge"
+  * Em inglês, buscando trechos reais e precisos de noticiários, mercado financeiro, pessoas ou locais específicos da notícia.
 
 - Cada subtext deve ser envolvente e narrável em voz alta. O conjunto dos subtexts forma o roteiro da locução ElevenLabs.
 - TODAS as headlines e subtexts DEVEM ser geradas em português brasileiro natural, envolvente e fluente para o público brasileiro, mesmo que o Título ou Resumo originais estejam em inglês. A única exceção é o campo 'youtube_search', que deve ser escrito em inglês para melhor busca no YouTube.
-- Máximo 3.5 segundos por cena para garantir dinamismo. Somar aproximadamente a duração pedida."""
+- Variar visual_type com mais equilíbrio — não concentrar todos os "video" no início ou no fim.
+- Estime duration_seconds com base no texto da narração (subtext): ~0.45s por palavra + 0.5s de margem. Mínimo 2.0s, sem máximo fixo. O sistema vai ajustar para a duração real do áudio ElevenLabs.
+"""
 
 
 
@@ -279,7 +293,6 @@ async def generate_video_scenes(
     def _validate(result: dict[str, Any], provider: str) -> dict[str, Any]:
         if not result.get("scenes"):
             raise ValueError(f"Resposta sem campo 'scenes' (chaves recebidas: {list(result.keys())})")
-        result["scenes"] = _adjust_scene_durations(result["scenes"], duration)
         return result
 
     # 1. Gemini — primary key

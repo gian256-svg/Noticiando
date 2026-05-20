@@ -109,6 +109,13 @@ PENALTY_KEYWORDS: list[str] = [
     # Artes / Design / Cultura (conteúdo não financeiro)
     "design", "designer", "bordado", "pôster", "exposição", "museu", "teatro", "peça teatral", "cinema", "filme",
     "estreia", "lançamento de filme", "diretor de cinema", "galeria de arte", "bienal", "quadro", "pintura",
+    # Consumer Tech & Listicles (Review de produtos, Top 10, promoções de varejo)
+    "notebook", "smartphone", "celular", "iphone", "android", "baratinho", "promoção",
+    "cupom", "black friday", "como fazer", "passo a passo", "dicas para", "melhores notebooks", "review",
+    "fones de ouvido", "smart tv", "gadget",
+    # Human Interest & Bizarre (Gossip e notícias de bairro)
+    "mulher descobre", "homem descobre", "viraliza", "bizarro", "casal", "marido", "esposa",
+    "assista", "veja o vídeo", "internautas", "tiktok", "tiktoker", "youtuber", "briga", "flagra"
 ]
 
 PENALTY_KEYWORDS_EN: list[str] = [
@@ -127,6 +134,9 @@ PENALTY_KEYWORDS_EN: list[str] = [
     "runway", "designer brand", "dress", "makeup", "skincare", "haircare", "perfume", "cosmetics",
     # Arts / Design
     "design", "designer", "poster", "exhibition", "museum", "theater", "movie", "film", "cinema", "gallery",
+    # Consumer Tech & Clickbait
+    "best laptop", "best smartphone", "cheap", "promo code", "how to", "step-by-step", "tips",
+    "watch the video", "viral", "bizarre", "husband", "wife", "couple", "tiktoker"
 ]
 
 # Palavras em inglês equivalentes (para fontes INT)

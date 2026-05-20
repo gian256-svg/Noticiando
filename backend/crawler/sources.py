@@ -380,6 +380,7 @@ DEFAULT_SOURCES: list[Source] = [
         name="Exame",
         url="https://exame.com/feed/",
         category="economy_br",
+        enabled=False,
         credibility_tier=3,
         require_cross_reference=False,  # Popular mas amplo — filtrar por nicho
     ),
@@ -399,6 +400,7 @@ DEFAULT_SOURCES: list[Source] = [
         name="UOL Economia",
         url="https://rss.uol.com.br/feed/economia.xml",
         category="economy_br",
+        enabled=False,
         credibility_tier=3,
     ),
 ]

@@ -160,21 +160,19 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 
 **Arquivo:** `backend/ai/video_scene_agent.py`
 
-### Diretrizes Gráficas e Tipografia (Diretor de Arte DESIGN.md)
-* **Tipografia:** Fonte principal **Oswald** (Bold/SemiBold) para títulos; **Inter** ou **Roboto** para legendas e textos de apoio.
-* **Tamanho de Fonte Mínimo:** **Nunca inferior a 48px** na tela para assegurar legibilidade em dispositivos móveis.
-* **Não Colocar Textos Gigantes:** Evitar parágrafos longos ou textos maciços para não poluir a tela e não comprometer o dinamismo do Reels.
+### Diretrizes Gráficas e Tipografia (Diretor de Arte DESIGN.md / The Economist Style)
+* **Tipografia:** Fontes super dimensionadas. **Oswald** (Bold/SemiBold) para títulos (88px para Hook, 76px para o resto); **Inter/Roboto** para legendas (mínimo 52px).
+* **Dinâmica Ken Burns:** Aplicar Ken Burns agressivo e contínuo nas mídias de vídeo e foto (escala de 1.0 a 1.12 no mínimo) para garantir dinamismo.
 * **Gramática Flexível de Legendas:** É permitido quebrar regras rígidas de parágrafos/pontuação, inserindo palavras isoladas ou frases curtas de impacto para reforçar a narração.
-* **Não Repetição de Imagens:** Não repetir a mesma imagem nas cenas, exceto em casos estritamente necessários (ex: bandeiras de países ou figuras conhecidas).
-* **Qualidade dos Recortes:** Recortes secos e nítidos nas fotos/ilustrações, **sem feather (suavização)** nas bordas, acompanhados de um contorno branco estilo sticker de **aproximadamente 4px de largura, sem blur**.
-* **Footage Real & Downloads:** É livre e obrigatório buscar e baixar vídeos reais relevantes (noticiários, stock financeiro) para as cenas e gerar imagens necessárias se preciso.
-* **Duração Flexível:** Vídeos podem durar um tempo maior caso faça sentido para acompanhar a narração de forma natural.
-* **Regra de Dinamismo:** Máximo de **2,5 segundos** sem mudança visual. Cada frase narrada deve apresentar pelo menos um elemento visual correspondente em tela.
+* **Layout Fullscreen:** Sempre que houver vídeo (b-roll), ele DEVE ocupar a tela inteira (100% fullscreen), contendo um gradient overlay sombrio editorial por cima. A borda flutuante limitante não deve ser utilizada para vídeo.
+* **Qualidade dos Recortes:** Recortes secos ocupando cerca de 58% da tela vertical (sem limitação máxima de altura), estilo sticker com contorno branco nítido de ~4px de largura, sem blur.
+* **Footage Real (yt-dlp):** Obrigatório extrair os primeiros 10 segundos reais do YouTube (sec 0:00-0:10) via queries específicas e contextuais.
+* **Paletas Editoriais:** Utilizar paletas de cor sólidas (dark themes como Navy/Green ou Black/Crimson) com glows radiais para não deixar a imagem chapada.
+* **Duração Flexível:** Cada cena recebe a margem cravada de +0.5s após a locução ElevenLabs. Não cortar ou reescalar as durações para evitar narração "engolida".
 * **Elementos Obrigatórios por Reel:**
-  - Pelo menos **2 cortes de vídeo real** ou YouTube (fins informativos/editoriais).
-  - Pelo menos **3 recortes fotográficos** animados (estilo colagem/cutout).
-  - Pelo menos **2 elementos gráficos decorativo** animado.
-  - Background rico e texturizado (film grain, textura de papel, HSL gradients, grid dinâmico).
+  - Pelo menos **2 cortes de vídeo real** fullscreen (fins informativos/editoriais).
+  - Pelo menos **3 recortes fotográficos** grandes flutuantes.
+  - Pelo menos **2 elementos gráficos decorativos** animados.
 
 ### Configurações de Locução (ElevenLabs)
 * **Voice Model:** `eleven_multilingual_v2`
@@ -225,8 +223,9 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 
 ### 🟢 Funcionalidades Ativadas e Concluídas
 - [x] **Integração ElevenLabs e Epidemic Sound:** Locução profissional brasileira e sonorização de fundo com ducking de 40% na pipeline de Reels.
-- [x] **Cortes de YouTube via yt-dlp:** Busca e download de trechos de 5s no YouTube em tempo real na pipeline backend.
-- [x] **Recortes (Cutouts) e Ilustrações:** Imagens de sticker transparentes (Nigro, Perini, dinheiro, cripto) servidas e orquestradas pela pipeline do sidecar Python.
+- [x] **Cortes de YouTube via yt-dlp:** Busca e download de trechos iniciais de 10s no YouTube em tempo real na pipeline backend com fallbacks categorizados.
+- [x] **Recortes (Cutouts) e Ilustrações:** Imagens de sticker transparentes grandes e jornalísticas servidas e orquestradas pela pipeline do sidecar Python.
+- [x] **Remotion Fullscreen UI & Sincronia:** Duração +0.5s perfeitamente ajustada e componentes Ken Burns cravados para o padrão documentário The Economist.
 
 ### 🔴 Alta prioridade
 - [ ] Filtro de nicho no backend: aplicar penalidade −50 em artigos fora do nicho antes de salvar

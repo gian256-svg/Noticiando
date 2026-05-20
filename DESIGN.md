@@ -53,10 +53,10 @@ A tipografia deve manter contraste extremo e excelente legibilidade, mesmo em te
 
 1. **Título Principal (Gancho / Hook):**
    - Fonte: **Oswald** (Bold ou SemiBold) em caixa alta (uppercase), com kerning (espaçamento de letras) apertado.
-   - Tamanho mínimo na tela: **Nunca abaixo de 48px** para leitura rápida no mobile.
+   - Tamanho mínimo na tela: **88px para Hook e 76px para demais títulos** para garantir extremo impacto visual.
 2. **Subtexto / Narrativa / Legendas:**
    - Fonte: **Inter** ou **Roboto** (Regular ou Light).
-   - Tamanho mínimo na tela: **48px** (para legendas principais do Reels).
+   - Tamanho mínimo na tela: **52px** (para legendas principais do Reels, nunca abaixo disso).
 3. **Keyword Highlighting (Destaque de Palavras-Chave):**
    - Palavras com score de engajamento alto ou de foco recebem a cor `accent` da paleta do nicho correspondente e um leve efeito de brilho (`text-shadow`).
 
@@ -163,26 +163,44 @@ const scale = spring({
 
 ### VideoBackground (`visual_type: "video"`)
 - Usar `<OffthreadVideo>` do Remotion — necessário para render CLI; `<Video>` não funciona server-side.
-- Overlay mínimo **60% de opacidade** sobre o vídeo: `linear-gradient(170deg, bg#99 0%, grad#cc 100%)` + vinheta superior/inferior.
+- **Fullscreen Obrigatório:** O vídeo DEVE ocupar 100% da tela (sem bordas flutuantes).
+- Overlay mínimo **60% de opacidade** sobre o vídeo: `linear-gradient(to top, rgba(0,0,0,0.88) 20%, rgba(0,0,0,0.15) 55%, rgba(0,0,0,0.70) 100%)`.
 - `volume={0}` sempre — áudio vem exclusivamente da narração ElevenLabs e trilha Epidemic.
-- **Liberdade de Duração:** Vídeos de background podem durar mais tempo nas cenas se fizer sentido para ilustrar a narração.
-- **Busca e Downloads:** Há liberdade e obrigação de baixar footages reais relevantes (noticiários, stock videos de pessoas/ações financeiras) e gerar imagens necessárias no nanobanana se necessário.
+- **Ken Burns agressivo:** O vídeo deve ter um zoom contínuo de 1.0 para 1.12 para manter dinamismo.
+- **Busca e Downloads (yt-dlp):** Extrair os 10 primeiros segundos reais (`0:00-0:10`) via queries específicas.
 
-### PhotoCutout (`visual_type: "cutout"`)
+### PhotoCutout & Illustration Sticker (`visual_type: "cutout" | "illustration"`)
 - **Não Repetição:** Não repetir imagens ao longo das cenas (exceto se for uma bandeira ou figura pública proeminente).
 - **Sem Feather:** O recorte da imagem deve ser nítido e seco, sem feather/suavização de borda.
-- **Contorno de Sticker:** Borda branca sólida de **4px de espessura, completamente nítida e sem blur**.
-- Posicionamento alternado: cenas pares → `right: -20px`; ímpares → `left: -20px`.
-- Tamanho: largura **52%** da tela, `height: auto`, `objectPosition: bottom center`.
-- Entrada: spring `translateX` (220px → 0), delay 6 frames + float `sin(frame/35)*6px`.
-- **Obrigatório**: Filtro drop-shadow editorial de sombra projetada forte + o contorno branco nítido de 4px.
+- **Empilhamento Vertical (Anti-Overlap):** O contêiner de texto principal fica posicionado no topo (`paddingTop: 180-210px`), liberando a metade inferior da tela para o sticker (`height: 44%-46%`, `bottom: 110-120px`).
+- **Moldura Scrapbook Tracejada (Glow & Depth):** O sticker fica envelopado em um contêiner com um cartão de fundo tracejado deslocado (`border: "2px dashed ...", background: "..."`), criando profundidade tridimensional física.
+- **Contorno de Sticker:** Borda branca sólida de **4px de espessura, completamente nítida e sem blur** (filtro `#sticker-outline`).
+- Posicionamento alternado: cenas pares → `right: 50px`; ímpares → `left: 50px`.
+- Entrada: spring `translateY` (380px → 0), delay 6 frames + float `cos(frame/12)*8px`.
+- **Obrigatório**: Filtro drop-shadow editorial de sombra projetada forte.
 
-### DecoratorElement (em todas as cenas)
-- 4 tipos: `star` | `arrow` | `circle` | `stripes` — escolher baseado no contexto emocional da cena.
-- Tamanho 80×80px, cor `pal.accent`, `drop-shadow` glow.
-- Pulse scale `0.92–1.08` (sin/30) + rotation `±6°` (sin/50).
-- Alternado por `sceneIndex`: par → `top:100 right:40`; ímpar → `bottom:180 left:40`.
-- Opacidade `enterSpring * 0.7` — sutil, não compete com headline.
+### DecoratorElement & Context-Aware Arrow
+- **Seta Direcional Contextual:** O decorator `arrow` (seta desenhada) ajusta dinamicamente sua rotação, margem e direção baseando-se no lado em que o asset visual (cutout/illustration) está posicionado, ou na posição de gráficos/jornais na tela.
+- **Fallback de Setas:** Se a cena possuir o decorator `arrow` mas não tiver nenhum asset visual ou dados na tela, ela faz fallback automático para `star` (estrela decorativa), evitando setas apontando para o vazio.
+- **Outros Decoradores:** `circle` | `stripes` | `star` continuam disponíveis para ambientação analógica.
+
+### Visualização de Dados Premium (Gráficos Sóbrios)
+- **Variedade Tripla de Gráficos:** Alterna ciclicamente com base no índice da cena (`sceneIndex % 3`):
+  1. *Bar Chart:* 4 barras verticais retangulares com bordas sólidas.
+  2. *Area Line Chart:* Gráfico de linha e área sombreada contínua via SVG.
+  3. *Radial Donut Chart:* Círculo de progresso radial elegante ao lado de legenda de texto.
+- **Largura Expandida:** Card de dados expandido para `maxWidth: 580px` para legibilidade máxima em mobile.
+- **Sem Marcas D'água:** Proibido o uso de marcas "Noticiando" ou logos redundantes nos cabeçalhos dos gráficos.
+- **Animação de Métricas (BigMetricCounter):** Qualquer cena com valores ou porcentagens (mesmo que não seja uma cena do tipo `data`) deve renderizar o componente `<BigMetricCounter>` para rolagem dinâmica animada de números em fonte *Oswald* gigante com rotação sutil.
+
+### Recortes de Jornal (NewspaperCutout)
+- **Tamanho Expandido:** Largura aumentada para `86%` (`maxWidth: 680px`), centralizado na tela (`left: 7%`), simulando um recorte impresso realista.
+- **Legibilidade:** Fontes de título maiores (`fontSize: 28px`, `lineHeight: 1.15`) e corpo do texto maior (`fontSize: 15px`).
+
+### TimelineBackground Estilizado
+- **Linha Direcional Baixa:** Linha horizontal vermelha deslocada para `72%` de altura para evitar overlap com o texto central.
+- **Marcadores de Projeção:** Rótulos estruturados ("ANTERIOR", "PRESENTE", "PROJEÇÃO") com animação de escala independente.
+- **Termos de Mercado Financeiro:** Textos de fundo em português de baixo contraste com jargões reais do mercado de capitais (COPOM, SELIC, IBOVESPA).
 
 ### ✍️ Tipografia, Dinamismo e Quebra de Parágrafos
 - **Dinamismo Textual:** Não colocar blocos de texto muito grandes para não perder o dinamismo do Reels.

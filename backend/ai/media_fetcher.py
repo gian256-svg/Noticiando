@@ -68,25 +68,48 @@ def _find_cached_photo(url_hash: str) -> Optional[Path]:
 
 
 
-async def _ensure_fallback_video() -> str:
-    dest = PROJECT_ROOT / "output" / "assets" / "fallback_video.mp4"
-    dest.parent.mkdir(parents=True, exist_ok=True)
+async def _ensure_fallback_video(category: str) -> str:
+    fallback_queries = {
+        "investments": "stock market trading chart loop",
+        "economy_br": "sao paulo avenue traffic aerial",
+        "economy_int": "new york wall street pedestrians",
+        "geopolitics": "spinning earth globe map",
+        "crypto": "bitcoin blockchain network loop",
+        "general": "newsroom abstract background"
+    }
+    query = fallback_queries.get(category, fallback_queries["general"])
+    qhash = _query_hash(f"fallback_{query}")
+    
+    dest = MEDIA_DIR / f"fallback_{qhash}.mp4"
     if dest.exists() and dest.stat().st_size > 10_000:
-        return f"{_get_localhost_base()}/output/assets/fallback_video.mp4"
-        
-    url = "https://github.com/mediaelement/mediaelement-files/raw/master/big_buck_bunny.mp4"
+        return f"{_get_localhost_base()}/output/media/fallback_{qhash}.mp4"
+    
     try:
-        logger.info(f"Baixando video de fallback local em {dest}…")
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.get(url)
-            if resp.status_code == 200:
-                dest.write_bytes(resp.content)
-                return f"{_get_localhost_base()}/output/assets/fallback_video.mp4"
+        import yt_dlp
+        logger.info(f"Baixando video de fallback local ({category}): '{query}'…")
+        ydl_opts = {
+            "format": "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best[height<=720]",
+            "outtmpl": str(MEDIA_DIR / f"fallback_{qhash}.%(ext)s"),
+            "noplaylist": True,
+            "quiet": True,
+            "no_warnings": True,
+            "max_filesize": 40 * 1024 * 1024,
+            "download_ranges": lambda info_dict, self: [{"start_time": 0, "end_time": 10}],
+            "match_filter": yt_dlp.utils.match_filter_func("duration < 120"),
+            "postprocessors": [{"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}],
+        }
+        import asyncio
+        def _run_ydl():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([f"ytsearch1:{query} -playlist"])
+        await asyncio.to_thread(_run_ydl)
+        
+        if dest.exists():
+            return f"{_get_localhost_base()}/output/media/fallback_{qhash}.mp4"
     except Exception as e:
         logger.warning(f"Falha ao baixar video de fallback local: {e}")
         
-    return url
-
+    return f"{_get_localhost_base()}/output/media/fallback_{qhash}.mp4"
 
 async def fetch_youtube_broll(search_query: str, category: str = "general") -> Optional[str]:
     """
@@ -97,7 +120,7 @@ async def fetch_youtube_broll(search_query: str, category: str = "general") -> O
         import yt_dlp  # noqa: PLC0415
     except ImportError:
         logger.warning("yt-dlp não instalado. Pulando download de B-roll.")
-        return await _ensure_fallback_video()
+        return await _ensure_fallback_video(category)
 
     queries_to_try = [search_query] + CATEGORY_FALLBACK_QUERIES.get(category, CATEGORY_FALLBACK_QUERIES["general"])
 
@@ -117,7 +140,7 @@ async def fetch_youtube_broll(search_query: str, category: str = "general") -> O
             "quiet": True,
             "no_warnings": True,
             "max_filesize": 40 * 1024 * 1024,  # 40 MB
-            "download_ranges": lambda info_dict, self: [{"start_time": 15, "end_time": 20}],
+            "download_ranges": lambda info_dict, self: [{"start_time": 0, "end_time": 10}],
             "match_filter": yt_dlp.utils.match_filter_func("duration < 120"),
             "postprocessors": [{"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}],
         }
@@ -141,7 +164,59 @@ async def fetch_youtube_broll(search_query: str, category: str = "general") -> O
             logger.warning(f"yt-dlp falhou para '{query}': {e}")
 
     logger.error("Todas as tentativas de B-roll falharam. Retornando fallback video.")
-    return await _ensure_fallback_video()
+    return await _ensure_fallback_video(category)
+
+
+async def fetch_youtube_thumbnail(search_query: str) -> Optional[str]:
+    """
+    Busca um vídeo no YouTube baseado na query e baixa a sua miniatura (thumbnail) de alta resolução.
+    Retorna URL local do arquivo ou None.
+    """
+    try:
+        import yt_dlp
+    except ImportError:
+        logger.warning("yt-dlp não instalado. Pulando download de thumbnail do YouTube.")
+        return None
+
+    qhash = _query_hash(f"thumb_{search_query}")
+    cached = _find_cached_photo(qhash)
+    if cached:
+        logger.info(f"Thumbnail em cache: {cached.name}")
+        return f"{_get_localhost_base()}/output/media/{cached.name}"
+
+    try:
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+        }
+        import asyncio
+        def _extract():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(f"ytsearch1:{search_query} -playlist", download=False)
+                if not info or "entries" not in info or not info["entries"]:
+                    return None
+                entry = info["entries"][0]
+                return entry.get("thumbnail")
+        
+        thumb_url = await asyncio.to_thread(_extract)
+        if not thumb_url:
+            logger.warning(f"Nenhum thumbnail encontrado para query '{search_query}'")
+            return None
+
+        ext = "jpg"
+        dest = MEDIA_DIR / f"photo_{qhash}.{ext}"
+        async with httpx.AsyncClient(headers=BROWSER_HEADERS, timeout=15.0, follow_redirects=True) as client:
+            resp = await client.get(thumb_url)
+            if resp.status_code != 200 or len(resp.content) < 5_000:
+                return None
+            dest.write_bytes(resp.content)
+        
+        logger.info(f"Thumbnail do YouTube baixado: {dest.name}")
+        return f"{_get_localhost_base()}/output/media/{dest.name}"
+    except Exception as e:
+        logger.warning(f"Falha ao obter thumbnail do YouTube para '{search_query}': {e}")
+        return None
 
 
 async def fetch_article_photos(

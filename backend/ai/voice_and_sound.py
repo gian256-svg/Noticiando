@@ -38,32 +38,32 @@ CATEGORY_MUSIC_CONFIG: dict[str, dict[str, Any]] = {
     "investments": {
         "tags": ["corporate", "upbeat", "motivational"],
         "mood": "uplifting",
-        "yt_fallback": "ytsearch1:corporate upbeat background music no copyright",
+        "yt_fallback": "ytsearch1:corporate upbeat instrumental background loop",
     },
     "economy_br": {
         "tags": ["cinematic", "news", "documentary"],
         "mood": "neutral",
-        "yt_fallback": "ytsearch1:news documentary background music no copyright cinematic",
+        "yt_fallback": "ytsearch1:news documentary cinematic instrumental background",
     },
     "economy_int": {
         "tags": ["investigative", "tension", "documentary"],
         "mood": "serious",
-        "yt_fallback": "ytsearch1:investigative journalism background music no copyright",
+        "yt_fallback": "ytsearch1:investigative journalism tension instrumental background",
     },
     "geopolitics": {
         "tags": ["cinematic", "tension", "dramatic"],
         "mood": "dramatic",
-        "yt_fallback": "ytsearch1:cinematic tension background music no copyright dramatic",
+        "yt_fallback": "ytsearch1:cinematic tension dramatic instrumental background loop",
     },
     "crypto": {
         "tags": ["futuristic", "electronic", "minimal"],
         "mood": "tech",
-        "yt_fallback": "ytsearch1:futuristic electronic ambient background music no copyright",
+        "yt_fallback": "ytsearch1:futuristic electronic ambient instrumental background",
     },
     "general": {
         "tags": ["corporate", "modern", "news"],
         "mood": "neutral",
-        "yt_fallback": "ytsearch1:modern corporate background music no copyright",
+        "yt_fallback": "ytsearch1:modern corporate instrumental background loop",
     },
 }
 
@@ -124,17 +124,59 @@ def sanitize_narration_text(text: str) -> str:
     return text
 
 
-async def generate_narration(text: str, voice_id: str = DEFAULT_BR_VOICE_ID) -> Optional[str]:
+def _build_word_timestamps(alignment: dict) -> list[dict]:
+    """Converte character-level alignment do ElevenLabs em word-level."""
+    chars = alignment.get("characters", [])
+    starts = alignment.get("character_start_times_seconds", [])
+    ends = alignment.get("character_end_times_seconds", [])
+
+    words = []
+    current_word = []
+    word_start = None
+    word_start_idx = None
+
+    for idx, (char, start, end) in enumerate(zip(chars, starts, ends)):
+        if char == " " or char == "":
+            if current_word:
+                last_idx = idx - 1
+                word_end = ends[last_idx] if last_idx < len(ends) else end
+                words.append({
+                    "word": "".join(current_word),
+                    "start": word_start,
+                    "end": word_end
+                })
+                current_word = []
+                word_start = None
+                word_start_idx = None
+        else:
+            if word_start is None:
+                word_start = start
+                word_start_idx = idx
+            current_word.append(char)
+
+    if current_word and word_start_idx is not None:
+        last_idx = len(chars) - 1
+        word_end = ends[last_idx] if last_idx < len(ends) else ends[-1]
+        words.append({
+            "word": "".join(current_word),
+            "start": word_start,
+            "end": word_end
+        })
+
+    return words
+
+
+async def generate_narration(text: str, voice_id: str = DEFAULT_BR_VOICE_ID) -> Optional[dict]:
     """
-    Gera narração via ElevenLabs API.
-    Retorna URL localhost do arquivo MP3 gerado ou None em falha.
+    Gera narração via ElevenLabs API com timestamps de alinhamento de palavras.
+    Retorna dicionário contendo as URLs do áudio e das legendas ou None.
     """
     if not ELEVENLABS_API_KEY:
         logger.warning("ELEVENLABS_API_KEY não configurada. Pulando locução.")
         return None
 
     sanitized = sanitize_narration_text(text)
-    url     = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    url     = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/with-timestamps"
     headers = {"xi-api-key": ELEVENLABS_API_KEY, "Content-Type": "application/json"}
     payload = {
         "text": sanitized,
@@ -148,17 +190,45 @@ async def generate_narration(text: str, voice_id: str = DEFAULT_BR_VOICE_ID) -> 
     }
 
     try:
-        logger.info(f"Gerando narração no ElevenLabs (Beto)... original: '{text[:60]}...' | sanitized: '{sanitized[:60]}...'")
+        logger.info(f"Gerando narração com timestamps no ElevenLabs (Beto)... original: '{text[:60]}...' | sanitized: '{sanitized[:60]}...'")
         async with httpx.AsyncClient() as client:
             resp = await client.post(url, json=payload, headers=headers, timeout=60.0)
             if resp.status_code != 200:
                 logger.error(f"ElevenLabs erro {resp.status_code}: {resp.text[:300]}")
                 return None
-            filename = f"narration_{int(time.time())}.mp3"
+            
+            data = resp.json()
+            audio_base64 = data.get("audio_base64", "")
+            if not audio_base64:
+                logger.error("ElevenLabs response did not contain audio_base64.")
+                return None
+            
+            import base64
+            import json
+            audio_bytes = base64.b64decode(audio_base64)
+            ts = int(time.time())
+            filename = f"narration_{ts}.mp3"
             filepath = OUTPUT_DIR / filename
-            filepath.write_bytes(resp.content)
-            logger.info(f"Narração salva: {filepath.name} ({len(resp.content) // 1024}KB)")
-            return f"{_get_localhost_base()}/output/{filename}"
+            filepath.write_bytes(audio_bytes)
+            
+            alignment = data.get("alignment") or data.get("normalized_alignment")
+            captions = []
+            captions_filename = f"narration_{ts}_captions.json"
+            captions_filepath = OUTPUT_DIR / captions_filename
+            
+            if alignment:
+                captions = _build_word_timestamps(alignment)
+                captions_filepath.write_text(json.dumps(captions, ensure_ascii=False))
+                logger.info(f"Legendas salvas: {captions_filepath.name}")
+            else:
+                captions_filepath.write_text("[]")
+                logger.warning("Nenhum alinhamento retornado pelo ElevenLabs.")
+
+            logger.info(f"Narração salva: {filepath.name} ({len(audio_bytes) // 1024}KB)")
+            return {
+                "audio_url": f"{_get_localhost_base()}/output/{filename}",
+                "captions_url": f"{_get_localhost_base()}/output/{captions_filename}"
+            }
     except Exception as e:
         logger.error(f"ElevenLabs falhou: {e}", exc_info=True)
         return None
@@ -179,13 +249,13 @@ async def get_epidemic_soundtrack(category: str) -> Optional[str]:
         logger.info(f"Trilha em cache para '{category}': {cached.name}")
         return f"{_get_localhost_base()}/output/media/{cached.name}"
 
-    # 1. Tentar Epidemic Sound API real
-    if EPIDEMIC_SOUND_TOKEN:
-        result = await _fetch_epidemic_track(category, cfg)
-        if result:
-            return result
+    # 1. Tentar Epidemic Sound API real (Temporariamente Desativado a pedido do usuário)
+    # if EPIDEMIC_SOUND_TOKEN:
+    #     result = await _fetch_epidemic_track(category, cfg)
+    #     if result:
+    #         return result
 
-    # 2. Fallback: yt-dlp download de música royalty-free
+    # 2. Fallback: yt-dlp download de música royalty-free limpa
     return await _download_music_ytdlp(category, cfg)
 
 
@@ -227,8 +297,8 @@ async def _fetch_epidemic_track(category: str, cfg: dict) -> Optional[str]:
 
                 track = tracks[0]
                 audio_url = (
-                    track.get("audioUrl")
-                    or track.get("downloadUrl")
+                    track.get("downloadUrl")
+                    or track.get("audioUrl")
                     or track.get("streamUrl")
                     or (track.get("stems", [{}])[0] if track.get("stems") else {}).get("audioUrl")
                 )
