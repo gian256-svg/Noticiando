@@ -163,12 +163,16 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 ### Diretrizes Gráficas e Tipografia (Diretor de Arte DESIGN.md / The Economist Style)
 * **Tipografia:** Fontes super dimensionadas. **Oswald** (Bold/SemiBold) para títulos (88px para Hook, 76px para o resto); **Inter/Roboto** para legendas (mínimo 52px).
 * **Dinâmica Ken Burns:** Aplicar Ken Burns agressivo e contínuo nas mídias de vídeo e foto (escala de 1.0 a 1.12 no mínimo) para garantir dinamismo.
+* **Pacing Ultra Dinâmico (Máx 3.0s):** Nenhuma cena pode ficar mais de 3.0 segundos na tela. O subtext do roteiro tem limite de 10-12 palavras, e o backend limita a duração calculada da cena a no máximo 3.0s.
+* **Texto Sempre em Movimento:** Animar a escala do contêiner de texto (de 1.0 a 1.05) progressivamente ao longo da cena para evitar elementos de texto estáticos.
+* **Marca D'água da Empresa:** Logo "NOTICIANDO" visível de forma sutil no topo direito de cada cena com indicador de progresso Instagram no topo.
+* **Garantia de Unicidade de Mídia (Bust Cache):** Um `generation_id` gerado por request de Reels serve de sal para os hashes de imagem (`image_generator.py`) e vídeos (`media_fetcher.py`), forçando o download e a geração de mídias novas. Além disso, o download de B-roll extrai os top 5 resultados do YouTube e escolhe uma URL aleatória do top 3.
 * **Gramática Flexível de Legendas:** É permitido quebrar regras rígidas de parágrafos/pontuação, inserindo palavras isoladas ou frases curtas de impacto para reforçar a narração.
 * **Layout Fullscreen:** Sempre que houver vídeo (b-roll), ele DEVE ocupar a tela inteira (100% fullscreen), contendo um gradient overlay sombrio editorial por cima. A borda flutuante limitante não deve ser utilizada para vídeo.
 * **Qualidade dos Recortes:** Recortes secos ocupando cerca de 58% da tela vertical (sem limitação máxima de altura), estilo sticker com contorno branco nítido de ~4px de largura, sem blur.
 * **Footage Real (yt-dlp):** Obrigatório extrair os primeiros 10 segundos reais do YouTube (sec 0:00-0:10) via queries específicas e contextuais.
 * **Paletas Editoriais:** Utilizar paletas de cor sólidas (dark themes como Navy/Green ou Black/Crimson) com glows radiais para não deixar a imagem chapada.
-* **Duração Flexível:** Cada cena recebe a margem cravada de +0.5s após a locução ElevenLabs. Não cortar ou reescalar as durações para evitar narração "engolida".
+* **Duração Flexível:** Cada cena recebe a margem cravada de +0.2s após a locução ElevenLabs, limitada ao máximo de 3.0s. Não cortar ou reescalar as durações para evitar narração "engolida".
 * **Elementos Obrigatórios por Reel:**
   - Pelo menos **2 cortes de vídeo real** fullscreen (fins informativos/editoriais).
   - Pelo menos **3 recortes fotográficos** grandes flutuantes.

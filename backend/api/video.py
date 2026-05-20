@@ -169,6 +169,9 @@ async def render_video_endpoint(req: RenderVideoRequest):
 @router.post("/generate-video-scenes")
 async def generate_scenes_endpoint(req: VideoSceneRequest):
     try:
+        import uuid
+        generation_id = str(uuid.uuid4())[:8]
+
         result = await generate_video_scenes(
             title=req.title,
             summary=req.summary,
@@ -219,7 +222,7 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
 
             # 1. Resolver vídeo de fundo (background_video_url)
             yt_query = scene.get("youtube_search") or scene.get("media_search_query") or req.title
-            bg_video = await fetch_youtube_broll(yt_query, req.category)
+            bg_video = await fetch_youtube_broll(yt_query, req.category, salt=generation_id)
             scene["background_video_url"] = bg_video
             scene["media_url"] = bg_video
 
@@ -239,7 +242,7 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
                         from ai.image_generator import generate_cutout_image
                         target_kw = scene.get("person_name") or scene.get("media_keyword") or scene.get("headline") or ""
                         context = scene.get("subtext") or scene.get("headline") or ""
-                        generated = await generate_cutout_image(target_kw, context, req.category)
+                        generated = await generate_cutout_image(target_kw, context, req.category, salt=generation_id)
                         if generated:
                             scene["cutout_url"] = generated
                             scene["image_generated"] = True
@@ -265,7 +268,7 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
                     from ai.image_generator import generate_cutout_image
                     target_kw = scene.get("media_keyword") or scene.get("headline") or ""
                     context = scene.get("subtext") or scene.get("headline") or ""
-                    generated = await generate_cutout_image(target_kw, context, req.category)
+                    generated = await generate_cutout_image(target_kw, context, req.category, salt=generation_id)
                     if generated:
                         scene["illustration_url"] = generated
                         scene["media_url"] = generated
@@ -291,7 +294,7 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
                 target_kw = scene.get("media_keyword") or scene.get("headline") or req.title
                 map_kw = f"geographic atlas map showing {target_kw}"
                 context = scene.get("subtext") or scene.get("headline") or ""
-                generated = await generate_cutout_image(map_kw, context, req.category)
+                generated = await generate_cutout_image(map_kw, context, req.category, salt=generation_id)
                 if generated:
                     scene["map_image_url"] = generated
 
@@ -357,12 +360,12 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
             v_type = s.get("visual_type", "context")
             if total_audio_duration > 0:
                 scene_duration = (words / total_words) * total_audio_duration
-                s["duration_seconds"] = round(scene_duration + 0.2, 2)
+                s["duration_seconds"] = min(3.0, round(scene_duration + 0.2, 2))
             else:
                 if v_type == "hook":
-                    s["duration_seconds"] = round(max(2.2, words * 0.45 + 0.4), 1)
+                    s["duration_seconds"] = min(3.0, round(max(2.2, words * 0.45 + 0.4), 1))
                 else:
-                    s["duration_seconds"] = round(max(2.0, words * 0.45 + 0.5), 1)
+                    s["duration_seconds"] = min(3.0, round(max(2.0, words * 0.45 + 0.5), 1))
 
             # Fatiar as legendas correspondentes
             scene_end_time = scene_start_time + s["duration_seconds"]

@@ -111,7 +111,11 @@ async def _ensure_fallback_video(category: str) -> str:
         
     return f"{_get_localhost_base()}/output/media/fallback_{qhash}.mp4"
 
-async def fetch_youtube_broll(search_query: str, category: str = "general") -> Optional[str]:
+async def fetch_youtube_broll(
+    search_query: str,
+    category: str = "general",
+    salt: Optional[str] = None
+) -> Optional[str]:
     """
     Baixa um clip de B-roll do YouTube via yt-dlp para uso como fundo de cena.
     Retorna URL localhost ou URL de fallback.
@@ -125,7 +129,7 @@ async def fetch_youtube_broll(search_query: str, category: str = "general") -> O
     queries_to_try = [search_query] + CATEGORY_FALLBACK_QUERIES.get(category, CATEGORY_FALLBACK_QUERIES["general"])
 
     for attempt, query in enumerate(queries_to_try[:3]):
-        qhash = _query_hash(query)
+        qhash = _query_hash(f"{query}_{salt}" if salt else query)
         cached = _find_cached_video(qhash)
         if cached:
             logger.info(f"B-roll em cache: {cached.name}")
@@ -145,10 +149,31 @@ async def fetch_youtube_broll(search_query: str, category: str = "general") -> O
             "postprocessors": [{"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}],
         }
 
-        search_url = f"ytsearch1:{query} -playlist"
         try:
+            import random
             import asyncio
-            logger.info(f"Baixando B-roll do YouTube (tentativa {attempt + 1}): '{query}'")
+            
+            logger.info(f"Buscando B-roll do YouTube para: '{query}'")
+            
+            def _extract_urls():
+                with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": True}) as ydl:
+                    info = ydl.extract_info(f"ytsearch5:{query} -playlist", download=False)
+                    if info and "entries" in info and info["entries"]:
+                        return [entry["url"] for entry in info["entries"] if entry.get("url")]
+                    return []
+            
+            urls = await asyncio.to_thread(_extract_urls)
+            
+            # Escolhe uma URL aleatória do top 3 se disponível, senão busca direta
+            search_url = f"ytsearch1:{query} -playlist"
+            if urls:
+                chosen_url = random.choice(urls[:3])
+                logger.info(f"Selecionada URL aleatória do top 3: {chosen_url}")
+                search_url = chosen_url
+            else:
+                logger.warning("Nenhuma URL extraída via busca flat. Fazendo download direto com busca fallback.")
+
+            logger.info(f"Baixando B-roll do YouTube (tentativa {attempt + 1}): '{query}' de {search_url}")
             def _run_ydl():
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([search_url])

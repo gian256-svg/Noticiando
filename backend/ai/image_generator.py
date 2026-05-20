@@ -66,7 +66,12 @@ async def remove_background(image_path: Path) -> Path:
         logger.error(f"Erro ao remover o fundo da imagem {image_path}: {e}")
         return image_path
 
-async def generate_cutout_image(keyword: str, context: str = "", category: str = "general") -> Optional[str]:
+async def generate_cutout_image(
+    keyword: str,
+    context: str = "",
+    category: str = "general",
+    salt: Optional[str] = None
+) -> Optional[str]:
     """
     Gera imagem editorial para uso como cutout.
     - Se for figura pública: retrato editorial com fundo branco (para rembg depois)
@@ -77,7 +82,8 @@ async def generate_cutout_image(keyword: str, context: str = "", category: str =
         return None
 
     is_person = is_public_figure(keyword)
-    qhash = hashlib.md5(f"gen_{keyword}_{category}".encode()).hexdigest()[:12]
+    salt_str = f"_{salt}" if salt else ""
+    qhash = hashlib.md5(f"gen_{keyword}_{category}{salt_str}".encode()).hexdigest()[:12]
     
     # Se já existir uma imagem transparente gerada, retornar ela
     existing_png = MEDIA_DIR / f"generated_{qhash}.png"
@@ -223,14 +229,10 @@ async def generate_cutout_image(keyword: str, context: str = "", category: str =
         try:
             dest_img.write_bytes(image_bytes)
             
-            # Se for figura pública, removemos o fundo
-            if is_person:
-                final_path = await remove_background(dest_img)
-                # Se removeu, dest_img original pode ser deletado se desejar
-                if final_path != dest_img and dest_img.exists():
-                    dest_img.unlink()
-            else:
-                final_path = dest_img
+            # Sempre remove o fundo para cutouts, permitindo que navios, logos e objetos virem stickers transparentes
+            final_path = await remove_background(dest_img)
+            if final_path != dest_img and dest_img.exists():
+                dest_img.unlink()
                 
             return f"{_get_localhost_base()}/output/media/{final_path.name}"
         except Exception as e:

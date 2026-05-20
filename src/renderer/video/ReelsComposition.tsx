@@ -43,12 +43,12 @@ export interface ReelsCompositionProps {
 interface Palette { bg: string; grad: string; accent: string; text: string; dim: string }
 
 const CATEGORY_PALETTE: Record<string, Palette> = {
-  investments:  { bg: "#F5F0E8", grad: "#E8E0D0", accent: "#1A3A6B", text: "#1E293B", dim: "rgba(26,58,107,0.09)" },
-  economy_br:   { bg: "#0A1628", grad: "#0D1E35", accent: "#00C896", text: "#FFFFFF", dim: "rgba(0,200,150,0.09)" },
-  economy_int:  { bg: "#0B0E17", grad: "#060810", accent: "#E0A96D", text: "#FFFFFF", dim: "rgba(224,169,109,0.12)" },
-  geopolitics:  { bg: "#1A0A0A", grad: "#2B1111", accent: "#D32F2F", text: "#FFFFFF", dim: "rgba(211,47,47,0.12)" },
-  crypto:       { bg: "#0D0D12", grad: "#06060A", accent: "#F59E0B", text: "#FFFFFF", dim: "rgba(245,158,11,0.12)" },
-  general:      { bg: "#F5F0E8", grad: "#EFEBE1", accent: "#1A3A6B", text: "#1E293B", dim: "rgba(26,58,107,0.09)" },
+  investments:  { bg: "#F8F6F0", grad: "#EDE8DC", accent: "#0F294A", text: "#1E293B", dim: "rgba(15,41,74,0.09)" },
+  economy_br:   { bg: "#0A1628", grad: "#050C16", accent: "#00E676", text: "#FFFFFF", dim: "rgba(0,230,118,0.09)" },
+  economy_int:  { bg: "#0B0E17", grad: "#040508", accent: "#00E5FF", text: "#FFFFFF", dim: "rgba(0,229,255,0.12)" },
+  geopolitics:  { bg: "#140505", grad: "#0A0202", accent: "#FF1744", text: "#FFFFFF", dim: "rgba(255,23,68,0.12)" },
+  crypto:       { bg: "#0B0B0F", grad: "#050507", accent: "#FFEA00", text: "#FFFFFF", dim: "rgba(255,234,0,0.12)" },
+  general:      { bg: "#F8F6F0", grad: "#EDE8DC", accent: "#0F294A", text: "#1E293B", dim: "rgba(15,41,74,0.09)" },
 };
 
 function getPalette(category?: string) {
@@ -179,17 +179,12 @@ const Decorator: React.FC<DecoratorProps> = ({
   isNewspaper = false,
   hasSideAsset = false,
 }) => {
-  if (type === "none" || !type) return null;
   const pulse = Math.sin(frame / 6) * 0.05 + 0.95;
 
   let resolvedType = type;
-  // Se for seta, mas não tiver asset visível, faz fallback para estrela decorativa
-  if (type === "arrow" && !hasSideAsset && !isData && !isNewspaper) {
-    resolvedType = "star";
-  }
-  
-  if (resolvedType === "star") {
-    return null; // A pedido do usuário, a estrela decorativa foi abolida
+  // Desabilitar setas do fundo e estrelas, garantindo no mínimo 3 elementos ativos com círculo ou listras
+  if (resolvedType === "none" || resolvedType === "arrow" || resolvedType === "star" || !resolvedType) {
+    resolvedType = (frame + 1) % 2 === 0 ? "circle" : "stripes";
   }
   
   if (resolvedType === "arrow") {
@@ -496,9 +491,9 @@ const NewspaperCutout: React.FC<{
   });
 
   const panProgress = frame / durationInFrames;
-  const hPan = interpolate(panProgress, [0, 1], [30, -380]);
+  const hPan = interpolate(panProgress, [0, 1], [20, -50]); // Panning muito lento para manter legível
   const rotate = interpolate(entrance, [0, 1], [6, -0.5]) + interpolate(exitProgress, [0, 1], [0, -3]);
-  const scale = interpolate(entrance, [0, 1], [0.85, 1]) * interpolate(exitProgress, [0, 1], [1, 0.85]);
+  const scale = interpolate(entrance, [0, 1], [1.3, 1.65]) * interpolate(exitProgress, [0, 1], [1, 0.85]); // Dobro de escala (1.65x)
   const translateY = interpolate(entrance, [0, 1], [380, 0]) + interpolate(exitProgress, [0, 1], [0, 480]);
 
   // Progressive yellow highlighter (starts after entrance animation completes, from frame 15 to 45)
@@ -513,14 +508,14 @@ const NewspaperCutout: React.FC<{
     <div
       style={{
         position: "absolute",
-        top: "46%",
-        left: "5%",
-        width: "140%", // Transborda as margens
+        top: "42%",
+        left: "10%",
+        width: "80%", // Centralizado e expandido via scale
         maxWidth: 1200,
         backgroundColor: "#f4f1ea", // newsprint warm paper color
         backgroundImage: "radial-gradient(#e5dec9 1px, transparent 1px)", // subtle paper texture
         backgroundSize: "20px 20px",
-        padding: "32px",
+        padding: "24px",
         border: "2px solid #d4c8ac",
         boxShadow: "0 28px 50px rgba(0, 0, 0, 0.5), inset 0 0 100px rgba(0,0,0,0.05)",
         transform: `translateY(${translateY}px) translateX(${hPan}px) scale(${scale}) rotate(${rotate}deg)`,
@@ -974,8 +969,53 @@ const NewsScene: React.FC<SceneProps> = ({
   // Headline parsing and text shadow variables
   const words = useMemo(() => scene.headline.split(" "), [scene.headline]);
   const accentSet = useMemo(() => new Set<number>(scene.accent_word_indices ?? []), [scene.accent_word_indices]);
-  const titleFontSize = isHook ? 88 : 76;
+  
+  const longestWordLength = useMemo(() => {
+    return Math.max(...words.map(w => w.length), 0);
+  }, [words]);
+
+  const baseTitleFontSize = isHook ? 88 : 76;
+  const titleFontSize = useMemo(() => {
+    if (longestWordLength > 12) {
+      return Math.max(48, baseTitleFontSize - (longestWordLength - 12) * 4);
+    }
+    return baseTitleFontSize;
+  }, [longestWordLength, baseTitleFontSize]);
+
+  const matchedCountries = useMemo(() => {
+    const fullText = `${scene.headline} ${scene.subtext ?? ""}`.toLowerCase();
+    const matched: string[] = [];
+    const COUNTRY_MAP: Record<string, string> = {
+      china: "cn",
+      "coreia do sul": "kr",
+      "coreia": "kr",
+      "estados unidos": "us",
+      eua: "us",
+      brasil: "br",
+      "arábia saudita": "sa",
+      saudi: "sa",
+      aramco: "sa",
+      irã: "ir",
+      "ira": "ir",
+      israel: "il",
+      rússia: "ru",
+      russia: "ru",
+      ucrânia: "ua",
+      ucrania: "ua",
+    };
+    for (const [key, code] of Object.entries(COUNTRY_MAP)) {
+      if (fullText.includes(key) && !matched.includes(code)) {
+        matched.push(code);
+      }
+    }
+    return matched;
+  }, [scene.headline, scene.subtext]);
   const subtextFontSize = 52; // STRICT MINIMUM: never below 48px for mobile legibility
+
+  const textPulse = interpolate(frame, [0, durationInFrames], [1.0, 1.05], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
 
   // Parse potential values (e.g. percentages or numbers) for all scenes
   const dataMetric = useMemo(() => {
@@ -1116,6 +1156,38 @@ const NewsScene: React.FC<SceneProps> = ({
         })}
       </div>
 
+      {/* ── Brand Watermark (NOTICIANDO) ── */}
+      <div style={{
+        position: "absolute",
+        top: 48,
+        right: 28,
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        zIndex: 100,
+        opacity: 0.85,
+        transform: `scale(${entrance})`,
+      }}>
+        <div style={{
+          width: 6,
+          height: 6,
+          borderRadius: "50%",
+          background: pal.accent,
+          boxShadow: `0 0 8px ${pal.accent}`,
+        }} />
+        <span style={{
+          color: "#FFFFFF",
+          fontSize: 14,
+          fontWeight: 900,
+          letterSpacing: "0.25em",
+          textTransform: "uppercase",
+          fontFamily: "'Oswald', 'Montserrat', 'Inter', sans-serif",
+          textShadow: "0 2px 4px rgba(0,0,0,0.5)",
+        }}>
+          NOTICIANDO
+        </span>
+      </div>
+
       {/* ── Content Container with camera zoom (Parallax layout) ── */}
       <AbsoluteFill style={{ transform: `scale(${cameraScale})`, transformOrigin: "center center" }}>
         
@@ -1232,16 +1304,7 @@ const NewsScene: React.FC<SceneProps> = ({
               ) * interpolate(exitProgress, [0, 1], [1, 0.7])
             }) rotate(${Math.sin(frame / 15) * 2 + (sceneIndex % 2 === 0 ? 2 : -2) + interpolate(exitProgress, [0, 1], [0, sceneIndex % 2 === 0 ? -12 : 12])}deg)`,
           }}>
-            {/* Scrapbook/Collage dotted outline backdrop card */}
-            <div style={{
-              position: "absolute",
-              inset: -14,
-              borderRadius: 6,
-              border: `2px dashed ${pal.accent}50`,
-              background: `${pal.accent}05`,
-              transform: "rotate(-3deg) translate(-4px, 4px)",
-              zIndex: -1,
-            }} />
+            {/* Outline backdrop removed by user request for organic look */}
             
             <Img
               src={scene.cutout_url}
@@ -1277,16 +1340,7 @@ const NewsScene: React.FC<SceneProps> = ({
               ) * interpolate(exitProgress, [0, 1], [1, 0])
             }) rotate(${Math.cos(frame / 12) * 3 + interpolate(exitProgress, [0, 1], [0, -15])}deg)`,
           }}>
-            {/* Dotted backdrop card for illustration */}
-            <div style={{
-              position: "absolute",
-              inset: -12,
-              borderRadius: 6,
-              border: `2.5px dashed ${pal.accent}50`,
-              background: `${pal.accent}05`,
-              transform: "rotate(3deg) translate(3px, 3px)",
-              zIndex: -1,
-            }} />
+            {/* Outline backdrop removed by user request for organic look */}
 
             <Img
               src={scene.illustration_url || scene.media_url || ""}
@@ -1299,6 +1353,49 @@ const NewsScene: React.FC<SceneProps> = ({
             />
           </div>
         )}
+
+        {/* Dynamic Country Flags Overlay (for context-relevant geopolitics/economics) */}
+        {matchedCountries.map((code, idx) => {
+          const delay = 12 + idx * 8; // Enters staggered after headline
+          const flagEntrance = spring({
+            frame: Math.max(0, frame - delay),
+            fps,
+            config: { damping: 13, stiffness: 95 },
+          });
+          
+          const y = interpolate(flagEntrance, [0, 1], [300, 0]);
+          const rot = interpolate(flagEntrance, [0, 1], [-20, 5 * (idx % 2 === 0 ? 1 : -1)]);
+          const scale = flagEntrance * (1 - exitProgress);
+          
+          const oppositeSide = assetSide === "right" ? "left" : "right";
+          const sideOffset = 60 + idx * 85;
+
+          return (
+            <div
+              key={code}
+              style={{
+                position: "absolute",
+                bottom: 260 + idx * 25,
+                [hasSideAsset ? oppositeSide : (idx % 2 === 0 ? "left" : "right")]: hasSideAsset ? sideOffset : (120 + idx * 95),
+                width: 100,
+                height: 100,
+                borderRadius: "50%",
+                border: "4px solid #FFFFFF",
+                boxShadow: "0 15px 30px rgba(0,0,0,0.5)",
+                overflow: "hidden",
+                zIndex: 5,
+                transform: `translateY(${y}px) rotate(${rot}deg) scale(${scale})`,
+                transformOrigin: "center center",
+                opacity: 1 - exitProgress,
+              }}
+            >
+              <img
+                src={`https://flagcdn.com/w160/${code}.png`}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </div>
+          );
+        })}
 
         {/* word-level synchronized captions overlay */}
         {scene.caption_words && scene.caption_words.length > 0 && (
@@ -1345,11 +1442,11 @@ const NewsScene: React.FC<SceneProps> = ({
           position: "absolute", inset: 0,
           display: "flex", flexDirection: "column",
           alignItems: containerAlignItems,
-          justifyContent: (hasSideAsset || isData || (scene.visual_type === "newspaper_clip" || scene.cutout_url === "newspaper") || isTimeline) ? "flex-start" : "center",
-          paddingTop: (hasSideAsset || isData || (scene.visual_type === "newspaper_clip" || scene.cutout_url === "newspaper") || isTimeline) ? (isHook ? 180 : 210) : 0,
+          justifyContent: (hasSideAsset || (scene.visual_type === "newspaper_clip" || scene.cutout_url === "newspaper") || isTimeline) ? "flex-start" : "center",
+          paddingTop: (hasSideAsset || (scene.visual_type === "newspaper_clip" || scene.cutout_url === "newspaper") || isTimeline) ? (isHook ? 180 : 210) : 0,
           paddingLeft: 80, paddingRight: 80,
           textAlign: textAlignment,
-          transform: `translateY(${interpolate(exitProgress, [0, 1], [0, -50])}px) scale(${interpolate(exitProgress, [0, 1], [1, 0.95])})`,
+          transform: `translateY(${interpolate(exitProgress, [0, 1], [0, -50])}px) scale(${interpolate(exitProgress, [0, 1], [1, 0.95]) * textPulse})`,
           opacity: 1 - exitProgress,
         }}>
 
@@ -1404,12 +1501,11 @@ const NewsScene: React.FC<SceneProps> = ({
             </div>
           ) : (
             <div style={{
-              display: "flex", flexWrap: "wrap",
-              justifyContent: textAlignment === "left" ? "flex-start" : (textAlignment === "right" ? "flex-end" : "center"),
-              gap: "14px 16px",
+              display: "block",
+              textAlign: textAlignment === "left" ? "left" : (textAlignment === "right" ? "right" : "center"),
               marginBottom: 20,
               zIndex: 10,
-              maxWidth: "100%", // Ocupa toda a largura, pois empilhamos verticalmente
+              width: "100%",
               wordBreak: "break-word",
             }}>
               {words.map((word, i) => {
@@ -1470,8 +1566,10 @@ const NewsScene: React.FC<SceneProps> = ({
                     style={{
                       position: "relative",
                       display: "inline-block",
+                      marginRight: 16,
+                      marginBottom: 14,
                       fontFamily: isCinematicVideo ? "'Georgia', 'Times New Roman', serif" : "'Oswald', 'Montserrat', 'Inter', sans-serif",
-                      fontSize: isHook ? 80 : 72, // Ligeiramente menor para evitar vazar a tela com palavras gigantes
+                      fontSize: titleFontSize, // Font size dinâmico calculado por tamanho da palavra
                       fontWeight: isCinematicVideo ? 600 : 900,
                       textTransform: isCinematicVideo ? "none" : "uppercase",
                       letterSpacing: isCinematicVideo ? "0em" : "-0.015em", // Slightly relaxed kerning to prevent overlap
@@ -1539,14 +1637,15 @@ const NewsScene: React.FC<SceneProps> = ({
           {/* High-Fidelity Data Visualization (Editorial Publication-Style Chart) */}
           {isData && (
             <div style={{
-              marginTop: 35,
-              padding: "20px 24px",
-              borderRadius: 4, // rectangular editorial card
-              background: "#FBF9F5", // pure book page creme
-              border: "2px solid #1E293B",
-              boxShadow: "8px 8px 0px rgba(30, 41, 59, 0.95)", // solid flat drop shadow
+              marginTop: 40,
+              padding: "24px",
+              borderRadius: 16,
+              background: "rgba(0, 0, 0, 0.35)", // Fundo escuro transparente e elegante
+              backdropFilter: "blur(12px)",
+              border: "1.5px solid rgba(255, 255, 255, 0.15)", // Borda fina e clean branca
+              boxShadow: "0 25px 50px rgba(0, 0, 0, 0.45)",
               width: "100%",
-              maxWidth: 640, // Aumentado para 640px
+              maxWidth: 680, // Aumentado
               opacity: interpolate(frame, [12, 22], [0, 1], {
                 extrapolateLeft: "clamp", extrapolateRight: "clamp",
               }),
@@ -1560,14 +1659,14 @@ const NewsScene: React.FC<SceneProps> = ({
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                borderBottom: "1.5px solid #1E293B",
+                borderBottom: "1.5px solid rgba(255, 255, 255, 0.15)",
                 paddingBottom: 8,
               }}>
                 <span style={{
                   fontFamily: "'Oswald', sans-serif",
                   fontSize: 14,
                   fontWeight: 900,
-                  color: "#1E293B",
+                  color: "#FFFFFF",
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
                 }}>
@@ -1615,7 +1714,7 @@ const NewsScene: React.FC<SceneProps> = ({
                           fontFamily: "'Oswald', sans-serif",
                           fontSize: 14,
                           fontWeight: 900,
-                          color: item.highlight ? highlightColor : "#475569",
+                          color: item.highlight ? highlightColor : "rgba(255, 255, 255, 0.6)",
                           marginBottom: 4,
                         }}>
                           {item.highlight ? currentCountText : item.val}{displayUnit}
@@ -1624,17 +1723,17 @@ const NewsScene: React.FC<SceneProps> = ({
                         <div style={{
                           width: "100%",
                           height: `${h * 0.8}%`,
-                          background: item.highlight ? highlightColor : "#94A3B8",
-                          border: "1.5px solid #1E293B",
+                          background: item.highlight ? highlightColor : "rgba(255, 255, 255, 0.25)",
+                          border: "1.5px solid rgba(255, 255, 255, 0.15)",
                           borderRadius: "2px 2px 0 0",
-                          boxShadow: item.highlight ? "3px -3px 0px rgba(30, 41, 59, 0.4)" : undefined,
+                          boxShadow: item.highlight ? `0 0 15px ${highlightColor}` : undefined,
                         }} />
 
                         <span style={{
                           fontFamily: "'Inter', sans-serif",
                           fontSize: 10,
                           fontWeight: 800,
-                          color: "#475569",
+                          color: "rgba(255, 255, 255, 0.5)",
                           marginTop: 6,
                           textTransform: "uppercase",
                         }}>
@@ -1655,9 +1754,9 @@ const NewsScene: React.FC<SceneProps> = ({
                   paddingTop: 10,
                 }}>
                   {/* Subtle Grid Lines */}
-                  <div style={{ position: "absolute", top: 40, left: 0, right: 0, height: 1, borderTop: "1px dashed #E2E8F0" }} />
-                  <div style={{ position: "absolute", top: 90, left: 0, right: 0, height: 1, borderTop: "1px dashed #E2E8F0" }} />
-                  <div style={{ position: "absolute", top: 140, left: 0, right: 0, height: 1, borderTop: "1px dashed #E2E8F0" }} />
+                  <div style={{ position: "absolute", top: 40, left: 0, right: 0, height: 1, borderTop: "1px dashed rgba(255, 255, 255, 0.15)" }} />
+                  <div style={{ position: "absolute", top: 90, left: 0, right: 0, height: 1, borderTop: "1px dashed rgba(255, 255, 255, 0.15)" }} />
+                  <div style={{ position: "absolute", top: 140, left: 0, right: 0, height: 1, borderTop: "1px dashed rgba(255, 255, 255, 0.15)" }} />
 
                   <svg width="100%" height="160" style={{ overflow: "visible" }}>
                     {/* Area fill */}
@@ -1679,7 +1778,7 @@ const NewsScene: React.FC<SceneProps> = ({
                       cy={140 - 100 * dataEasedProgress}
                       r="8"
                       fill={highlightColor}
-                      stroke="#1E293B"
+                      stroke="#050811"
                       strokeWidth="2.5"
                     />
                     <circle
@@ -1702,7 +1801,7 @@ const NewsScene: React.FC<SceneProps> = ({
                     fontFamily: "'Inter', sans-serif",
                     fontSize: 10,
                     fontWeight: 800,
-                    color: "#475569",
+                    color: "rgba(255, 255, 255, 0.5)",
                   }}>
                     <span>INICIAL</span>
                     <span>Q2</span>
@@ -1724,7 +1823,7 @@ const NewsScene: React.FC<SceneProps> = ({
                   {/* Left Donut */}
                   <div style={{ position: "relative", width: 160, height: 160 }}>
                     <svg width="160" height="160" style={{ transform: "rotate(-90deg)" }}>
-                      <circle cx="80" cy="80" r="62" fill="none" stroke="#E2E8F0" strokeWidth="10" />
+                      <circle cx="80" cy="80" r="62" fill="none" stroke="rgba(255, 255, 255, 0.15)" strokeWidth="10" />
                       <circle
                         cx="80"
                         cy="80"
@@ -1771,13 +1870,13 @@ const NewsScene: React.FC<SceneProps> = ({
                       }}>
                         <div style={{
                           width: 8, height: 8, borderRadius: "50%",
-                          background: item.highlight ? highlightColor : "#94A3B8"
+                          background: item.highlight ? highlightColor : "rgba(255, 255, 255, 0.3)"
                         }} />
                         <div style={{ display: "flex", flexDirection: "column" }}>
-                          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 10, fontWeight: 700, color: "#64748B" }}>
+                          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 10, fontWeight: 700, color: "rgba(255, 255, 255, 0.5)" }}>
                             {item.label}
                           </span>
-                          <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 16, fontWeight: 900, color: item.highlight ? highlightColor : "#1E293B" }}>
+                          <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 16, fontWeight: 900, color: item.highlight ? highlightColor : "rgba(255, 255, 255, 0.9)" }}>
                             {item.val}
                           </span>
                         </div>

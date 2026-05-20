@@ -20,3 +20,4 @@ noticiando.db
 output/*
 !output/assets/
 .claude/
+brain/

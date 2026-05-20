@@ -53,7 +53,10 @@ O **CEREBRO** gerencia duas pipelines principais de forma assíncrona e resilien
    - Executa `remotion render` com codec `H.264` e `yuv420p` para compatibilidade mobile/social.
 
 ### 🚨 Padrão de Qualidade Visual Obrigatório (enforce por cena)
-- **Não Repetição de Imagens:** É proibido repetir imagens idênticas ao longo do vídeo.
+- **Não Repetição de Imagens & Salt de Cache (Bust Caching):** É estritamente proibido repetir imagens ou vídeos idênticos ao longo de um Reels ou entre runs. O backend gera um `generation_id` único por request de Reels que serve de sal para os hashes de imagem (`image_generator.py`) e vídeos (`media_fetcher.py`), forçando o download e a geração de mídias novas. Além disso, o download de B-roll busca do top 5 do YouTube e escolhe uma URL aleatória do top 3.
+- **Pacing Ultra Dinâmico (Máx 3.0s):** Nenhuma cena pode ficar mais de 3.0 segundos na tela. As narrações (`subtext`) geradas pelo LLM devem ter no máximo 10 a 12 palavras, e o backend impõe um teto rígido de 3.0s de duração por cena.
+- **Marca D'água da Empresa (Logo):** Exibição permanente de um badge "NOTICIANDO" com contorno neon elegante no canto superior direito de cada cena do Reels.
+- **Texto Sempre em Movimento:** O contêiner de headline/legendas possui uma animação contínua de pulso sutil de escala (escala progressiva de 1.0 a 1.05) ao longo da cena, para que nenhum elemento de texto fique estático.
 - **Recortes e Contornos de Stickers:** As imagens em cenas de recorte (`cutout` ou `illustration`) devem ter recortes limpos e nítidos, **sem feather (suavização de borda)**. O contorno/borda de sticker deve ser branco sólido com **cerca de 4px de espessura, sem blur** nas bordas.
 - **Empilhamento Vertical (Anti-Overlap):** O texto é empilhado na parte superior da tela e o asset visual/gráfico é renderizado na metade inferior para evitar sobreposição de elementos.
 - **Moldura Scrapbook:** Cutouts e illustrations são envolvidos em um contêiner com fundo tracejado (`2px dashed`) deslocado em rotação.

@@ -41,7 +41,7 @@ Schema obrigatório:
       "id": "scene_1",
       "headline": "TEXTO CURTO IMPACTANTE EM CAIXA ALTA",
       "subtext": "Texto completo que será narrado nesta cena. Deve ser fluído, informativo e conter dados.",
-      "duration_seconds": 3.0,
+      "duration_seconds": 2.5,
       "visual_type": "hook" | "video" | "cutout" | "illustration" | "data" | "map" | "timeline" | "collage" | "split_video" | "newspaper_clip",
       "accent_word_indices": [0, 2],
       "decorator_type": "arrow" | "circle" | "stripes",
@@ -54,9 +54,15 @@ Schema obrigatório:
 
 REGRAS OBRIGATÓRIAS DE DIREÇÃO DE ARTE — VIOLÁ-LAS INVALIDA O OUTPUT:
 
+PACING ACELERADO (REGRA DE OURO):
+  * NADA PODE FICAR MAIS DE 3 SEGUNDOS NA TELA.
+  * A duração de cada cena deve ser de no máximo 3.0 segundos (idealmente entre 2.0 e 3.0 segundos).
+  * Para cumprir isso, cada frase da narração (subtext) DEVE ser extremamente curta: no máximo 10 a 12 palavras por cena.
+  * O roteiro deve conter muitas cenas (15 a 18 cenas para um vídeo de 45 segundos) para manter cortes rápidos e dinâmicos.
+
 VISUAL_TYPE — distribuição mínima obrigatória por reel:
   * "hook": Sempre a cena 1 (2 a 2,5s). Gancho agressivo, 3-5 palavras na headline. OBRIGATÓRIO: preencher o "subtext" com o início da locução (ex: a frase introdutória do vídeo).
-  * "video": MÍNIMO 2 cenas. B-roll de vídeo ao fundo. OBRIGATÓRIO: preencher "youtube_search" em inglês com queries mais específicas e contextuais (pessoa + evento + ano quando possível). Ex: "Gabriel Galipolo Banco Central audiencia senado 2025", "oil pump jack field aerial", "Dubai skyline night aerial 4k". A youtube_search DEVE descrever exatamente o que aparece na narração naquele momento — não um tema geral.
+  * "video": MÍNIMO 2 cenas. B-roll de vídeo ao fundo. OBRIGATÓRIO: preencher "youtube_search" in inglês com queries mais específicas e contextuais (pessoa + evento + ano quando possível). Ex: "Gabriel Galipolo Banco Central audiencia senado 2025", "oil pump jack field aerial", "Dubai skyline night aerial 4k". A youtube_search DEVE descrever exatamente o que aparece na narração naquele momento — não um tema geral.
   * "cutout": MÍNIMO 2 cenas. Foto editorial flutuante. OBRIGATÓRIO: preencher "media_keyword" com o nome exato da pessoa, corporação, logo ou objeto (ex: "Elon Musk", "Petrobras logo", "Saudi Arabia flag", "dollar bills"). Evite termos genéricos como "money" ou "briefcase" repetidamente.
   * "illustration": MÍNIMO 1 cena. Gráfico animado. OBRIGATÓRIO: preencher "media_keyword" detalhando o tipo de gráfico (ex: "bar chart inflation", "line chart stock price", "pie chart budget").
   * "newspaper_clip": MÍNIMO 1 cena. Recorte de jornal impresso tradicional exibindo uma notícia de veracidade. OBRIGATÓRIO: preencher "headline" com o título do jornal simulado (ex: "THE WALL STREET JOURNAL", "VALOR ECONÔMICO") e "media_keyword" com a frase exata da narração que deve ser grifada com marca-texto amarelo.
@@ -72,7 +78,8 @@ PERSON_NAME — obrigatório em cenas "cutout" com figuras públicas:
   * Para cutouts sem figura humana ou com temas abstratos, preencher como null ou omitir.
   * O campo person_name será utilizado diretamente para alimentar o gerador de retratos com IA.
 
-NUNCA REPETIR FRASES OU MÍDIAS:
+NUNCA REPETIR FRASES OU MÍDIAS (REGRA DE OURO):
+  * É expressamente proibido repetir a mesma imagem, pessoa ou conceito visual em duas cenas consecutivas. A imagem da próxima cena DEVE ser alterada para variar e não cansar a tela.
   * É expressamente proibido repetir a mesma frase de narração (`subtext`) ou a mesma `headline` em várias cenas. Cada cena DEVE ter um texto de narração único que progride linearmente na história. Se a cena anterior terminou com "o mercado desabou", a próxima cena deve dar sequência, por exemplo "com as ações caindo 12%".
   * É expressamente proibido repetir a mesma media_keyword ou imagens similares em várias cenas. Garanta que cada cena de cutout ou illustration traga elementos novos para manter o interesse.
 
@@ -95,21 +102,21 @@ YOUTUBE_SEARCH — obrigatório em cenas video:
 - Cada subtext deve ser envolvente e narrável em voz alta. O conjunto dos subtexts forma o roteiro da locução ElevenLabs.
 - TODAS as headlines e subtexts DEVEM ser geradas em português brasileiro natural, envolvente e fluente para o público brasileiro, mesmo que o Título ou Resumo originais estejam em inglês. A única exceção é o campo 'youtube_search', que deve ser escrito em inglês para melhor busca no YouTube.
 - Variar visual_type com mais equilíbrio — não concentrar todos os "video" no início ou no fim.
-- Estime duration_seconds com base no texto da narração (subtext): ~0.45s por palavra + 0.5s de margem. Mínimo 2.0s, sem máximo fixo. O sistema vai ajustar para a duração real do áudio ElevenLabs.
+- Estime duration_seconds com base no texto da narração (subtext): ~0.2s por palavra. A duração por cena DEVE ser de no máximo 3.0s.
 """
 
 
 def _build_user_msg(title: str, summary: str, category: str, duration: int) -> str:
     if duration <= 30:
-        scene_count = "6 a 8"
+        scene_count = "10 a 12"
     elif duration <= 45:
-        scene_count = "9 a 11"
+        scene_count = "15 a 18"
     else:
-        scene_count = "12 a 14"
+        scene_count = "20 a 24"
 
     return (
         f"Crie roteiro visual de exatamente {duration} segundos para Reels sobre esta notícia.\n"
-        f"Gere entre {scene_count} cenas no total para cobrir esse tempo de forma equilibrada.\n\n"
+        f"Gere entre {scene_count} cenas no total para cobrir esse tempo de forma extremamente rápida e dinâmica (máximo de 3.0s por cena).\n\n"
         f"Título: {title}\n"
         f"Categoria: {category}\n"
         f"Resumo: {summary or title}\n\n"

@@ -376,5 +376,29 @@ Implementado buffer `pendingNews` no store:
 
 ---
 
-*Última atualização: 2026-05-19*
+## BUG-013 — Reels de baixa qualidade: cenas longas/estáticas, mídias repetidas e ausência de logo
+
+**Data:** 2026-05-20
+**Área:** Backend + Frontend — `video_scene_agent.py`, `image_generator.py`, `media_fetcher.py`, `video.py`, `ReelsComposition.tsx`
+**Severidade:** Alta
+
+### Sintoma
+Os Reels gerados ficavam monótonos, com cenas que passavam de 3 segundos paradas na tela com o mesmo B-roll ou cutout estático, elementos visuais se repetindo ao longo do vídeo, ausência de logo corporativo e textos sem movimento.
+
+### Causa Raiz
+1. **Pacing Lento**: O roteiro gerado pelo LLM tinha subtexts excessivamente longos por cena. Além disso, a duração da cena dependia inteiramente do tamanho da locução sem qualquer teto limitante.
+2. **Mídias Repetidas**: Os downloads e as gerações de imagens por IA usavam hashing simples baseados estritamente na query ou palavra-chave. Em múltiplos requests ou na mesma sequência, o cache era reutilizado indefinidamente resultando em repetição de mídias.
+3. **UI Estática**: Não havia marca d'água corporativa nas cenas e os contêineres de texto ficavam completamente estáticos na tela durante a exibição.
+
+### Solução Aplicada
+1. **Roteiro Curto & Pacing Limitado**: Atualizado o prompt do `video_scene_agent.py` para obrigar narrações de no máximo 10-12 palavras e cenas de no máximo 3.0s. No backend (`video.py`), a duração calculada de cada cena foi limitada em `min(3.0, round(scene_duration + 0.2, 2))`.
+2. **Sal no Cache (Bust Cache) & Aleatoriedade**: O backend gera um `generation_id` por run que serve de `salt` para os hashes de imagem (`image_generator.py`) e vídeos (`media_fetcher.py`), forçando o download e a geração de mídias novas. Além disso, o download de B-roll busca do top 5 do YouTube e escolhe uma URL aleatória do top 3.
+3. **Watermark & Texto Animado**: Adicionado o watermark permanente "NOTICIANDO" no canto superior direito de cada cena do Reels e aplicada animação de escala progressiva contínua (pulso 1.0 a 1.05) no contêiner de texto para mantê-lo sempre em movimento.
+
+### Regra Para Nunca Repetir
+> Para vídeos curtos estilo Reels, nenhuma cena pode passar de 3.0s de duração. O subtext do roteiro deve ser curto e o backend deve garantir mídias únicas injetando um `generation_id`/`salt` único em cada requisição de geração para desviar do cache. Legendas e títulos devem possuir animações contínuas de escala para eliminar imagens de texto estáticas.
+
+---
+
+*Última atualização: 2026-05-20*
 *Mantenedor: Antigravity AI + Grupo Primo*

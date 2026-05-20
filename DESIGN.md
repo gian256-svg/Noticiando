@@ -68,7 +68,11 @@ A tipografia deve manter contraste extremo e excelente legibilidade, mesmo em te
 * **[2s–Xs] → DESENVOLVIMENTO:** Narração clara sincronizada perfeitamente com elementos visuais de apoio na tela.
 * **[Xs–fim] → CONCLUSÃO / PROLONGAMENTO:** Fechamento e conclusão didática/analítica da notícia, prolongando o vídeo sem CTA ou assinaturas de encerramento.
 * **Regra de Dinamismo (Sem Tela Estática):**
-  - **Máximo de 2,5 segundos** sem mudança visual (um novo elemento entrando, corte, transição ou animação).
+  - **Máximo de 3.0 segundos** sem mudança visual (um novo elemento entrando, corte, transição ou animação) — idealmente cada cena dura entre 2.0s e 3.0s.
+  - Cada frase narrada deve ter no máximo 10-12 palavras no roteiro para corresponder a esse ritmo de cortes rápidos.
+  - **Texto em Movimento Contínuo:** O contêiner de headline/legendas possui uma animação contínua de escala (escala progressiva de 1.0 a 1.05) para manter dinamismo visual enquanto a cena está ativa.
+  - **Marca D'água da Empresa:** Exibição permanente e sutil do badge "NOTICIANDO" com contorno e brilho neon no canto superior direito de todas as cenas.
+  - **Garantia de Unicidade (Bust Caching):** Um `generation_id` gerado no início da request serve de sal para os hashes de imagem (`image_generator.py`) e vídeos (`media_fetcher.py`), forçando o download e a geração de mídias novas. O download de B-roll extrai os top 5 resultados do YouTube e escolhe uma URL aleatória do top 3.
   - Cada frase narrada deve ter pelo menos 1 elemento visual correspondente na tela.
   - **Elementos Obrigatórios por Reel:**
     - Pelo menos **1 vídeo real** ou corte curto do YouTube (máx 5s por trecho, uso editorial).
