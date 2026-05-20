@@ -44,7 +44,7 @@ Schema obrigatório:
       "duration_seconds": 3.0,
       "visual_type": "hook" | "video" | "cutout" | "illustration" | "data" | "map" | "timeline" | "collage" | "split_video" | "newspaper_clip",
       "accent_word_indices": [0, 2],
-      "decorator_type": "star" | "arrow" | "circle" | "stripes",
+      "decorator_type": "arrow" | "circle" | "stripes",
       "youtube_search": "Termo de busca bem curto para extrair um corte de vídeo do YouTube no yt-dlp (ex: 'bolsa de valores caindo', 'investimentos grafico', 'empresa fabrica')",
       "media_keyword": "money" | "growth" | "crypto" | "chart" | "bitcoin" | "briefcase" | "newspaper",
       "person_name": "Nome da figura pública a ser gerada ou null"
@@ -73,17 +73,17 @@ PERSON_NAME — obrigatório em cenas "cutout" com figuras públicas:
   * O campo person_name será utilizado diretamente para alimentar o gerador de retratos com IA.
 
 NUNCA REPETIR FRASES OU MÍDIAS:
-  * É expressamente proibido repetir a mesma frase de narração (`subtext`) ou a mesma `headline` in várias cenas. Cada cena DEVE ter um texto de narração único que progride linearmente na história. Se a cena anterior terminou com "o mercado desabou", a próxima cena deve dar sequência, por exemplo "com as ações caindo 12%".
-  * É expressamente proibido repetir a mesma media_keyword ou imagens similares em várias cenas. Garanta que cada cena de cutout ou illustration traga elements novos para manter o interesse.
+  * É expressamente proibido repetir a mesma frase de narração (`subtext`) ou a mesma `headline` em várias cenas. Cada cena DEVE ter um texto de narração único que progride linearmente na história. Se a cena anterior terminou com "o mercado desabou", a próxima cena deve dar sequência, por exemplo "com as ações caindo 12%".
+  * É expressamente proibido repetir a mesma media_keyword ou imagens similares em várias cenas. Garanta que cada cena de cutout ou illustration traga elementos novos para manter o interesse.
 
 TEXTOS CURTOS E GRAMÁTICA DINÂMICA:
   * As headlines e textos em tela devem ser extremamente curtos e dinâmicos para não poluir a tela.
+  * NUNCA inclua referências escritas ao nome do canal ou termos como "Noticiando" nas headlines, subtexts ou legendas dos vídeos.
   * Você PODE e DEVE ignorar regras estritas de parágrafos/pontuação nos textos em tela. Prefira palavras soltas de impacto ou frases curtas de 2-4 palavras para reforçar as falas da narração.
 
 DECORATOR_TYPE — OBRIGATÓRIO EM TODA CENA, PROIBIDO "none":
-  * "star"   → breaking news, choque, urgência
   * "arrow"  → crescimento, direção, tendência
-  * "circle" → análise, contexto, dado circular
+  * "circle" → análise, contexto, dado circular ou destaque
   * "stripes" → energia, momentum, impacto visual
 
 MEDIA_KEYWORD — obrigatório em cenas cutout, newspaper_clip e illustration:
@@ -97,7 +97,6 @@ YOUTUBE_SEARCH — obrigatório em cenas video:
 - Variar visual_type com mais equilíbrio — não concentrar todos os "video" no início ou no fim.
 - Estime duration_seconds com base no texto da narração (subtext): ~0.45s por palavra + 0.5s de margem. Mínimo 2.0s, sem máximo fixo. O sistema vai ajustar para a duração real do áudio ElevenLabs.
 """
-
 
 
 def _build_user_msg(title: str, summary: str, category: str, duration: int) -> str:

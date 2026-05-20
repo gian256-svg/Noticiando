@@ -196,6 +196,27 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
             if not scene.get("decorator_type"):
                 scene["decorator_type"] = "none"
 
+            # Interceptar termos de gráficos/tabelas/dados estáticos para abolir gráficos feios
+            kw = (scene.get("media_keyword") or "").lower().strip()
+            headline_text = (scene.get("headline") or "").lower().strip()
+            subtext_text = (scene.get("subtext") or "").lower().strip()
+            
+            chart_terms = ["chart", "grafico", "gráfico", "graph", "dashboard", "diagram", "tabela", "table", "stats"]
+            is_chart = any(term in kw or term in headline_text or term in subtext_text for term in chart_terms)
+            
+            if v_type in ["cutout", "illustration"] and is_chart:
+                text_to_search = f"{scene.get('headline', '')} {scene.get('subtext', '')}"
+                has_numbers = bool(re.search(r'\d', text_to_search))
+                if has_numbers:
+                    logger.info(f"Interceptado gráfico estático. Convertendo para 'data' (nativo do Remotion). Keyword: {kw}")
+                    v_type = "data"
+                    scene["visual_type"] = "data"
+                else:
+                    logger.info(f"Interceptado gráfico estático sem números. Convertendo para 'video' loop. Keyword: {kw}")
+                    v_type = "video"
+                    scene["visual_type"] = "video"
+                    scene["youtube_search"] = "financial market chart analysis motion background loop"
+
             # 1. Resolver vídeo de fundo (background_video_url)
             yt_query = scene.get("youtube_search") or scene.get("media_search_query") or req.title
             bg_video = await fetch_youtube_broll(yt_query, req.category)
@@ -263,6 +284,16 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
             # 4. Caso de jornal impresso tradicional
             elif v_type == "newspaper_clip":
                 scene["cutout_url"] = "newspaper"
+
+            # 5. Caso de mapa geográfico real
+            elif v_type == "map":
+                from ai.image_generator import generate_cutout_image
+                target_kw = scene.get("media_keyword") or scene.get("headline") or req.title
+                map_kw = f"geographic atlas map showing {target_kw}"
+                context = scene.get("subtext") or scene.get("headline") or ""
+                generated = await generate_cutout_image(map_kw, context, req.category)
+                if generated:
+                    scene["map_image_url"] = generated
 
         # Organizar as tasks para rodar em paralelo
         tasks = []

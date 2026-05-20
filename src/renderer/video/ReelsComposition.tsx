@@ -25,6 +25,7 @@ export interface ReelsScene {
   media_keyword?: string;
   background_video_url?: string;
   illustration_url?: string;
+  map_image_url?: string;
   audio_url?: string;
   caption_words?: Array<{ word: string; start: number; end: number }>;
 }
@@ -188,24 +189,7 @@ const Decorator: React.FC<DecoratorProps> = ({
   }
   
   if (resolvedType === "star") {
-    return (
-      <svg
-        viewBox="0 0 100 100"
-        style={{
-          position: "absolute",
-          top: 180,
-          right: 80,
-          width: 80,
-          height: 80,
-          fill: color,
-          filter: `drop-shadow(0 0 16px ${color})`,
-          transform: `scale(${pulse}) rotate(${frame * 0.4}deg)`,
-          zIndex: 6,
-        }}
-      >
-        <path d="M50 0 L58 35 L90 20 L65 45 L100 50 L65 55 L90 80 L58 65 L50 100 L42 65 L10 80 L35 55 L0 50 L35 45 L10 20 L42 35 Z" />
-      </svg>
-    );
+    return null; // A pedido do usuário, a estrela decorativa foi abolida
   }
   
   if (resolvedType === "arrow") {
@@ -344,7 +328,7 @@ const BigMetricCounter: React.FC<{
     }}>
       <div style={{
         fontFamily: "'Oswald', 'Montserrat', sans-serif",
-        fontSize: 124,
+        fontSize: 190, // Ampliado para 190px para impacto visual massivo
         fontWeight: 900,
         color,
         lineHeight: 1,
@@ -511,7 +495,9 @@ const NewspaperCutout: React.FC<{
     config: { damping: 15, stiffness: 85 },
   });
 
-  const rotate = interpolate(entrance, [0, 1], [12, sceneIndex % 2 === 0 ? -1.5 : 1.5]) + interpolate(exitProgress, [0, 1], [0, -6]);
+  const panProgress = frame / durationInFrames;
+  const hPan = interpolate(panProgress, [0, 1], [30, -380]);
+  const rotate = interpolate(entrance, [0, 1], [6, -0.5]) + interpolate(exitProgress, [0, 1], [0, -3]);
   const scale = interpolate(entrance, [0, 1], [0.85, 1]) * interpolate(exitProgress, [0, 1], [1, 0.85]);
   const translateY = interpolate(entrance, [0, 1], [380, 0]) + interpolate(exitProgress, [0, 1], [0, 480]);
 
@@ -528,16 +514,16 @@ const NewspaperCutout: React.FC<{
       style={{
         position: "absolute",
         top: "46%",
-        left: "7%",
-        width: "86%",
-        maxWidth: 680,
+        left: "5%",
+        width: "140%", // Transborda as margens
+        maxWidth: 1200,
         backgroundColor: "#f4f1ea", // newsprint warm paper color
         backgroundImage: "radial-gradient(#e5dec9 1px, transparent 1px)", // subtle paper texture
         backgroundSize: "20px 20px",
-        padding: "28px",
+        padding: "32px",
         border: "2px solid #d4c8ac",
         boxShadow: "0 28px 50px rgba(0, 0, 0, 0.5), inset 0 0 100px rgba(0,0,0,0.05)",
-        transform: `translateY(${translateY}px) scale(${scale}) rotate(${rotate}deg)`,
+        transform: `translateY(${translateY}px) translateX(${hPan}px) scale(${scale}) rotate(${rotate}deg)`,
         transformOrigin: "center center",
         fontFamily: "'Georgia', 'Times New Roman', serif",
         color: "#1a1a1a",
@@ -625,23 +611,41 @@ const NewspaperCutout: React.FC<{
   );
 };
 
-const MapBackground: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) => {
+const MapBackground: React.FC<{ frame: number; fps: number; mapImageUrl?: string }> = ({ frame, fps, mapImageUrl }) => {
   const drawLine = spring({ frame: Math.max(0, frame - 15), fps, config: { damping: 200 } });
   
   return (
     <AbsoluteFill style={{ background: "#F4F1EA", zIndex: 0 }}>
-      {/* Grid pattern */}
-      <div style={{
-        position: "absolute", inset: 0, opacity: 0.4,
-        backgroundImage: "linear-gradient(#d1ccc0 1px, transparent 1px), linear-gradient(90deg, #d1ccc0 1px, transparent 1px)",
-        backgroundSize: "40px 40px",
-        transform: `translate(${frame * 0.5}px, ${frame * 0.2}px)`
-      }} />
-      {/* SVG Map Abstract Coasts */}
-      <svg width="100%" height="100%" style={{ position: "absolute", opacity: 0.15, transform: "scale(1.5)" }}>
-        <path d="M 100,200 Q 300,400 400,100 T 800,500 T 1000,200" fill="none" stroke="#000" strokeWidth="10" />
-        <path d="M -200,600 Q 400,800 600,600 T 1080,900" fill="none" stroke="#000" strokeWidth="15" />
-      </svg>
+      {mapImageUrl ? (
+        <Img
+          src={mapImageUrl}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            opacity: 0.85,
+            filter: "grayscale(25%) sepia(20%) brightness(92%)",
+            transform: `scale(${interpolate(frame, [0, 300], [1.0, 1.08])})`,
+          }}
+        />
+      ) : (
+        <>
+          {/* Grid pattern */}
+          <div style={{
+            position: "absolute", inset: 0, opacity: 0.4,
+            backgroundImage: "linear-gradient(#d1ccc0 1px, transparent 1px), linear-gradient(90deg, #d1ccc0 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+            transform: `translate(${frame * 0.5}px, ${frame * 0.2}px)`
+          }} />
+          {/* SVG Map Abstract Coasts */}
+          <svg width="100%" height="100%" style={{ position: "absolute", opacity: 0.15, transform: "scale(1.5)" }}>
+            <path d="M 100,200 Q 300,400 400,100 T 800,500 T 1000,200" fill="none" stroke="#000" strokeWidth="10" />
+            <path d="M -200,600 Q 400,800 600,600 T 1080,900" fill="none" stroke="#000" strokeWidth="15" />
+          </svg>
+        </>
+      )}
       
       {/* Animated Red Route Line */}
       <svg width="100%" height="100%" style={{ position: "absolute", zIndex: 2 }}>
@@ -936,6 +940,22 @@ const NewsScene: React.FC<SceneProps> = ({
   // Keep colors high-contrast (dark on light gradient, white on full-bleed video)
   const textColor = (isCinematicVideo || isCollage) ? "#FFFFFF" : ((isMap || isTimeline) ? "#1A1A1A" : pal.text);
 
+  const isLightAccent = pal.accent === "#1A3A6B" || pal.accent === "#1A0A0A" || pal.accent === "#0A1628";
+  const highlightColor = (isCinematicVideo || isCollage) && isLightAccent ? "#FFC107" : pal.accent; // Destaque em ouro para B-roll em temas escuros
+
+  // Brand Badge Detector (JBS, VALE, etc)
+  const brandLayout = useMemo(() => {
+    const upper = scene.headline.toUpperCase().trim();
+    const brands = ["JBS", "VALE", "PETROBRAS", "PETRO", "APPLE", "NVIDIA", "TESLA", "GOOGLE", "MICROSOFT"];
+    for (const brand of brands) {
+      if (upper.startsWith(brand + " ") || upper.endsWith(" " + brand)) {
+        const rest = upper.replace(brand, "").trim();
+        return { brand, rest };
+      }
+    }
+    return null;
+  }, [scene.headline]);
+
   // Slow dynamic camera zoom-in effect (Ken Burns)
   const cameraScale = interpolate(frame, [0, durationInFrames], [1.0, 1.12], {
     extrapolateLeft: "clamp",
@@ -1036,7 +1056,7 @@ const NewsScene: React.FC<SceneProps> = ({
         <SplitVideoElement src={scene.media_url} frame={frame} durationInFrames={durationInFrames} />
       )}
 
-      {isMap && <MapBackground frame={frame} fps={fps} />}
+      {isMap && <MapBackground frame={frame} fps={fps} mapImageUrl={scene.map_image_url} />}
       {isTimeline && <TimelineBackground frame={frame} fps={fps} />}
       {isCollage && <CollageBackground frame={frame} fps={fps} cutoutUrl={scene.cutout_url} />}
 
@@ -1189,11 +1209,11 @@ const NewsScene: React.FC<SceneProps> = ({
         {scene.visual_type === "cutout" && scene.cutout_url && scene.cutout_url !== "newspaper" && (
           <div style={{
             position: "absolute",
-            bottom: 110,
+            bottom: 80,
             right: assetSide === "right" ? 50 : "auto",
             left: assetSide === "left" ? 50 : "auto",
-            height: "46%",
-            width: "46%",
+            height: "58%", // Aumentado para 58%
+            width: "58%",  // Aumentado para 58%
             zIndex: 4,
             opacity: 1 - exitProgress,
             transform: `translateY(${
@@ -1239,11 +1259,11 @@ const NewsScene: React.FC<SceneProps> = ({
         {(scene.illustration_url || (scene.visual_type === "illustration" && scene.media_url)) && (
           <div style={{
             position: "absolute",
-            bottom: 120,
+            bottom: 80,
             right: assetSide === "right" ? 50 : "auto",
             left: assetSide === "left" ? 50 : "auto",
-            height: "44%",
-            width: "44%",
+            height: "56%", // Aumentado para 56%
+            width: "56%",  // Aumentado para 56%
             zIndex: 4,
             opacity: 1 - exitProgress,
             transform: `translateY(${
@@ -1286,7 +1306,7 @@ const NewsScene: React.FC<SceneProps> = ({
             words={scene.caption_words}
             frame={frame}
             fps={fps}
-            accentColor={pal.accent}
+            accentColor={highlightColor}
           />
         )}
 
@@ -1334,105 +1354,155 @@ const NewsScene: React.FC<SceneProps> = ({
         }}>
 
           {/* Kinetic Headline - Overshoot spring & Neon glow */}
-          <div style={{
-            display: "flex", flexWrap: "wrap",
-            justifyContent: textAlignment === "left" ? "flex-start" : (textAlignment === "right" ? "flex-end" : "center"),
-            gap: "14px 16px",
-            marginBottom: 20,
-            zIndex: 10,
-            maxWidth: "100%", // Ocupa toda a largura, pois empilhamos verticalmente
-            wordBreak: "break-word",
-          }}>
-            {words.map((word, i) => {
-              const isHighlighted = accentSet.has(i);
-              const delay = i * 2.5;
-              const wordFrame = Math.max(0, frame - delay);
+          {brandLayout ? (
+            <div style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 18,
+              zIndex: 10,
+              width: "100%",
+              marginBottom: 20,
+            }}>
+              {/* Brand Logo Badge */}
+              <div style={{
+                background: "#0F294A", // Corporate navy
+                color: "#FFFFFF",
+                fontFamily: "'Oswald', sans-serif",
+                fontSize: 66,
+                fontWeight: 900,
+                padding: "10px 28px",
+                borderRadius: 6,
+                border: "3px solid #FFFFFF",
+                boxShadow: "0 14px 30px rgba(15,41,74,0.45), 0 4px 10px rgba(0,0,0,0.25)",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                transform: `scale(${interpolate(entrance, [0, 1], [0.8, 1])}) rotate(-2deg)`,
+              }}>
+                {brandLayout.brand}
+              </div>
 
-              let transform = "";
-              let opacity = 0;
-              let filter = "";
+              {/* Action Text Sublined */}
+              <div style={{
+                position: "relative",
+                fontFamily: "'Oswald', sans-serif",
+                fontSize: 76,
+                fontWeight: 900,
+                color: highlightColor,
+                textTransform: "uppercase",
+                transform: `scale(${interpolate(entrance, [0, 1], [0.9, 1])})`,
+                marginTop: 6,
+                paddingBottom: 8,
+              }}>
+                {brandLayout.rest}
+                <WordHighlightLine
+                  color={highlightColor}
+                  width={brandLayout.rest.length * 40}
+                  frame={Math.max(0, frame - 10)}
+                />
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              display: "flex", flexWrap: "wrap",
+              justifyContent: textAlignment === "left" ? "flex-start" : (textAlignment === "right" ? "flex-end" : "center"),
+              gap: "14px 16px",
+              marginBottom: 20,
+              zIndex: 10,
+              maxWidth: "100%", // Ocupa toda a largura, pois empilhamos verticalmente
+              wordBreak: "break-word",
+            }}>
+              {words.map((word, i) => {
+                const isHighlighted = accentSet.has(i);
+                const delay = i * 2.5;
+                const wordFrame = Math.max(0, frame - delay);
 
-              const animStyle = sceneIndex % 3;
+                let transform = "";
+                let opacity = 0;
+                let filter = "";
 
-              if (animStyle === 0) {
-                // Style 0: Slide Up + Rotate Stagger
-                const s = spring({
-                  frame: wordFrame,
-                  fps,
-                  config: { damping: 12, stiffness: 140 },
-                });
-                const y = interpolate(s, [0, 1], [40, 0]);
-                const rot = interpolate(s, [0, 1], [-6, 0]);
-                const o = interpolate(wordFrame, [0, 5], [0, 1], { extrapolateRight: "clamp" });
-                
-                transform = `scale(${s * (isHighlighted ? 1.12 : 1.0)}) translateY(${y}px) rotate(${rot + (isHighlighted ? 1.5 : 0)}deg)`;
-                opacity = o;
-              } else if (animStyle === 1) {
-                // Style 1: Punchy Pop (Scale In with Bounce)
-                const s = spring({
-                  frame: wordFrame,
-                  fps,
-                  config: { damping: 10, stiffness: 180 },
-                });
-                const rot = interpolate(s, [0, 1], [8, 0]);
-                const o = interpolate(wordFrame, [0, 4], [0, 1], { extrapolateRight: "clamp" });
+                const animStyle = sceneIndex % 3;
 
-                transform = `scale(${s * (isHighlighted ? 1.15 : 1.0)}) rotate(${rot}deg)`;
-                opacity = o;
-              } else {
-                // Style 2: Smooth Slide-in + Blur Reveal
-                const s = spring({
-                  frame: wordFrame,
-                  fps,
-                  config: { damping: 14, stiffness: 120 },
-                });
-                const x = interpolate(s, [0, 1], [-25, 0]);
-                const blurVal = interpolate(s, [0, 1], [8, 0]);
-                const o = interpolate(wordFrame, [0, 6], [0, 1], { extrapolateRight: "clamp" });
+                if (animStyle === 0) {
+                  // Style 0: Slide Up + Rotate Stagger
+                  const s = spring({
+                    frame: wordFrame,
+                    fps,
+                    config: { damping: 12, stiffness: 140 },
+                  });
+                  const y = interpolate(s, [0, 1], [40, 0]);
+                  const rot = interpolate(s, [0, 1], [-6, 0]);
+                  const o = interpolate(wordFrame, [0, 5], [0, 1], { extrapolateRight: "clamp" });
+                  
+                  transform = `scale(${s * (isHighlighted ? 1.12 : 1.0)}) translateY(${y}px) rotate(${rot + (isHighlighted ? 1.5 : 0)}deg)`;
+                  opacity = o;
+                } else if (animStyle === 1) {
+                  // Style 1: Punchy Pop (Scale In with Bounce)
+                  const s = spring({
+                    frame: wordFrame,
+                    fps,
+                    config: { damping: 10, stiffness: 180 },
+                  });
+                  const rot = interpolate(s, [0, 1], [8, 0]);
+                  const o = interpolate(wordFrame, [0, 4], [0, 1], { extrapolateRight: "clamp" });
 
-                transform = `scale(${s * (isHighlighted ? 1.12 : 1.0)}) translateX(${x}px)`;
-                opacity = o;
-                filter = `blur(${blurVal}px)`;
-              }
+                  transform = `scale(${s * (isHighlighted ? 1.15 : 1.0)}) rotate(${rot}deg)`;
+                  opacity = o;
+                } else {
+                  // Style 2: Smooth Slide-in + Blur Reveal
+                  const s = spring({
+                    frame: wordFrame,
+                    fps,
+                    config: { damping: 14, stiffness: 120 },
+                  });
+                  const x = interpolate(s, [0, 1], [-25, 0]);
+                  const blurVal = interpolate(s, [0, 1], [8, 0]);
+                  const o = interpolate(wordFrame, [0, 6], [0, 1], { extrapolateRight: "clamp" });
 
-              return (
-                <span
-                  key={i}
-                  style={{
-                    position: "relative",
-                    display: "inline-block",
-                    fontFamily: isCinematicVideo ? "'Georgia', 'Times New Roman', serif" : "'Oswald', 'Montserrat', 'Inter', sans-serif",
-                    fontSize: isHook ? 80 : 72, // Ligeiramente menor para evitar vazar a tela com palavras gigantes
-                    fontWeight: isCinematicVideo ? 600 : 900,
-                    textTransform: isCinematicVideo ? "none" : "uppercase",
-                    letterSpacing: isCinematicVideo ? "0em" : "-0.04em", // tight kerning
-                    lineHeight: isCinematicVideo ? 1.1 : 0.95,
-                    color: isTimeline && !isHighlighted ? "transparent" : (isHighlighted ? (isTimeline ? "#D32F2F" : pal.accent) : textColor),
-                    textShadow: isHighlighted 
-                      ? (isTimeline ? "none" : (isCinematicVideo ? "0 4px 18px rgba(0,0,0,0.95)" : `0 4px 22px rgba(0,0,0,0.9), 0 0 10px ${pal.accent}60`))
-                      : (textColor === "#FFFFFF" ? "0 4px 18px rgba(0,0,0,0.85)" : "none"),
-                    transform,
-                    transformOrigin: "center center",
-                    opacity,
-                    filter,
-                    paddingBottom: isHighlighted ? 6 : 0,
-                    maxWidth: "100%", // Permite que a palavra quebre se for maior que a tela
-                    wordWrap: "break-word",
-                    WebkitTextStroke: isTimeline && !isHighlighted ? "2px #D32F2F" : "none", // Red outline for timeline numbers
-                  }}
-                >
-                  {word}
-                  {isHighlighted && !isTimeline && !isCinematicVideo && (
-                    <WordHighlightLine
-                      color={pal.accent}
-                      width={word.length * (titleFontSize * 0.55)}
-                      frame={wordFrame}
-                    />
-                  )}
-                </span>
-              );
-            })}
-          </div>
+                  transform = `scale(${s * (isHighlighted ? 1.12 : 1.0)}) translateX(${x}px)`;
+                  opacity = o;
+                  filter = `blur(${blurVal}px)`;
+                }
+
+                return (
+                  <span
+                    key={i}
+                    style={{
+                      position: "relative",
+                      display: "inline-block",
+                      fontFamily: isCinematicVideo ? "'Georgia', 'Times New Roman', serif" : "'Oswald', 'Montserrat', 'Inter', sans-serif",
+                      fontSize: isHook ? 80 : 72, // Ligeiramente menor para evitar vazar a tela com palavras gigantes
+                      fontWeight: isCinematicVideo ? 600 : 900,
+                      textTransform: isCinematicVideo ? "none" : "uppercase",
+                      letterSpacing: isCinematicVideo ? "0em" : "-0.015em", // Slightly relaxed kerning to prevent overlap
+                      lineHeight: isCinematicVideo ? 1.15 : 1.05, // Slightly increased height to prevent vertical overlap
+                      color: isTimeline && !isHighlighted ? "transparent" : (isHighlighted ? (isTimeline ? "#D32F2F" : highlightColor) : textColor),
+                      textShadow: isHighlighted 
+                        ? (isTimeline ? "none" : (isCinematicVideo ? "0 4px 18px rgba(0,0,0,0.95)" : `0 4px 22px rgba(0,0,0,0.9), 0 0 10px ${highlightColor}60`))
+                        : (textColor === "#FFFFFF" ? "0 4px 18px rgba(0,0,0,0.85)" : "none"),
+                      transform,
+                      transformOrigin: "center center",
+                      opacity,
+                      filter,
+                      paddingBottom: isHighlighted ? 6 : 0,
+                      maxWidth: "100%", // Permite que a palavra quebre se for maior que a tela
+                      wordWrap: "break-word",
+                      WebkitTextStroke: isTimeline && !isHighlighted ? "2px #D32F2F" : "none", // Red outline for timeline numbers
+                    }}
+                  >
+                    {word}
+                    {isHighlighted && !isTimeline && !isCinematicVideo && (
+                      <WordHighlightLine
+                        color={highlightColor}
+                        width={word.length * (titleFontSize * 0.55)}
+                        frame={wordFrame}
+                      />
+                    )}
+                  </span>
+                );
+              })}
+            </div>
+          )}
 
           {/* O subtext (narração completa) NÃO é mais renderizado na tela a pedido do usuário,
               apenas a headline com palavras-chave curtas aparece como lettering! */}
@@ -1443,11 +1513,11 @@ const NewsScene: React.FC<SceneProps> = ({
               fontFamily: "'Inter', 'Montserrat', sans-serif",
               fontSize: 34,
               fontWeight: 500,
-              color: "rgba(255, 255, 255, 0.88)",
+              color: textColor === "#FFFFFF" ? "rgba(255, 255, 255, 0.88)" : `${textColor}ee`,
               marginTop: 20,
               textAlign: textAlignment,
               maxWidth: "85%",
-              textShadow: "0 3px 12px rgba(0,0,0,0.75)",
+              textShadow: textColor === "#FFFFFF" ? "0 4px 16px rgba(0,0,0,0.95)" : "none",
               opacity: interpolate(entrance, [0, 1], [0, 1]),
               transform: `translateY(${interpolate(entrance, [0, 1], [15, 0])}px)`,
               lineHeight: 1.3,
@@ -1456,11 +1526,11 @@ const NewsScene: React.FC<SceneProps> = ({
             </div>
           )}
 
-          {/* Big metric/percentage counter animation (for non-data scenes that contain a value) */}
-          {!isData && dataMetric && (
+          {/* Big metric/percentage counter animation (for all scenes that contain a value) */}
+          {dataMetric && (
             <BigMetricCounter
               value={dataMetric.rawString || `${dataMetric.num}${dataMetric.unit}`}
-              color={pal.accent}
+              color={highlightColor}
               frame={frame}
               fps={fps}
             />
@@ -1476,7 +1546,7 @@ const NewsScene: React.FC<SceneProps> = ({
               border: "2px solid #1E293B",
               boxShadow: "8px 8px 0px rgba(30, 41, 59, 0.95)", // solid flat drop shadow
               width: "100%",
-              maxWidth: 580, // Aumentado de 440px para 580px
+              maxWidth: 640, // Aumentado para 640px
               opacity: interpolate(frame, [12, 22], [0, 1], {
                 extrapolateLeft: "clamp", extrapolateRight: "clamp",
               }),
@@ -1507,7 +1577,7 @@ const NewsScene: React.FC<SceneProps> = ({
                   fontFamily: "'Inter', sans-serif",
                   fontSize: 10,
                   fontWeight: 700,
-                  color: pal.accent,
+                  color: highlightColor,
                   letterSpacing: "0.05em",
                 }}>
                   ● ATUALIZADO
@@ -1521,7 +1591,7 @@ const NewsScene: React.FC<SceneProps> = ({
                   display: "flex",
                   alignItems: "flex-end",
                   justifyContent: "space-between",
-                  height: 130,
+                  height: 180, // Aumentado para 180px
                   padding: "10px 10px 0 10px",
                   position: "relative",
                 }}>
@@ -1545,7 +1615,7 @@ const NewsScene: React.FC<SceneProps> = ({
                           fontFamily: "'Oswald', sans-serif",
                           fontSize: 14,
                           fontWeight: 900,
-                          color: item.highlight ? pal.accent : "#475569",
+                          color: item.highlight ? highlightColor : "#475569",
                           marginBottom: 4,
                         }}>
                           {item.highlight ? currentCountText : item.val}{displayUnit}
@@ -1554,7 +1624,7 @@ const NewsScene: React.FC<SceneProps> = ({
                         <div style={{
                           width: "100%",
                           height: `${h * 0.8}%`,
-                          background: item.highlight ? pal.accent : "#94A3B8",
+                          background: item.highlight ? highlightColor : "#94A3B8",
                           border: "1.5px solid #1E293B",
                           borderRadius: "2px 2px 0 0",
                           boxShadow: item.highlight ? "3px -3px 0px rgba(30, 41, 59, 0.4)" : undefined,
@@ -1579,45 +1649,45 @@ const NewsScene: React.FC<SceneProps> = ({
               {sceneIndex % 3 === 1 && (
                 /* TYPE 1: Premium Area/Line Chart */
                 <div style={{
-                  height: 130,
+                  height: 180, // Aumentado para 180px
                   position: "relative",
                   width: "100%",
                   paddingTop: 10,
                 }}>
                   {/* Subtle Grid Lines */}
-                  <div style={{ position: "absolute", top: 30, left: 0, right: 0, height: 1, borderTop: "1px dashed #E2E8F0" }} />
-                  <div style={{ position: "absolute", top: 70, left: 0, right: 0, height: 1, borderTop: "1px dashed #E2E8F0" }} />
-                  <div style={{ position: "absolute", top: 110, left: 0, right: 0, height: 1, borderTop: "1px dashed #E2E8F0" }} />
+                  <div style={{ position: "absolute", top: 40, left: 0, right: 0, height: 1, borderTop: "1px dashed #E2E8F0" }} />
+                  <div style={{ position: "absolute", top: 90, left: 0, right: 0, height: 1, borderTop: "1px dashed #E2E8F0" }} />
+                  <div style={{ position: "absolute", top: 140, left: 0, right: 0, height: 1, borderTop: "1px dashed #E2E8F0" }} />
 
-                  <svg width="100%" height="110" style={{ overflow: "visible" }}>
+                  <svg width="100%" height="160" style={{ overflow: "visible" }}>
                     {/* Area fill */}
                     <path
-                      d={`M 20 90 L 150 70 L 300 80 L 480 ${90 - 70 * dataEasedProgress} L 480 110 L 20 110 Z`}
-                      fill={`${pal.accent}15`}
+                      d={`M 20 140 L 150 110 L 300 125 L 480 ${140 - 100 * dataEasedProgress} L 480 160 L 20 160 Z`}
+                      fill={`${highlightColor}15`}
                     />
                     {/* Line stroke */}
                     <path
-                      d={`M 20 90 L 150 70 L 300 80 L 480 ${90 - 70 * dataEasedProgress}`}
+                      d={`M 20 140 L 150 110 L 300 125 L 480 ${140 - 100 * dataEasedProgress}`}
                       fill="none"
-                      stroke={pal.accent}
-                      strokeWidth="4"
+                      stroke={highlightColor}
+                      strokeWidth="5"
                       strokeLinecap="round"
                     />
                     {/* End point marker */}
                     <circle
                       cx="480"
-                      cy={90 - 70 * dataEasedProgress}
-                      r="7"
-                      fill={pal.accent}
+                      cy={140 - 100 * dataEasedProgress}
+                      r="8"
+                      fill={highlightColor}
                       stroke="#1E293B"
-                      strokeWidth="2"
+                      strokeWidth="2.5"
                     />
                     <circle
                       cx="480"
-                      cy={90 - 70 * dataEasedProgress}
-                      r={10 + Math.sin(frame / 6) * 4}
+                      cy={140 - 100 * dataEasedProgress}
+                      r={12 + Math.sin(frame / 6) * 4}
                       fill="none"
-                      stroke={pal.accent}
+                      stroke={highlightColor}
                       strokeWidth="2"
                       opacity={0.6 - 0.4 * (Math.sin(frame / 6) * 0.5 + 0.5)}
                     />
@@ -1637,7 +1707,7 @@ const NewsScene: React.FC<SceneProps> = ({
                     <span>INICIAL</span>
                     <span>Q2</span>
                     <span>Q3</span>
-                    <span style={{ color: pal.accent }}>{currentCountText}{displayUnit}</span>
+                    <span style={{ color: highlightColor }}>{currentCountText}{displayUnit}</span>
                   </div>
                 </div>
               )}
@@ -1648,22 +1718,22 @@ const NewsScene: React.FC<SceneProps> = ({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-around",
-                  height: 130,
+                  height: 180, // Aumentado para 180px
                   padding: "0 10px",
                 }}>
                   {/* Left Donut */}
-                  <div style={{ position: "relative", width: 110, height: 110 }}>
-                    <svg width="110" height="110" style={{ transform: "rotate(-90deg)" }}>
-                      <circle cx="55" cy="55" r="42" fill="none" stroke="#E2E8F0" strokeWidth="8" />
+                  <div style={{ position: "relative", width: 160, height: 160 }}>
+                    <svg width="160" height="160" style={{ transform: "rotate(-90deg)" }}>
+                      <circle cx="80" cy="80" r="62" fill="none" stroke="#E2E8F0" strokeWidth="10" />
                       <circle
-                        cx="55"
-                        cy="55"
-                        r="42"
+                        cx="80"
+                        cy="80"
+                        r="62"
                         fill="none"
-                        stroke={pal.accent}
-                        strokeWidth="8"
-                        strokeDasharray={264}
-                        strokeDashoffset={264 - (Math.min(parsedValue, 100) / 100) * dataEasedProgress * 264}
+                        stroke={highlightColor}
+                        strokeWidth="10"
+                        strokeDasharray={390}
+                        strokeDashoffset={390 - (Math.min(parsedValue, 100) / 100) * dataEasedProgress * 390}
                         strokeLinecap="round"
                       />
                     </svg>
@@ -1675,9 +1745,9 @@ const NewsScene: React.FC<SceneProps> = ({
                       alignItems: "center",
                       justifyContent: "center",
                       fontFamily: "'Oswald', sans-serif",
-                      fontSize: 20,
+                      fontSize: 26,
                       fontWeight: 900,
-                      color: pal.accent,
+                      color: highlightColor,
                     }}>
                       {currentCountText}{displayUnit}
                     </div>
@@ -1701,13 +1771,13 @@ const NewsScene: React.FC<SceneProps> = ({
                       }}>
                         <div style={{
                           width: 8, height: 8, borderRadius: "50%",
-                          background: item.highlight ? pal.accent : "#94A3B8"
+                          background: item.highlight ? highlightColor : "#94A3B8"
                         }} />
                         <div style={{ display: "flex", flexDirection: "column" }}>
                           <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 10, fontWeight: 700, color: "#64748B" }}>
                             {item.label}
                           </span>
-                          <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 16, fontWeight: 900, color: item.highlight ? pal.accent : "#1E293B" }}>
+                          <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 16, fontWeight: 900, color: item.highlight ? highlightColor : "#1E293B" }}>
                             {item.val}
                           </span>
                         </div>
