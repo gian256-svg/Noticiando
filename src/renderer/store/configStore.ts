@@ -50,7 +50,12 @@ export const useConfigStore = create<ConfigStore>()(
       settingsOpen: false,
 
       addSource: (url) => {
-        const name = new URL(url).hostname.replace("www.", "");
+        let name: string;
+        try {
+          name = new URL(url).hostname.replace("www.", "");
+        } catch {
+          return; // URL inválida — ignora silenciosamente
+        }
         const existing = get().sources.find((s) => s.url === url);
         if (existing) return;
         set((s) => ({

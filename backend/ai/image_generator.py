@@ -36,6 +36,8 @@ def is_public_figure(keyword: str) -> bool:
     kw = keyword.lower().strip()
     if not kw:
         return False
+    if "logo" in kw:
+        return False
     return not any(generic in kw for generic in GENERIC_KEYWORDS)
 
 def _get_localhost_base() -> str:
@@ -93,7 +95,15 @@ async def generate_cutout_image(
         
     dest_img = MEDIA_DIR / f"generated_{qhash}.jpg"
     
-    if is_person:
+    is_logo = "logo" in keyword.lower().strip()
+    
+    if is_logo:
+        prompt = (
+            f"Flat vector icon of {keyword}, minimalist logo design, clean solid white background, "
+            f"high contrast, corporate branding logo, professional style, no text"
+        )
+        negative_prompt = "photorealistic, realistic portrait, face, photograph, 3d, gradient, text, watermark, signature, frame, background scene"
+    elif is_person:
         prompt = (
             f"Editorial portrait photograph of {keyword}, "
             f"professional headshot style, clean white background, "

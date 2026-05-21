@@ -491,9 +491,9 @@ const NewspaperCutout: React.FC<{
   });
 
   const panProgress = frame / durationInFrames;
-  const hPan = interpolate(panProgress, [0, 1], [20, -50]); // Panning muito lento para manter legível
+  const hPan = 0; // Removed horizontal panning to keep text inside margins
   const rotate = interpolate(entrance, [0, 1], [6, -0.5]) + interpolate(exitProgress, [0, 1], [0, -3]);
-  const scale = interpolate(entrance, [0, 1], [1.3, 1.65]) * interpolate(exitProgress, [0, 1], [1, 0.85]); // Dobro de escala (1.65x)
+  const scale = interpolate(entrance, [0, 1], [0.95, 1.03]) * interpolate(exitProgress, [0, 1], [1, 0.85]); // Scaled down to keep within margins
   const translateY = interpolate(entrance, [0, 1], [380, 0]) + interpolate(exitProgress, [0, 1], [0, 480]);
 
   // Progressive yellow highlighter (starts after entrance animation completes, from frame 15 to 45)
@@ -509,8 +509,8 @@ const NewspaperCutout: React.FC<{
       style={{
         position: "absolute",
         top: "42%",
-        left: "10%",
-        width: "80%", // Centralizado e expandido via scale
+        left: "6%",
+        width: "88%", // Centralizado e expandido via scale
         maxWidth: 1200,
         backgroundColor: "#f4f1ea", // newsprint warm paper color
         backgroundImage: "radial-gradient(#e5dec9 1px, transparent 1px)", // subtle paper texture
@@ -906,7 +906,7 @@ const NewsScene: React.FC<SceneProps> = ({
       })
     : 1;
 
-  const isHook = scene.visual_type === "hook";
+  const isHook = sceneIndex === 0 || scene.visual_type === "hook";
   const isData = scene.visual_type === "data";
   const isMap = scene.visual_type === "map";
   const isTimeline = scene.visual_type === "timeline";
@@ -923,14 +923,9 @@ const NewsScene: React.FC<SceneProps> = ({
 
   const assetSide = sceneIndex % 2 === 0 ? "right" : "left";
 
-  // Align text to opposite side of asset to prevent overlap
-  const textAlignment = hasSideAsset
-    ? (assetSide === "right" ? "left" : "right")
-    : "center";
-
-  const containerAlignItems = textAlignment === "left"
-    ? "flex-start"
-    : (textAlignment === "right" ? "flex-end" : "center");
+  // Force text to center horizontally
+  const textAlignment = "center";
+  const containerAlignItems = "center";
 
   // Keep colors high-contrast (dark on light gradient, white on full-bleed video)
   const textColor = (isCinematicVideo || isCollage) ? "#FFFFFF" : ((isMap || isTimeline) ? "#1A1A1A" : pal.text);
@@ -974,7 +969,7 @@ const NewsScene: React.FC<SceneProps> = ({
     return Math.max(...words.map(w => w.length), 0);
   }, [words]);
 
-  const baseTitleFontSize = isHook ? 88 : 76;
+  const baseTitleFontSize = isHook ? 110 : 76;
   const titleFontSize = useMemo(() => {
     if (longestWordLength > 12) {
       return Math.max(48, baseTitleFontSize - (longestWordLength - 12) * 4);
@@ -983,7 +978,11 @@ const NewsScene: React.FC<SceneProps> = ({
   }, [longestWordLength, baseTitleFontSize]);
 
   const matchedCountries = useMemo(() => {
-    const fullText = `${scene.headline} ${scene.subtext ?? ""}`.toLowerCase();
+    const cleanText = ` ${scene.headline} ${scene.subtext ?? ""} `
+      .toLowerCase()
+      .replace(/[,.;:!?()"[\]]/g, " ")
+      .replace(/\s+/g, " ");
+    
     const matched: string[] = [];
     const COUNTRY_MAP: Record<string, string> = {
       china: "cn",
@@ -996,7 +995,6 @@ const NewsScene: React.FC<SceneProps> = ({
       saudi: "sa",
       aramco: "sa",
       irã: "ir",
-      "ira": "ir",
       israel: "il",
       rússia: "ru",
       russia: "ru",
@@ -1004,7 +1002,8 @@ const NewsScene: React.FC<SceneProps> = ({
       ucrania: "ua",
     };
     for (const [key, code] of Object.entries(COUNTRY_MAP)) {
-      if (fullText.includes(key) && !matched.includes(code)) {
+      const paddedKey = ` ${key} `;
+      if (cleanText.includes(paddedKey) && !matched.includes(code)) {
         matched.push(code);
       }
     }
@@ -1156,37 +1155,7 @@ const NewsScene: React.FC<SceneProps> = ({
         })}
       </div>
 
-      {/* ── Brand Watermark (NOTICIANDO) ── */}
-      <div style={{
-        position: "absolute",
-        top: 48,
-        right: 28,
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        zIndex: 100,
-        opacity: 0.85,
-        transform: `scale(${entrance})`,
-      }}>
-        <div style={{
-          width: 6,
-          height: 6,
-          borderRadius: "50%",
-          background: pal.accent,
-          boxShadow: `0 0 8px ${pal.accent}`,
-        }} />
-        <span style={{
-          color: "#FFFFFF",
-          fontSize: 14,
-          fontWeight: 900,
-          letterSpacing: "0.25em",
-          textTransform: "uppercase",
-          fontFamily: "'Oswald', 'Montserrat', 'Inter', sans-serif",
-          textShadow: "0 2px 4px rgba(0,0,0,0.5)",
-        }}>
-          NOTICIANDO
-        </span>
-      </div>
+      {/* ── Brand Watermark (NOTICIANDO) Removed ── */}
 
       {/* ── Content Container with camera zoom (Parallax layout) ── */}
       <AbsoluteFill style={{ transform: `scale(${cameraScale})`, transformOrigin: "center center" }}>
@@ -1282,10 +1251,9 @@ const NewsScene: React.FC<SceneProps> = ({
           <div style={{
             position: "absolute",
             bottom: 80,
-            right: assetSide === "right" ? 50 : "auto",
-            left: assetSide === "left" ? 50 : "auto",
-            height: "58%", // Aumentado para 58%
-            width: "58%",  // Aumentado para 58%
+            left: "6%",
+            height: "46%",
+            width: "88%",
             zIndex: 4,
             opacity: 1 - exitProgress,
             transform: `translateY(${
@@ -1323,10 +1291,9 @@ const NewsScene: React.FC<SceneProps> = ({
           <div style={{
             position: "absolute",
             bottom: 80,
-            right: assetSide === "right" ? 50 : "auto",
-            left: assetSide === "left" ? 50 : "auto",
-            height: "56%", // Aumentado para 56%
-            width: "56%",  // Aumentado para 56%
+            left: "6%",
+            height: "46%",
+            width: "88%",
             zIndex: 4,
             opacity: 1 - exitProgress,
             transform: `translateY(${
@@ -1398,7 +1365,7 @@ const NewsScene: React.FC<SceneProps> = ({
         })}
 
         {/* word-level synchronized captions overlay */}
-        {scene.caption_words && scene.caption_words.length > 0 && (
+        {scene.caption_words && scene.caption_words.length > 0 && !isHook && (
           <CaptionEngine
             words={scene.caption_words}
             frame={frame}
@@ -1407,44 +1374,16 @@ const NewsScene: React.FC<SceneProps> = ({
           />
         )}
 
-        {/* Top visual category pill/logo (Hook scene) */}
-        {isHook && (
-          <div style={{
-            position: "absolute", top: 80, left: 0, right: 0,
-            display: "flex", justifyContent: "center",
-          }}>
-            <div style={{
-              display: "flex", alignItems: "center", gap: 8,
-              padding: "6px 22px", borderRadius: 999,
-              background: pal.dim,
-              border: `1px solid ${pal.accent}50`,
-              boxShadow: `0 8px 24px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.08)`,
-              transform: `scale(${entrance}) translateY(${Math.sin(frame / 8) * 3}px)`,
-            }}>
-              <div style={{
-                width: 8, height: 8, borderRadius: "50%",
-                background: pal.accent,
-                boxShadow: `0 0 10px ${pal.accent}`,
-              }} />
-              <span style={{
-                color: pal.accent, fontSize: 11, fontWeight: 900,
-                letterSpacing: "0.22em", textTransform: "uppercase",
-                fontFamily: "'Oswald', 'Montserrat', 'Inter', sans-serif",
-              }}>
-                BREAKING
-              </span>
-            </div>
-          </div>
-        )}
+        {/* Top visual category pill/logo (Hook scene) Removed */}
 
         {/* Main Central Card & Typography */}
         <div style={{
           position: "absolute", inset: 0,
           display: "flex", flexDirection: "column",
           alignItems: containerAlignItems,
-          justifyContent: (hasSideAsset || (scene.visual_type === "newspaper_clip" || scene.cutout_url === "newspaper") || isTimeline) ? "flex-start" : "center",
-          paddingTop: (hasSideAsset || (scene.visual_type === "newspaper_clip" || scene.cutout_url === "newspaper") || isTimeline) ? (isHook ? 180 : 210) : 0,
-          paddingLeft: 80, paddingRight: 80,
+          justifyContent: (hasSideAsset || isData || (scene.visual_type === "newspaper_clip" || scene.cutout_url === "newspaper") || isTimeline) ? "flex-start" : "center",
+          paddingTop: (hasSideAsset || isData || (scene.visual_type === "newspaper_clip" || scene.cutout_url === "newspaper") || isTimeline) ? (isHook ? 180 : 210) : 0,
+          paddingLeft: isData ? 30 : 80, paddingRight: isData ? 30 : 80,
           textAlign: textAlignment,
           transform: `translateY(${interpolate(exitProgress, [0, 1], [0, -50])}px) scale(${interpolate(exitProgress, [0, 1], [1, 0.95]) * textPulse})`,
           opacity: 1 - exitProgress,
@@ -1502,7 +1441,7 @@ const NewsScene: React.FC<SceneProps> = ({
           ) : (
             <div style={{
               display: "block",
-              textAlign: textAlignment === "left" ? "left" : (textAlignment === "right" ? "right" : "center"),
+              textAlign: textAlignment,
               marginBottom: 20,
               zIndex: 10,
               width: "100%",
@@ -1605,27 +1544,10 @@ const NewsScene: React.FC<SceneProps> = ({
           {/* O subtext (narração completa) NÃO é mais renderizado na tela a pedido do usuário,
               apenas a headline com palavras-chave curtas aparece como lettering! */}
 
-          {/* Renderizar subtítulo (subtext completo) APENAS no Hook/Capa do Reels para dar contexto */}
-          {isHook && scene.subtext && (
-            <div style={{
-              fontFamily: "'Inter', 'Montserrat', sans-serif",
-              fontSize: 34,
-              fontWeight: 500,
-              color: textColor === "#FFFFFF" ? "rgba(255, 255, 255, 0.88)" : `${textColor}ee`,
-              marginTop: 20,
-              textAlign: textAlignment,
-              maxWidth: "85%",
-              textShadow: textColor === "#FFFFFF" ? "0 4px 16px rgba(0,0,0,0.95)" : "none",
-              opacity: interpolate(entrance, [0, 1], [0, 1]),
-              transform: `translateY(${interpolate(entrance, [0, 1], [15, 0])}px)`,
-              lineHeight: 1.3,
-            }}>
-              {scene.subtext}
-            </div>
-          )}
+          {/* Renderizar subtítulo (subtext completo) APENAS no Hook/Capa do Reels para dar contexto - Removed to avoid duplication */}
 
           {/* Big metric/percentage counter animation (for all scenes that contain a value) */}
-          {dataMetric && (
+          {dataMetric && !isHook && (
             <BigMetricCounter
               value={dataMetric.rawString || `${dataMetric.num}${dataMetric.unit}`}
               color={highlightColor}
@@ -1645,7 +1567,7 @@ const NewsScene: React.FC<SceneProps> = ({
               border: "1.5px solid rgba(255, 255, 255, 0.15)", // Borda fina e clean branca
               boxShadow: "0 25px 50px rgba(0, 0, 0, 0.45)",
               width: "100%",
-              maxWidth: 680, // Aumentado
+              maxWidth: 1020, // Aumentado para pegar de ponta a ponta
               opacity: interpolate(frame, [12, 22], [0, 1], {
                 extrapolateLeft: "clamp", extrapolateRight: "clamp",
               }),
@@ -1690,7 +1612,7 @@ const NewsScene: React.FC<SceneProps> = ({
                   display: "flex",
                   alignItems: "flex-end",
                   justifyContent: "space-between",
-                  height: 180, // Aumentado para 180px
+                  height: 280, // Aumentado para 280px para preencher a tela
                   padding: "10px 10px 0 10px",
                   position: "relative",
                 }}>
@@ -1748,25 +1670,25 @@ const NewsScene: React.FC<SceneProps> = ({
               {sceneIndex % 3 === 1 && (
                 /* TYPE 1: Premium Area/Line Chart */
                 <div style={{
-                  height: 180, // Aumentado para 180px
+                  height: 280, // Aumentado para 280px para preencher a tela
                   position: "relative",
                   width: "100%",
                   paddingTop: 10,
                 }}>
                   {/* Subtle Grid Lines */}
-                  <div style={{ position: "absolute", top: 40, left: 0, right: 0, height: 1, borderTop: "1px dashed rgba(255, 255, 255, 0.15)" }} />
-                  <div style={{ position: "absolute", top: 90, left: 0, right: 0, height: 1, borderTop: "1px dashed rgba(255, 255, 255, 0.15)" }} />
+                  <div style={{ position: "absolute", top: 60, left: 0, right: 0, height: 1, borderTop: "1px dashed rgba(255, 255, 255, 0.15)" }} />
                   <div style={{ position: "absolute", top: 140, left: 0, right: 0, height: 1, borderTop: "1px dashed rgba(255, 255, 255, 0.15)" }} />
+                  <div style={{ position: "absolute", top: 220, left: 0, right: 0, height: 1, borderTop: "1px dashed rgba(255, 255, 255, 0.15)" }} />
 
-                  <svg width="100%" height="160" style={{ overflow: "visible" }}>
+                  <svg width="100%" height="260" style={{ overflow: "visible" }}>
                     {/* Area fill */}
                     <path
-                      d={`M 20 140 L 150 110 L 300 125 L 480 ${140 - 100 * dataEasedProgress} L 480 160 L 20 160 Z`}
+                      d={`M 20 240 L 150 190 L 300 205 L 480 ${240 - 180 * dataEasedProgress} L 480 260 L 20 260 Z`}
                       fill={`${highlightColor}15`}
                     />
                     {/* Line stroke */}
                     <path
-                      d={`M 20 140 L 150 110 L 300 125 L 480 ${140 - 100 * dataEasedProgress}`}
+                      d={`M 20 240 L 150 190 L 300 205 L 480 ${240 - 180 * dataEasedProgress}`}
                       fill="none"
                       stroke={highlightColor}
                       strokeWidth="5"
@@ -1775,7 +1697,7 @@ const NewsScene: React.FC<SceneProps> = ({
                     {/* End point marker */}
                     <circle
                       cx="480"
-                      cy={140 - 100 * dataEasedProgress}
+                      cy={240 - 180 * dataEasedProgress}
                       r="8"
                       fill={highlightColor}
                       stroke="#050811"
@@ -1783,7 +1705,7 @@ const NewsScene: React.FC<SceneProps> = ({
                     />
                     <circle
                       cx="480"
-                      cy={140 - 100 * dataEasedProgress}
+                      cy={240 - 180 * dataEasedProgress}
                       r={12 + Math.sin(frame / 6) * 4}
                       fill="none"
                       stroke={highlightColor}
@@ -1817,22 +1739,22 @@ const NewsScene: React.FC<SceneProps> = ({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-around",
-                  height: 180, // Aumentado para 180px
+                  height: 300, // Aumentado para 300px
                   padding: "0 10px",
                 }}>
                   {/* Left Donut */}
-                  <div style={{ position: "relative", width: 160, height: 160 }}>
-                    <svg width="160" height="160" style={{ transform: "rotate(-90deg)" }}>
-                      <circle cx="80" cy="80" r="62" fill="none" stroke="rgba(255, 255, 255, 0.15)" strokeWidth="10" />
+                  <div style={{ position: "relative", width: 260, height: 260 }}>
+                    <svg width="260" height="260" style={{ transform: "rotate(-90deg)" }}>
+                      <circle cx="130" cy="130" r="102" fill="none" stroke="rgba(255, 255, 255, 0.15)" strokeWidth="16" />
                       <circle
-                        cx="80"
-                        cy="80"
-                        r="62"
+                        cx="130"
+                        cy="130"
+                        r="102"
                         fill="none"
                         stroke={highlightColor}
-                        strokeWidth="10"
-                        strokeDasharray={390}
-                        strokeDashoffset={390 - (Math.min(parsedValue, 100) / 100) * dataEasedProgress * 390}
+                        strokeWidth="16"
+                        strokeDasharray={640}
+                        strokeDashoffset={640 - (Math.min(parsedValue, 100) / 100) * dataEasedProgress * 640}
                         strokeLinecap="round"
                       />
                     </svg>
@@ -1844,7 +1766,7 @@ const NewsScene: React.FC<SceneProps> = ({
                       alignItems: "center",
                       justifyContent: "center",
                       fontFamily: "'Oswald', sans-serif",
-                      fontSize: 26,
+                      fontSize: 42,
                       fontWeight: 900,
                       color: highlightColor,
                     }}>

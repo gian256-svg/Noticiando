@@ -18,7 +18,7 @@ PERIOD_HOURS = {"1h": 1, "6h": 6, "24h": 24, "7d": 168}
 
 
 @router.get("")
-async def list_news(
+def list_news(
     db: Session = Depends(get_db),
     limit: int = Query(100, le=200),
     offset: int = Query(0, ge=0),

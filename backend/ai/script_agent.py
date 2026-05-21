@@ -8,7 +8,26 @@ from ai.prompts import build_messages
 logger = logging.getLogger(__name__)
 
 MODEL = "claude-sonnet-4-6"
-MAX_TOKENS = 2048
+
+# Cache de clientes por api_key — evita criar uma nova instância a cada geração.
+# A chave do dict é a própria api_key; uma nova chave = novo cliente automaticamente.
+_client_cache: dict[str, anthropic.AsyncAnthropic] = {}
+
+
+def _get_client(api_key: str) -> anthropic.AsyncAnthropic:
+    if api_key not in _client_cache:
+        _client_cache[api_key] = anthropic.AsyncAnthropic(api_key=api_key)
+    return _client_cache[api_key]
+
+
+def _max_tokens_for_duration(duration: int) -> int:
+    """Orçamento de tokens proporcional à duração do vídeo em segundos.
+
+    Fórmula: ~2 palavras/s de narração × ~1,5 tokens/palavra × 3× para
+    direções de cena e formatação → ~9 tokens/s, com mínimo de 2048 e
+    máximo de 4096.
+    """
+    return max(2048, min(4096, int(duration * 9)))
 
 
 async def generate_script_stream(
@@ -37,12 +56,13 @@ async def generate_script_stream(
         duration=duration,
     )
 
-    client = anthropic.AsyncAnthropic(api_key=api_key)
+    client = _get_client(api_key)
+    max_tokens = _max_tokens_for_duration(duration)
 
     try:
         async with client.messages.stream(
             model=MODEL,
-            max_tokens=MAX_TOKENS,
+            max_tokens=max_tokens,
             system=system_prompt,
             messages=[{"role": "user", "content": user_message}],
         ) as stream:

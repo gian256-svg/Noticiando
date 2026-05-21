@@ -67,6 +67,15 @@ export function useNewsFeed() {
     }
   }, [fetchNews, appendNews, setCrawlerStatus]);
 
+  const triggerCrawl = useCallback(async () => {
+    try {
+      const base = await getApiBase();
+      await fetch(`${base}/crawl/trigger`, { method: "POST" });
+    } catch (err) {
+      console.error("Failed to trigger crawl:", err);
+    }
+  }, []);
+
   const startPolling = useCallback(async () => {
     // Only show loading spinner on initial load if we don't have news items yet
     const currentNews = useFeedStore.getState().allNews;
@@ -78,6 +87,9 @@ export function useNewsFeed() {
     // Connect to Server-Sent Events
     connectSSE();
 
+    // Trigger immediate crawl on startup instead of waiting for interval
+    triggerCrawl();
+
     // Start fallback interval polling using the user-defined crawlInterval
     if (pollRef.current) clearInterval(pollRef.current);
     const intervalMinutes = useConfigStore.getState().crawlInterval || 2;
@@ -85,7 +97,7 @@ export function useNewsFeed() {
       lastFetchRef.current = 0; // força bypass do debounce no interval
       fetchNews();
     }, intervalMinutes * 60 * 1000);
-  }, [fetchNews, connectSSE, setLoading]);
+  }, [fetchNews, connectSSE, setLoading, triggerCrawl]);
 
   const stopPolling = useCallback(() => {
     if (sseRef.current) {
@@ -107,9 +119,10 @@ export function useNewsFeed() {
       lastFetchRef.current = 0;
       fetchNews();
       if (!sseRef.current) connectSSE();
+      triggerCrawl();
     });
     return unsub;
-  }, [fetchNews, connectSSE]);
+  }, [fetchNews, connectSSE, triggerCrawl]);
 
   return { startPolling, stopPolling, fetchNews };
 }

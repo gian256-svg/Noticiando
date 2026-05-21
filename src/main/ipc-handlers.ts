@@ -1,4 +1,7 @@
-import { ipcMain, BrowserWindow, Notification, app, shell } from "electron";
+import { ipcMain, BrowserWindow, Notification, app, shell, dialog } from "electron";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { getBackendPort } from "./sidecar";
 import { getSavedScripts, saveScript, deleteScript } from "./db";
 import Store from "electron-store";
@@ -158,5 +161,58 @@ export function setupIpcHandlers() {
   ipcMain.handle("config:set", (_e, key: string, value: unknown) => {
     (store as any).set(key, value);
     return { success: true };
+  });
+
+  // scripts:export-pdf — gera um PDF do roteiro usando printToPDF nativo do Electron
+  ipcMain.handle("scripts:export-pdf", async (_e, { title, content }: { title: string; content: string }) => {
+    const safeTitle = title
+      .slice(0, 40)
+      .replace(/[^\w\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-");
+
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: "Exportar Roteiro como PDF",
+      defaultPath: `roteiro-${safeTitle}.pdf`,
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+
+    if (canceled || !filePath) return { ok: false };
+
+    const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 680px; margin: 48px auto; color: #111; line-height: 1.7; }
+    h1 { font-size: 1rem; font-weight: 600; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 28px; color: #333; }
+    pre { white-space: pre-wrap; font-family: inherit; font-size: 0.88rem; }
+  </style>
+</head>
+<body>
+  <h1>${title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</h1>
+  <pre>${content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
+</body>
+</html>`;
+
+    const tmpFile = path.join(os.tmpdir(), `noticiando-${Date.now()}.html`);
+
+    try {
+      fs.writeFileSync(tmpFile, htmlContent, "utf-8");
+
+      const hiddenWin = new BrowserWindow({ show: false });
+      await hiddenWin.loadFile(tmpFile);
+      const pdfBuffer = await hiddenWin.webContents.printToPDF({ printBackground: false });
+      hiddenWin.destroy();
+
+      fs.writeFileSync(filePath, pdfBuffer);
+      shell.openPath(filePath);
+      return { ok: true, filePath };
+    } catch (err) {
+      console.error("[IPC scripts:export-pdf]", err);
+      return { ok: false, error: String(err) };
+    } finally {
+      try { fs.unlinkSync(tmpFile); } catch { /* ignora se já foi removido */ }
+    }
   });
 }

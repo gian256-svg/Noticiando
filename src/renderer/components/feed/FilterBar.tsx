@@ -48,7 +48,7 @@ export function FilterBar() {
         <input
           type="range"
           min={0}
-          max={90}
+          max={100}
           step={10}
           value={filters.minScore}
           onChange={(e) => setFilters({ minScore: Number(e.target.value) })}

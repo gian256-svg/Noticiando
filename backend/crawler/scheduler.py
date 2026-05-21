@@ -135,6 +135,11 @@ def _process_crawl_results(raw_items: list[dict]) -> list[dict]:
                 if _is_off_topic(base["title"], base.get("summary", ""), merged_sources):
                     logger.debug(f"Off-topic rejected: {base['title'][:80]}")
                     continue
+                # Dedup por URL: evita inserir o mesmo artigo com título levemente diferente
+                url_existing = db.query(NewsItem).filter_by(url=base["url"]).first()
+                if url_existing:
+                    logger.debug(f"URL duplicate skipped: {base['url'][:80]}")
+                    continue
                 temp_item = NewsItem(
                     title=base["title"],
                     title_hash=h,

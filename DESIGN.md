@@ -53,7 +53,8 @@ A tipografia deve manter contraste extremo e excelente legibilidade, mesmo em te
 
 1. **Título Principal (Gancho / Hook):**
    - Fonte: **Oswald** (Bold ou SemiBold) em caixa alta (uppercase), com kerning (espaçamento de letras) apertado.
-   - Tamanho mínimo na tela: **88px para Hook e 76px para demais títulos** para garantir extremo impacto visual.
+   - Tamanho mínimo na tela: **110px para Hook e 76px para demais títulos** para garantir extremo impacto visual.
+   - **Diagramação e Alinhamento:** Todo o layout de texto é centralizado horizontalmente e empilhado verticalmente com o conteúdo visual. Na cena 0 (Hook), o subtext e os contadores de métricas/porcentagens são omitidos para evitar redundâncias na tela.
 2. **Subtexto / Narrativa / Legendas:**
    - Fonte: **Inter** ou **Roboto** (Regular ou Light).
    - Tamanho mínimo na tela: **52px** (para legendas principais do Reels, nunca abaixo disso).
@@ -68,14 +69,15 @@ A tipografia deve manter contraste extremo e excelente legibilidade, mesmo em te
 * **[2s–Xs] → DESENVOLVIMENTO:** Narração clara sincronizada perfeitamente com elementos visuais de apoio na tela.
 * **[Xs–fim] → CONCLUSÃO / PROLONGAMENTO:** Fechamento e conclusão didática/analítica da notícia, prolongando o vídeo sem CTA ou assinaturas de encerramento.
 * **Regra de Dinamismo (Sem Tela Estática):**
-  - **Máximo de 3.0 segundos** sem mudança visual (um novo elemento entrando, corte, transição ou animação) — idealmente cada cena dura entre 2.0s e 3.0s.
+  - **Máximo de 3.0 segundos** sem mudança visual para cenas estáticas (cutout, illustration, data, etc.) — idealmente cada cena dura entre 2.0s e 3.0s.
+  - **Exceção de Pacing:** Cenas do tipo `video` ou `split_video` (vídeos em tela cheia) estão isentas da limitação de 3.0 segundos, durando o tempo completo falado de seu trecho correspondente no roteiro.
   - Cada frase narrada deve ter no máximo 10-12 palavras no roteiro para corresponder a esse ritmo de cortes rápidos.
   - **Texto em Movimento Contínuo:** O contêiner de headline/legendas possui uma animação contínua de escala (escala progressiva de 1.0 a 1.05) para manter dinamismo visual enquanto a cena está ativa.
-  - **Marca D'água da Empresa:** Exibição permanente e sutil do badge "NOTICIANDO" com contorno e brilho neon no canto superior direito de todas as cenas.
+  - **Remoção de Elementos Fixos:** A marca d'água "NOTICIANDO" e a categoria "BREAKING" foram removidas permanentemente das telas.
   - **Garantia de Unicidade (Bust Caching):** Um `generation_id` gerado no início da request serve de sal para os hashes de imagem (`image_generator.py`) e vídeos (`media_fetcher.py`), forçando o download e a geração de mídias novas. O download de B-roll extrai os top 5 resultados do YouTube e escolhe uma URL aleatória do top 3.
   - Cada frase narrada deve ter pelo menos 1 elemento visual correspondente na tela.
   - **Elementos Obrigatórios por Reel:**
-    - Pelo menos **1 vídeo real** ou corte curto do YouTube (máx 5s por trecho, uso editorial).
+    - Pelo menos **1 vídeo real** ou corte curto do YouTube (uso editorial).
     - Pelo menos **2 recortes fotográficos** animados (cutouts).
     - Pelo menos **1 elemento gráfico decorativo** animado (linha, forma, estrela, ou ícone).
 
@@ -176,7 +178,7 @@ const scale = spring({
 ### PhotoCutout & Illustration Sticker (`visual_type: "cutout" | "illustration"`)
 - **Não Repetição:** Não repetir imagens ao longo das cenas (exceto se for uma bandeira ou figura pública proeminente).
 - **Sem Feather:** O recorte da imagem deve ser nítido e seco, sem feather/suavização de borda.
-- **Empilhamento Vertical (Anti-Overlap):** O contêiner de texto principal fica posicionado no topo (`paddingTop: 180-210px`), liberando a metade inferior da tela para o sticker (`height: 44%-46%`, `bottom: 110-120px`).
+- **Empilhamento Vertical e Margin-to-Margin:** O contêiner de texto principal fica posicionado no topo, liberando a metade inferior para o asset visual. Os stickers ocupam **88% da largura da tela** (centralizados com `left: "6%"`) e altura de `46%` (com `bottom: 110-120px`) para maximizar o preenchimento da tela e evitar grandes vazios.
 - **Moldura Scrapbook Tracejada (Glow & Depth):** O sticker fica envelopado em um contêiner com um cartão de fundo tracejado deslocado (`border: "2px dashed ...", background: "..."`), criando profundidade tridimensional física.
 - **Contorno de Sticker:** Borda branca sólida de **4px de espessura, completamente nítida e sem blur** (filtro `#sticker-outline`).
 - Posicionamento alternado: cenas pares → `right: 50px`; ímpares → `left: 50px`.
@@ -188,18 +190,22 @@ const scale = spring({
 - **Fallback de Setas:** Se a cena possuir o decorator `arrow` mas não tiver nenhum asset visual ou dados na tela, ela faz fallback automático para `star` (estrela decorativa), evitando setas apontando para o vazio.
 - **Outros Decoradores:** `circle` | `stripes` | `star` continuam disponíveis para ambientação analógica.
 
-### Visualização de Dados Premium (Gráficos Sóbrios)
+### Visualização de Dados Premium (Gráficos Sóbrios de Ponta a Ponta)
 - **Variedade Tripla de Gráficos:** Alterna ciclicamente com base no índice da cena (`sceneIndex % 3`):
   1. *Bar Chart:* 4 barras verticais retangulares com bordas sólidas.
   2. *Area Line Chart:* Gráfico de linha e área sombreada contínua via SVG.
   3. *Radial Donut Chart:* Círculo de progresso radial elegante ao lado de legenda de texto.
-- **Largura Expandida:** Card de dados expandido para `maxWidth: 580px` para legibilidade máxima em mobile.
+- **Layout Margin-to-Margin:** O card de dados é expandido de 580px para **maxWidth: 1020px** e o padding lateral da cena é dinamicamente reduzido de 80px para 30px quando há dados na tela (`isData === true`). A altura dos gráficos foi ampliada para **280px** (e **300px** para o donut radial). Isso garante que o gráfico ocupe toda a largura disponível de margem a margem.
 - **Sem Marcas D'água:** Proibido o uso de marcas "Noticiando" ou logos redundantes nos cabeçalhos dos gráficos.
-- **Animação de Métricas (BigMetricCounter):** Qualquer cena com valores ou porcentagens (mesmo que não seja uma cena do tipo `data`) deve renderizar o componente `<BigMetricCounter>` para rolagem dinâmica animada de números em fonte *Oswald* gigante com rotação sutil.
+- **Animação de Métricas (BigMetricCounter):** Qualquer cena com valores ou porcentagens (mesmo que não seja uma cena do tipo `data`, exceto na cena 0 do Hook) deve renderizar o componente `<BigMetricCounter>` para rolagem dinâmica animada de números em fonte *Oswald* gigante com rotação sutil.
 
 ### Recortes de Jornal (NewspaperCutout)
-- **Tamanho Expandido:** Largura aumentada para `86%` (`maxWidth: 680px`), centralizado na tela (`left: 7%`), simulando um recorte impresso realista.
-- **Legibilidade:** Fontes de título maiores (`fontSize: 28px`, `lineHeight: 1.15`) e corpo do texto maior (`fontSize: 15px`).
+- **Tamanho Margin-to-Margin:** A largura é aumentada de 86% para **88%** (`left: 6%`) para expandir de margem a margem.
+- **Legibilidade e Panning Controlado:** A escala é travada em no máximo 1.0-1.05 e o deslocamento horizontal (`hPan`) é zerado. Isso evita que trechos do jornal saiam da tela e garante leitura confortável. Fontes de título maiores (`fontSize: 28px`, `lineHeight: 1.15`) e corpo do texto maior (`fontSize: 15px`).
+
+### Falsos Positivos de Bandeiras e Geração de Logos de Empresas
+- **Word-Boundary para Bandeiras:** A identificação de palavras para inserção de bandeiras de países (como a bandeira do Irã) utiliza limites de palavra (`\bira\b` ou Regex exata em português "irã" e não substring "ira"), impedindo que palavras normais como "financeira" ou "carteira" acionem a inserção de bandeiras falsas.
+- **Foco em Logos de Empresas:** Quando o roteiro mencionar uma empresa (ex: Hyperliquid, Nvidia), o agente deve requisitar o visual do tipo `cutout` com a palavra-chave `<NomeDaEmpresa> logo`. A geração de imagens com a palavra "logo" no termo causará o desvio do filtro negativo "logo" do gerador e o preenchimento automático do prompt com instruções para criar um ícone vetorial plano em fundo branco nítido, que será recortado centralizado e ampliado na tela, acompanhado do crescimento de métricas.
 
 ### TimelineBackground Estilizado
 - **Linha Direcional Baixa:** Linha horizontal vermelha deslocada para `72%` de altura para evitar overlap com o texto central.

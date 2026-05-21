@@ -49,12 +49,14 @@ export function ScriptActions({ news, script }: ScriptActionsProps) {
         label={copied ? "Copiado!" : "Copiar"}
         variant={copied ? "success" : "default"}
       />
-      <ActionButton
-        onClick={() => generate(news)}
-        disabled={!hasScript}
-        icon={RefreshCw}
-        label="Regenerar"
-      />
+      {hasScript && (
+        <ActionButton
+          onClick={() => generate(news)}
+          disabled={false}
+          icon={RefreshCw}
+          label="Regenerar"
+        />
+      )}
       <ActionButton
         onClick={handleSave}
         disabled={!hasScript}

@@ -353,32 +353,105 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
 
         # 2. Distribuir a duração exata proporcionalmente por cena
         # E também distribuir as captions correspondentes à janela de tempo de cada cena
-        scene_start_time = 0.0
-        for s in scenes:
-            text = s.get("subtext") or s.get("headline", "")
-            words = len(text.split())
-            v_type = s.get("visual_type", "context")
-            if total_audio_duration > 0:
-                scene_duration = (words / total_words) * total_audio_duration
-                s["duration_seconds"] = min(3.0, round(scene_duration + 0.2, 2))
-            else:
+        if total_audio_duration > 0:
+            # Pass 0: Partition all_captions sequentially based on word counts of each scene's script
+            scene_captions = []
+            caption_index = 0
+            num_captions = len(all_captions)
+            for i, s in enumerate(scenes):
+                text = s.get("subtext") or s.get("headline", "")
+                words_count = len(text.split())
+                if i == len(scenes) - 1:
+                    slice_words = all_captions[caption_index:]
+                else:
+                    end_idx = min(caption_index + words_count, num_captions)
+                    slice_words = all_captions[caption_index:end_idx]
+                    caption_index = end_idx
+                scene_captions.append(slice_words)
+
+            # Pass 1: calculate duration_seconds and timeline windows for all scenes
+            visual_start = 0.0
+            for i, s in enumerate(scenes):
+                slice_words = scene_captions[i]
+                v_type = s.get("visual_type", "context")
+                is_video = v_type in ["video", "split_video"]
+                is_last = (i == len(scenes) - 1)
+
+                if slice_words:
+                    spoken_start = slice_words[0]["start"]
+                    spoken_end = slice_words[-1]["end"]
+                    spoken_dur = spoken_end - spoken_start
+                else:
+                    # fallback if no words assigned
+                    text = s.get("subtext") or s.get("headline", "")
+                    words_count = len(text.split())
+                    spoken_dur = (words_count / total_words) * total_audio_duration if total_words > 0 else 3.0
+
+                if is_last:
+                    # Last scene covers all remaining audio time
+                    duration = total_audio_duration - visual_start
+                elif is_video:
+                    duration = spoken_dur
+                else:
+                    duration = min(3.0, spoken_dur)
+
+                # Ensure a sensible minimum duration so visuals don't flash
+                duration = max(1.5, duration)
+                duration = round(duration, 2)
+
+                # Check that we don't exceed total audio duration
+                if visual_start + duration > total_audio_duration and not is_last:
+                    duration = total_audio_duration - visual_start
+
+                s["duration_seconds"] = duration
+                s["visual_start"] = visual_start
+                s["visual_end"] = visual_start + duration
+                visual_start += duration
+
+            # Pass 2: map word captions to the scene visible when they are spoken
+            for s in scenes:
+                s["caption_words"] = []
+
+            for w in all_captions:
+                word_start = w["start"]
+                # Find which scene covers this timestamp on the visual timeline
+                assigned_scene_idx = 0
+                for i, s in enumerate(scenes):
+                    if word_start >= s["visual_start"] and word_start < s["visual_end"]:
+                        assigned_scene_idx = i
+                        break
+                else:
+                    assigned_scene_idx = len(scenes) - 1
+
+                target_scene = scenes[assigned_scene_idx]
+                rel_start = round(max(0.0, word_start - target_scene["visual_start"]), 3)
+                rel_end = round(max(0.0, w["end"] - target_scene["visual_start"]), 3)
+                
+                target_scene["caption_words"].append({
+                    "word": w["word"],
+                    "start": rel_start,
+                    "end": rel_end
+                })
+
+            # Clean up temporary visual_start/visual_end fields
+            for s in scenes:
+                if "visual_start" in s:
+                    del s["visual_start"]
+                if "visual_end" in s:
+                    del s["visual_end"]
+        else:
+            # Fallback when there is no audio duration
+            for s in scenes:
+                v_type = s.get("visual_type", "context")
+                text = s.get("subtext") or s.get("headline", "")
+                words = len(text.split())
                 if v_type == "hook":
                     s["duration_seconds"] = min(3.0, round(max(2.2, words * 0.45 + 0.4), 1))
+                elif v_type in ["video", "split_video"]:
+                    s["duration_seconds"] = round(max(2.0, words * 0.45 + 0.5), 1)
                 else:
                     s["duration_seconds"] = min(3.0, round(max(2.0, words * 0.45 + 0.5), 1))
-
-            # Fatiar as legendas correspondentes
-            scene_end_time = scene_start_time + s["duration_seconds"]
-            scene_words = []
-            for w in all_captions:
-                if w["start"] >= scene_start_time and w["start"] < scene_end_time:
-                    scene_words.append({
-                        "word": w["word"],
-                        "start": round(w["start"] - scene_start_time, 3),
-                        "end": round(w["end"] - scene_start_time, 3)
-                    })
-            s["caption_words"] = scene_words
-            scene_start_time = scene_end_time
+                s["caption_words"] = []
 
         # Atualizar a duração total no JSON gerado como a soma de todas as cenas
         total_duration = sum(s["duration_seconds"] for s in scenes)

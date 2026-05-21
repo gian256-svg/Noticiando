@@ -87,7 +87,7 @@ export function Sidebar() {
             <input
               type="range"
               min={0}
-              max={80}
+              max={100}
               step={10}
               value={filters.minScore}
               onChange={(e) => setFilters({ minScore: Number(e.target.value) })}
@@ -95,8 +95,8 @@ export function Sidebar() {
             />
             <div className="flex justify-between mt-1.5 text-[9px] text-text-muted">
               <span>0</span>
-              <span>40</span>
-              <span>80</span>
+              <span>50</span>
+              <span>100</span>
             </div>
           </div>
         </div>

@@ -76,7 +76,6 @@ VISUAL_TYPE — distribuição mínima obrigatória por reel:
 PERSON_NAME — obrigatório em cenas "cutout" com figuras públicas:
   * Preencher com o nome completo + cargo/empresa da figura pública real citada (ex: "Jerome Powell Federal Reserve chairman", "Elon Musk Tesla CEO", "Lula presidente do Brasil").
   * Para cutouts sem figura humana ou com temas abstratos, preencher como null ou omitir.
-  * O campo person_name será utilizado diretamente para alimentar o gerador de retratos com IA.
 
 NUNCA REPETIR FRASES OU MÍDIAS (REGRA DE OURO):
   * É expressamente proibido repetir a mesma imagem, pessoa ou conceito visual em duas cenas consecutivas. A imagem da próxima cena DEVE ser alterada para variar e não cansar a tela.
@@ -85,13 +84,18 @@ NUNCA REPETIR FRASES OU MÍDIAS (REGRA DE OURO):
 
 TEXTOS CURTOS E GRAMÁTICA DINÂMICA:
   * As headlines e textos em tela devem ser extremamente curtos e dinâmicos para não poluir a tela.
-  * NUNCA inclua referências escritas ao nome do canal ou termos como "Noticiando" nas headlines, subtexts ou legendas dos vídeos.
+  * OBRIGATÓRIO: A headline e as palavras selecionadas devem seguir exatamente o que está no roteiro falado (subtext). Por exemplo, se na narração se diz "24 horas", a headline/texto na tela deve conter "24 horas" (não abrevie para "24").
+  * NUNCA inclua referências escritas ao nome do canal ou termos como "Noticiando" ou "Breaking" nas headlines, subtexts ou legendas dos vídeos.
   * Você PODE e DEVE ignorar regras estritas de parágrafos/pontuação nos textos em tela. Prefira palavras soltas de impacto ou frases curtas de 2-4 palavras para reforçar as falas da narração.
 
-DECORATOR_TYPE — OBRIGATÓRIO EM TODA CENA, PROIBIDO "none":
-  * "arrow"  → crescimento, direção, tendência
-  * "circle" → análise, contexto, dado circular ou destaque
-  * "stripes" → energia, momentum, impacto visual
+DIRETRIZES DE FLUXO, MÉTRICAS E ÚLTIMA CENA:
+  * EVITE EXCESSO DE TEXTO ESCURO: Não crie cenas escuras com apenas textos de baixo contraste que dificultem a leitura. Sempre insira ilustrações vibrantes, logos ou stock footage relevantes ao tema falado (ex: "Hyperliquid logo" em vez de imagens sem sentido).
+  * EVITE DUPLICAÇÃO DE MÉTRICAS: Se a métrica (ex: "77 mil") já estiver na headline ou subtext, garanta uma melhor diagramação para evitar que o mesmo valor apareça duplicado ou triplicado de forma desnecessária na mesma tela.
+  * ÚLTIMA CENA DE ALTO IMPACTO: A última cena deve encerrar o vídeo com um impacto forte sobre o tema abordado (ex: uma conclusão relevante ou projeção futura). NUNCA termine com um texto genérico fraco como "INVESTIMENTOS" ou "MERCADO".
+  * DECORATOR_TYPE — OBRIGATÓRIO EM TODA CENA, PROIBIDO "none":
+    * "arrow"  → crescimento, direção, tendência
+    * "circle" → análise, contexto, dado circular ou destaque
+    * "stripes" → energia, momentum, impacto visual
 
 MEDIA_KEYWORD — obrigatório em cenas cutout, newspaper_clip e illustration:
   * Detalhe exatamente o que deve ser buscado ou exibido (ex: "Elon Musk", "Nvidia logo", "American flag", "bar chart inflation").
@@ -102,7 +106,7 @@ YOUTUBE_SEARCH — obrigatório em cenas video:
 - Cada subtext deve ser envolvente e narrável em voz alta. O conjunto dos subtexts forma o roteiro da locução ElevenLabs.
 - TODAS as headlines e subtexts DEVEM ser geradas em português brasileiro natural, envolvente e fluente para o público brasileiro, mesmo que o Título ou Resumo originais estejam em inglês. A única exceção é o campo 'youtube_search', que deve ser escrito em inglês para melhor busca no YouTube.
 - Variar visual_type com mais equilíbrio — não concentrar todos os "video" no início ou no fim.
-- Estime duration_seconds com base no texto da narração (subtext): ~0.2s por palavra. A duração por cena DEVE ser de no máximo 3.0s.
+- Estime duration_seconds com base no texto da narração (subtext): ~0.2s por palavra. A duração por cena DEVE ser de no máximo 3.0s (exceto para cenas de visual_type 'video' e 'split_video', que podem ter a duração real correspondente sem o teto de 3 segundos).
 """
 
 

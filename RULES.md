@@ -123,6 +123,7 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 - **A filtragem por score, categoria e período é responsabilidade do `feedStore`**, não do backend.
 - O debounce de 30s em `fetchNews` existe para evitar chamadas excessivas durante polling. **No handler do evento SSE `idle`, resetar `lastFetchRef.current = 0` antes de chamar `fetchNews()`** — caso contrário o re-fetch pós-crawl é bloqueado silenciosamente.
 - O handler `sse.onerror` deve fechar a conexão, limpar o intervalo e reconectar via `startPolling()` após 5 segundos. Não apenas setar status de erro.
+- **Busca de notícias imediata no startup**: Ao inicializar o Noticiando (seja no `startPolling` ou no evento `backend:ready`), o app deve imediatamente disparar um ciclo de crawl chamando `POST /crawl/trigger` para o backend, garantindo notícias atualizadas sem precisar aguardar o tempo de espera configurado.
 
 **Arquivo:** `src/renderer/hooks/useNewsFeed.ts`
 
@@ -161,22 +162,26 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 **Arquivo:** `backend/ai/video_scene_agent.py`
 
 ### Diretrizes Gráficas e Tipografia (Diretor de Arte DESIGN.md / The Economist Style)
-* **Tipografia:** Fontes super dimensionadas. **Oswald** (Bold/SemiBold) para títulos (88px para Hook, 76px para o resto); **Inter/Roboto** para legendas (mínimo 52px).
+* **Tipografia:** Fontes super dimensionadas. **Oswald** (Bold/SemiBold) para títulos (110px para Hook, 76px para o resto); **Inter/Roboto** para legendas (mínimo 52px).
+* **Alinhamento e Diagramação:** Todo texto é centralizado horizontalmente e empilhado verticalmente com o conteúdo visual. Proibido jogar textos nos cantos superior esquerdo/direito. O subtext e os contadores de métricas/porcentagens são ocultados no Hook (cena index 0) para evitar duplicação redundante de informações na tela.
+* **Remoção de Watermarks e Pills:** A marca d'água "NOTICIANDO" no topo direito e a categoria "BREAKING" no topo esquerdo foram removidas permanentemente de todas as telas.
 * **Dinâmica Ken Burns:** Aplicar Ken Burns agressivo e contínuo nas mídias de vídeo e foto (escala de 1.0 a 1.12 no mínimo) para garantir dinamismo.
-* **Pacing Ultra Dinâmico (Máx 3.0s):** Nenhuma cena pode ficar mais de 3.0 segundos na tela. O subtext do roteiro tem limite de 10-12 palavras, e o backend limita a duração calculada da cena a no máximo 3.0s.
+* **Pacing Ultra Dinâmico e Exceção para Vídeos:** Nenhuma cena estática (cutout, data, newspaper, etc.) pode ficar mais de 3.0 segundos na tela. O subtext do roteiro de cenas estáticas tem limite de 10-12 palavras, e o backend limita a duração calculada da cena a no máximo 3.0s. Como exceção, cenas do tipo `video` ou `split_video` (vídeos em tela cheia) não são limitadas ao teto de 3 segundos, mantendo a duração real correspondente à locução ElevenLabs para aproveitar o b-roll sem cortes abruptos.
 * **Texto Sempre em Movimento:** Animar a escala do contêiner de texto (de 1.0 a 1.05) progressivamente ao longo da cena para evitar elementos de texto estáticos.
-* **Marca D'água da Empresa:** Logo "NOTICIANDO" visível de forma sutil no topo direito de cada cena com indicador de progresso Instagram no topo.
 * **Garantia de Unicidade de Mídia (Bust Cache):** Um `generation_id` gerado por request de Reels serve de sal para os hashes de imagem (`image_generator.py`) e vídeos (`media_fetcher.py`), forçando o download e a geração de mídias novas. Além disso, o download de B-roll extrai os top 5 resultados do YouTube e escolhe uma URL aleatória do top 3.
 * **Gramática Flexível de Legendas:** É permitido quebrar regras rígidas de parágrafos/pontuação, inserindo palavras isoladas ou frases curtas de impacto para reforçar a narração.
 * **Layout Fullscreen:** Sempre que houver vídeo (b-roll), ele DEVE ocupar a tela inteira (100% fullscreen), contendo um gradient overlay sombrio editorial por cima. A borda flutuante limitante não deve ser utilizada para vídeo.
-* **Qualidade dos Recortes:** Recortes secos ocupando cerca de 58% da tela vertical (sem limitação máxima de altura), estilo sticker com contorno branco nítido de ~4px de largura, sem blur.
+* **Layout Margin-to-Margin (Preenchimento de Tela):** Os elementos gráficos de dados (`isData`), recortes de jornal (`NewspaperCutout`), cutouts e illustrations devem ocupar de ponta a ponta da margem do vídeo (largura de ~88%, centralizados com `left: 6%`, e largura máxima dos cards de gráficos expandida para 1020px com padding reduzido de 80px para 30px nas laterais). Isso reduz espaços em branco vazios na tela e maximiza o impacto visual.
+* **Qualidade dos Recortes:** Recortes secos ocupando cerca de 88% da largura da tela (sem limitação máxima de altura), estilo sticker com contorno branco nítido de ~4px de largura, sem blur.
+* **Evitar Falsos Positivos de Bandeiras:** A correspondência de termos de países para exibição de bandeiras deve usar limites de palavras exatas (word-boundary) e não simples substrings, para evitar que termos como "financeira" insiram erroneamente a bandeira do Irã ("ira").
 * **Footage Real (yt-dlp):** Obrigatório extrair os primeiros 10 segundos reais do YouTube (sec 0:00-0:10) via queries específicas e contextuais.
 * **Paletas Editoriais:** Utilizar paletas de cor sólidas (dark themes como Navy/Green ou Black/Crimson) com glows radiais para não deixar a imagem chapada.
-* **Duração Flexível:** Cada cena recebe a margem cravada de +0.2s após a locução ElevenLabs, limitada ao máximo de 3.0s. Não cortar ou reescalar as durações para evitar narração "engolida".
+* **Duração Flexível e Sincronismo Fino:** A duração de cada cena é calculada proporcionalmente ao tempo falado exato do subtext e mapeada no backend no nível de palavra de locução (ElevenLabs). O mapeamento de legendas no frontend segue o tempo absoluto de visualização para evitar qualquer dessincronização progressiva.
 * **Elementos Obrigatórios por Reel:**
   - Pelo menos **2 cortes de vídeo real** fullscreen (fins informativos/editoriais).
   - Pelo menos **3 recortes fotográficos** grandes flutuantes.
   - Pelo menos **2 elementos gráficos decorativos** animados.
+
 
 ### Configurações de Locução (ElevenLabs)
 * **Voice Model:** `eleven_multilingual_v2`
