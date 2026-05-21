@@ -200,14 +200,6 @@ DEFAULT_SOURCES: list[Source] = [
         language="en",
         credibility_tier=1,
     ),
-    Source(
-        name="Le Monde",
-        url="https://www.lemonde.fr/rss/une.xml",
-        category="geopolitics",
-        language="fr",
-        credibility_tier=1,
-    ),
-
     # ── Think Tanks de Geopolítica ────────────────────────────────────
     Source(
         name="Foreign Affairs",

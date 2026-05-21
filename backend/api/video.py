@@ -58,6 +58,43 @@ def get_audio_duration(file_path: Path) -> float:
         return 0.0
 
 
+def get_min_duration_for_scene(scene: dict, sources_count: int) -> float:
+    v_type = scene.get("visual_type", "context")
+    kw = (scene.get("media_keyword") or "").lower().strip()
+    cutout = (scene.get("cutout_url") or "").lower().strip()
+    
+    if v_type in ["newspaper_clip", "collage"] or cutout == "newspaper" or kw == "newspaper":
+        return 3.5 * max(1, sources_count)
+    elif v_type == "data":
+        return 10.0
+    elif v_type == "timeline":
+        return 6.0
+    elif v_type in ["video", "split_video"]:
+        return 4.0
+    elif v_type == "map":
+        return 4.0
+    else:
+        return 3.0
+
+
+def slice_audio(input_file: Path, start: float, end: float, output_file: Path) -> bool:
+    import subprocess
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", f"{start:.3f}",
+        "-to", f"{end:.3f}",
+        "-i", str(input_file),
+        "-b:a", "192k",
+        str(output_file)
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, check=True)
+        return True
+    except Exception as e:
+        logger.error(f"FFmpeg slice audio failed: {e}")
+        return False
+
+
 def align_scenes_to_audio(scenes: list[dict], actual_audio_duration: float) -> list[dict]:
     raw_durations = []
     for scene in scenes:
@@ -182,6 +219,25 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
         if req.thumbnail_url:
             result["thumbnail_url"] = req.thumbnail_url
 
+        # ── Obter as fontes reais da notícia do banco de dados ──
+        from db.database import SessionLocal
+        from models.news import NewsItem
+        db_sources = []
+        with SessionLocal() as db:
+            news_item = db.query(NewsItem).filter(NewsItem.id == req.news_id).first()
+            if news_item:
+                db_sources = news_item.sources or []
+
+        # Normalizar fontes
+        clean_sources = []
+        for s in db_sources:
+            if isinstance(s, dict):
+                clean_sources.append(s)
+            elif isinstance(s, str):
+                clean_sources.append({"source": s, "title": "", "url": ""})
+        sources_count = len(clean_sources)
+        result["sources"] = clean_sources
+
         from ai.media_fetcher import fetch_article_photos, fetch_youtube_broll, fetch_youtube_thumbnail
         from ai.voice_and_sound import generate_narration, get_epidemic_soundtrack
 
@@ -194,10 +250,15 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
         )
 
         # ── Resolver mídia por cena (paralelizado com asyncio.gather) ──
-        async def resolve_single_scene(scene, idx_for_photo):
+        async def resolve_single_scene(scene, idx_for_photo, scene_idx):
             v_type = scene.get("visual_type", "context")
             if not scene.get("decorator_type"):
                 scene["decorator_type"] = "none"
+
+            # Resolver logo_url a partir do brand_domain
+            brand_domain = scene.get("brand_domain")
+            if brand_domain:
+                scene["logo_url"] = f"https://logo.clearbit.com/{brand_domain}"
 
             # Interceptar termos de gráficos/tabelas/dados estáticos para abolir gráficos feios
             kw = (scene.get("media_keyword") or "").lower().strip()
@@ -222,7 +283,7 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
 
             # 1. Resolver vídeo de fundo (background_video_url)
             yt_query = scene.get("youtube_search") or scene.get("media_search_query") or req.title
-            bg_video = await fetch_youtube_broll(yt_query, req.category, salt=generation_id)
+            bg_video = await fetch_youtube_broll(yt_query, req.category, salt=generation_id, scene_index=scene_idx)
             scene["background_video_url"] = bg_video
             scene["media_url"] = bg_video
 
@@ -301,13 +362,13 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
         # Organizar as tasks para rodar em paralelo
         tasks = []
         cutout_count = 0
-        for scene in scenes:
+        for idx, scene in enumerate(scenes):
             if scene.get("visual_type") == "cutout":
                 photo_idx = cutout_count
                 cutout_count += 1
             else:
                 photo_idx = None
-            tasks.append(resolve_single_scene(scene, photo_idx))
+            tasks.append(resolve_single_scene(scene, photo_idx, idx))
 
         await asyncio.gather(*tasks)
 
@@ -352,7 +413,7 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
                 logger.error(f"Erro ao carregar legendas do ElevenLabs: {e}")
 
         # 2. Distribuir a duração exata proporcionalmente por cena
-        # E também distribuir as captions correspondentes à janela de tempo de cada cena
+        # E fatiar o áudio global em clipes por cena para esticar o visual de forma independente
         if total_audio_duration > 0:
             # Pass 0: Partition all_captions sequentially based on word counts of each scene's script
             scene_captions = []
@@ -369,76 +430,52 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
                     caption_index = end_idx
                 scene_captions.append(slice_words)
 
-            # Pass 1: calculate duration_seconds and timeline windows for all scenes
-            visual_start = 0.0
+            # Para cada cena, calcular start, end e fatiar o áudio
             for i, s in enumerate(scenes):
                 slice_words = scene_captions[i]
-                v_type = s.get("visual_type", "context")
-                is_video = v_type in ["video", "split_video"]
-                is_last = (i == len(scenes) - 1)
-
                 if slice_words:
                     spoken_start = slice_words[0]["start"]
                     spoken_end = slice_words[-1]["end"]
-                    spoken_dur = spoken_end - spoken_start
                 else:
-                    # fallback if no words assigned
-                    text = s.get("subtext") or s.get("headline", "")
-                    words_count = len(text.split())
-                    spoken_dur = (words_count / total_words) * total_audio_duration if total_words > 0 else 3.0
+                    # fallback se não houver palavras mapeadas
+                    words_before = sum(len((prev.get("subtext") or prev.get("headline", "")).split()) for prev in scenes[:i])
+                    words_count = len((s.get("subtext") or s.get("headline", "")).split())
+                    spoken_start = (words_before / total_words) * total_audio_duration
+                    spoken_end = ((words_before + words_count) / total_words) * total_audio_duration
 
-                if is_last:
-                    # Last scene covers all remaining audio time
-                    duration = total_audio_duration - visual_start
-                elif is_video:
-                    duration = spoken_dur
-                else:
-                    duration = min(3.0, spoken_dur)
-
-                # Ensure a sensible minimum duration so visuals don't flash
-                duration = max(1.5, duration)
-                duration = round(duration, 2)
-
-                # Check that we don't exceed total audio duration
-                if visual_start + duration > total_audio_duration and not is_last:
-                    duration = total_audio_duration - visual_start
-
-                s["duration_seconds"] = duration
-                s["visual_start"] = visual_start
-                s["visual_end"] = visual_start + duration
-                visual_start += duration
-
-            # Pass 2: map word captions to the scene visible when they are spoken
-            for s in scenes:
-                s["caption_words"] = []
-
-            for w in all_captions:
-                word_start = w["start"]
-                # Find which scene covers this timestamp on the visual timeline
-                assigned_scene_idx = 0
-                for i, s in enumerate(scenes):
-                    if word_start >= s["visual_start"] and word_start < s["visual_end"]:
-                        assigned_scene_idx = i
-                        break
-                else:
-                    assigned_scene_idx = len(scenes) - 1
-
-                target_scene = scenes[assigned_scene_idx]
-                rel_start = round(max(0.0, word_start - target_scene["visual_start"]), 3)
-                rel_end = round(max(0.0, w["end"] - target_scene["visual_start"]), 3)
+                spoken_dur = spoken_end - spoken_start
+                min_dur = get_min_duration_for_scene(s, sources_count)
                 
-                target_scene["caption_words"].append({
-                    "word": w["word"],
-                    "start": rel_start,
-                    "end": rel_end
-                })
+                # Fórmula de duração: max(duração_áudio + 0.5s, duração_mínima_por_tipo)
+                duration = max(spoken_dur + 0.5, min_dur)
+                s["duration_seconds"] = round(duration, 1)
 
-            # Clean up temporary visual_start/visual_end fields
-            for s in scenes:
-                if "visual_start" in s:
-                    del s["visual_start"]
-                if "visual_end" in s:
-                    del s["visual_end"]
+                # Fatiar o áudio com ffmpeg
+                scene_filename = f"scene_{generation_id}_{i}.mp3"
+                scene_audio_path = _PROJECT_ROOT / "output" / scene_filename
+                
+                # Adicionar margem de segurança no final para não cortar ElevenLabs de repente
+                slice_end = min(total_audio_duration, spoken_end + 0.15)
+                
+                success = slice_audio(local_audio_path, spoken_start, slice_end, scene_audio_path)
+                if success:
+                    s["audio_url"] = f"{_get_localhost()}/output/{scene_filename}"
+                else:
+                    s["audio_url"] = None
+
+                # Mapear captions_words relativas ao início desta cena
+                s["caption_words"] = []
+                for w in slice_words:
+                    rel_start = round(max(0.0, w["start"] - spoken_start), 3)
+                    rel_end = round(max(0.0, w["end"] - spoken_start), 3)
+                    s["caption_words"].append({
+                        "word": w["word"],
+                        "start": rel_start,
+                        "end": rel_end
+                    })
+
+            # Anular a narração global no retorno para o player usar apenas a local por cena
+            result["narration_url"] = None
         else:
             # Fallback when there is no audio duration
             for s in scenes:
@@ -446,11 +483,12 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
                 text = s.get("subtext") or s.get("headline", "")
                 words = len(text.split())
                 if v_type == "hook":
-                    s["duration_seconds"] = min(3.0, round(max(2.2, words * 0.45 + 0.4), 1))
-                elif v_type in ["video", "split_video"]:
-                    s["duration_seconds"] = round(max(2.0, words * 0.45 + 0.5), 1)
+                    spoken_dur = max(2.2, words * 0.45 + 0.4)
                 else:
-                    s["duration_seconds"] = min(3.0, round(max(2.0, words * 0.45 + 0.5), 1))
+                    spoken_dur = max(2.0, words * 0.45 + 0.5)
+                
+                min_dur = get_min_duration_for_scene(s, sources_count)
+                s["duration_seconds"] = round(max(spoken_dur + 0.5, min_dur), 1)
                 s["caption_words"] = []
 
         # Atualizar a duração total no JSON gerado como a soma de todas as cenas

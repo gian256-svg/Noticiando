@@ -114,11 +114,12 @@ async def _ensure_fallback_video(category: str) -> str:
 async def fetch_youtube_broll(
     search_query: str,
     category: str = "general",
-    salt: Optional[str] = None
+    salt: Optional[str] = None,
+    scene_index: int = 0
 ) -> Optional[str]:
     """
     Baixa um clip de B-roll do YouTube via yt-dlp para uso como fundo de cena.
-    Retorna URL localhost ou URL de fallback.
+    Retorna URL localhost ou URL de fallback. Usa scene_index para garantir B-roll único.
     """
     try:
         import yt_dlp  # noqa: PLC0415
@@ -129,31 +130,10 @@ async def fetch_youtube_broll(
     queries_to_try = [search_query] + CATEGORY_FALLBACK_QUERIES.get(category, CATEGORY_FALLBACK_QUERIES["general"])
 
     for attempt, query in enumerate(queries_to_try[:3]):
-        qhash = _query_hash(f"{query}_{salt}" if salt else query)
-        cached = _find_cached_video(qhash)
-        if cached:
-            logger.info(f"B-roll em cache: {cached.name}")
-            return f"{_get_localhost_base()}/output/media/{cached.name}"
-
-        output_template = str(MEDIA_DIR / f"broll_{qhash}.%(ext)s")
-        # Usar --download-sections para pegar apenas 5 segundos (segundos 15 a 20) de forma super rápida!
-        ydl_opts = {
-            "format": "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best[height<=720]",
-            "outtmpl": output_template,
-            "noplaylist": True,
-            "quiet": True,
-            "no_warnings": True,
-            "max_filesize": 40 * 1024 * 1024,  # 40 MB
-            "download_ranges": lambda info_dict, self: [{"start_time": 0, "end_time": 10}],
-            "match_filter": yt_dlp.utils.match_filter_func("duration < 120"),
-            "postprocessors": [{"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}],
-        }
-
         try:
-            import random
             import asyncio
             
-            logger.info(f"Buscando B-roll do YouTube para: '{query}'")
+            logger.info(f"Buscando B-roll do YouTube para: '{query}' (cena {scene_index})")
             
             def _extract_urls():
                 with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": True}) as ydl:
@@ -164,14 +144,36 @@ async def fetch_youtube_broll(
             
             urls = await asyncio.to_thread(_extract_urls)
             
-            # Escolhe uma URL aleatória do top 3 se disponível, senão busca direta
-            search_url = f"ytsearch1:{query} -playlist"
+            # Seleciona URL baseada no scene_index
             if urls:
-                chosen_url = random.choice(urls[:3])
-                logger.info(f"Selecionada URL aleatória do top 3: {chosen_url}")
+                chosen_url = urls[scene_index % len(urls)]
+                logger.info(f"Selecionada URL indexada {scene_index % len(urls)}: {chosen_url}")
                 search_url = chosen_url
             else:
-                logger.warning("Nenhuma URL extraída via busca flat. Fazendo download direto com busca fallback.")
+                logger.warning("Nenhuma URL extraída via busca flat. Fazendo busca direta.")
+                search_url = f"ytsearch1:{query} -playlist"
+
+            # qhash baseado na URL escolhida ou na query se não houver URL
+            url_for_hash = search_url if urls else query
+            qhash = _query_hash(f"{url_for_hash}_{salt}" if salt else url_for_hash)
+            
+            cached = _find_cached_video(qhash)
+            if cached:
+                logger.info(f"B-roll em cache: {cached.name}")
+                return f"{_get_localhost_base()}/output/media/{cached.name}"
+
+            output_template = str(MEDIA_DIR / f"broll_{qhash}.%(ext)s")
+            ydl_opts = {
+                "format": "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best[height<=720]",
+                "outtmpl": output_template,
+                "noplaylist": True,
+                "quiet": True,
+                "no_warnings": True,
+                "max_filesize": 40 * 1024 * 1024,  # 40 MB
+                "download_ranges": lambda info_dict, self: [{"start_time": 0, "end_time": 10}],
+                "match_filter": yt_dlp.utils.match_filter_func("duration < 120"),
+                "postprocessors": [{"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}],
+            }
 
             logger.info(f"Baixando B-roll do YouTube (tentativa {attempt + 1}): '{query}' de {search_url}")
             def _run_ydl():

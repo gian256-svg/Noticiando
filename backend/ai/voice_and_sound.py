@@ -218,10 +218,10 @@ async def generate_narration(text: str, voice_id: str = DEFAULT_BR_VOICE_ID) -> 
             
             if alignment:
                 captions = _build_word_timestamps(alignment)
-                captions_filepath.write_text(json.dumps(captions, ensure_ascii=False))
+                captions_filepath.write_text(json.dumps(captions, ensure_ascii=False), encoding="utf-8")
                 logger.info(f"Legendas salvas: {captions_filepath.name}")
             else:
-                captions_filepath.write_text("[]")
+                captions_filepath.write_text("[]", encoding="utf-8")
                 logger.warning("Nenhum alinhamento retornado pelo ElevenLabs.")
 
             logger.info(f"Narração salva: {filepath.name} ({len(audio_bytes) // 1024}KB)")

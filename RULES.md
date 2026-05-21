@@ -157,42 +157,22 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 
 - **Anthropic/Claude não é usado neste projeto.** Não adicionar `ANTHROPIC_API_KEY` nem o pacote `anthropic`.
 - Todas as chaves ficam exclusivamente em `backend/.env` — nunca hardcodar.
-- Após cada provider call, **validar que o resultado contém o campo `"scenes"`**. Se ausente, tratar como falha de provider e tentar o próximo — nunca retornar HTTP 200 com JSON sem `scenes`.
-- Mensagens de erro do cascade devem citar `GEMINI_API_KEY` ou `GROQ_API_KEY`.
-
-**Arquivo:** `backend/ai/video_scene_agent.py`
+- Após cada provider call, **validar que o resultado contém o campo `"scenes"`**. Se ausente, tratar como falha de provider e tentar o próximo — nunca retornar HTTP 200 com JSON sem "scenes".
 
 ### Diretrizes Gráficas e Tipografia (Diretor de Arte DESIGN.md / The Economist Style)
-* **Tipografia:** Fontes super dimensionadas. **Oswald** (Bold/SemiBold) para títulos (110px para Hook, 76px para o resto); **Inter/Roboto** para legendas (mínimo 52px).
-* **Alinhamento e Diagramação:** Todo texto é centralizado horizontalmente e empilhado verticalmente com o conteúdo visual. Proibido jogar textos nos cantos. O subtext e os contadores de métricas são ocultados no Hook (cena index 0).
-* **Remoção de Watermarks e Pills:** A marca d'água "NOTICIANDO" no topo direito e a categoria "BREAKING" no topo esquerdo foram removidas permanentemente.
-* **Ken Burns Direcional (Sem Conflitos):** 
-  - **Zoom In (1.0 → 1.12):** Usado para notícias de tensão, conflito, urgência ou economia negativa (ex: palavras-chave *queda, crise, guerra, crash*).
-  - **Zoom Out (1.12 → 1.0):** Usado para revelações, anúncios positivos ou contextualizações geográficas (*alta, recorde, acordo*).
-  - **Pan Horizontal (translateX -2% → +2%):** Usado em cenas neutras sem assets laterais.
-  - **Exclusividade:** Zoom e Pan nunca devem ser combinados na mesma cena (o scale é fixado em 1.0 se o pan estiver rodando).
-* **Glow Editorial:** Glow radial usando gradiente na cor de destaque (`accent`) da paleta correspondente com **11% de opacidade** posicionado atrás do bloco de headline em todas as cenas que não sejam vídeos ou cenários analógicos.
-* **Entrada do Headline:** O bloco inteiro do headline entra com **fade + translateY de 24px → 0px** em 12 frames (100% de opacidade final).
-* **Animações de Palavra (Stagger):**
-  - `animStyle 0` (Slide Up + Rotate) ajustado para **translateY de 24px → 0px**, com mola (spring) calibrada em `damping: 14, stiffness: 150`.
-* **Sombra de Texto (Text Shadow):** Sombra forte sempre ativa. Cenas destacadas (highlighted) usam `rgba(0,0,0,0.9)` + glow da cor acentuada; textos normais usam `0 2px 16px rgba(0,0,0,0.8), 0 1px 4px rgba(0,0,0,0.9)`.
-* **Cutout Lateral (Personagens/Recortes):**
-  - **Duração e Dimensões:** Altura fixada em **58%** sem limitação máxima.
-  - **Entrada:** Slide-in a partir do lado oposto ao alinhamento do texto usando mola calibrada em `damping: 22, stiffness: 200, mass: 0.9`.
-  - **Sombra Projetada:** Filtro de drop-shadow lateral (`drop-shadow(-8px 8px 24px rgba(0,0,0,0.7))`) para profundidade 3D física.
-* **Illustration Height:** Elevado para **58%** (mesmo tamanho do cutout) para máximo aproveitamento da tela vertical.
-* **CaptionEngine Position:** Ajustado para `bottom: 300` (posicionado a cerca de 82% da altura vertical da tela, acima da safe-zone inferior).
-* **Pacing Ultra Dinâmico e Exceção para Vídeos:** Cenas estáticas têm limite rígido de 3.0s e frases com no máximo 12 palavras. Cenas do tipo `video` ou `split_video` (vídeos em tela cheia) estão isentas da limitação de 3 segundos, mantendo a duração real correspondente à locução ElevenLabs.
-* **Layout Fullscreen:** Sempre que houver vídeo (b-roll), ele DEVE ocupar a tela inteira (100% fullscreen) com um gradient overlay sombrio por cima.
-* **Layout Margin-to-Margin (Preenchimento de Tela):** Os elementos gráficos de dados (`isData`), recortes de jornal (`NewspaperCutout`), cutouts e illustrations devem ocupar largura de ~88% (centralizados com `left: 6%`), e largura máxima dos cards de gráficos expandida para 1020px com padding de 30px nas laterais para evitar grandes vazios na tela.
-* **Evitar Falsos Positivos de Bandeiras:** Correspondência por limites exatos de palavras (Regex `\b`) para evitar falsos positivos (ex: "financeira" ativando a bandeira do Irã).
-* **Footage Real (yt-dlp):** Obrigatório extrair os primeiros 10 segundos reais do YouTube (sec 0:00-0:10).
-* **Paletas Premium Dark por Categoria:**
-  - *Economia/Finanças:* Fundo gradiente 3-stops escuro, destaque ciano elétrico (`#00d4ff`).
-  - *Política:* Fundo escuro com tons avermelhados, destaque vermelho forte (`#ff4444`).
-  - *Tecnologia/Crypto:* Fundo azul-marinho profundo, destaque roxo tech (`#7b61ff`).
-  - *Esportes:* Fundo verde escuro, destaque verde neon (`#00ff88`).
-  - *Internacional:* Fundo violeta escuro, destaque âmbar (`#ffaa00`).
+Abaixo estão as 10 regras globais de ajuste fino de qualidade baseadas no estilo @theeconomist / documentário premium:
+
+1. **CENTRALIZAÇÃO GLOBAL (CRÍTICA):** Todo conteúdo visual deve estar centralizado na tela verticalmente e horizontalmente. Headline deve estar centralizado horizontalmente entre 15% e 35% do topo. Subtext centralizado logo abaixo. Elementos importantes nunca devem ficar fora dos 10%-90% de altura.
+2. **INFORMAÇÃO ÚNICA (SEM REPETIÇÃO):** Nunca exibir a mesma informação duas vezes na mesma cena. O dado grande e animado é o elemento principal, sem duplicar na headline.
+3. **GRÁFICOS SEMPRE ANIMADOS:** Todo gráfico deve ter animação. Gráficos de linha usam `strokeDashoffset` crescendo da esquerda para a direita (60% do tempo). Gráficos de barras crescem com `scaleY` em cascata (delay de 4 frames). Counters contam de 0 até o valor final durante 70% da cena. Linhas de timeline horizontal crescem da esquerda para a direita com marcadores aparecendo com `spring()`.
+4. **LOGOS DE EMPRESAS/MARCAS:** Sempre exibir o logo se mencionado. Buscar via site oficial/Clearbit, Wikipedia ou Gemini. Exibir sem caixa branca de fundo (usar `mix-blend-mode: "screen"` ou `"luminosity"`), tamanho máximo de 35% da tela, centralizado abaixo do safe zone superior. Entrada com spring fade + scale 0.85 -> 1.0.
+5. **B-ROLL E FOOTAGES ÚNICOS:** Anti-repetição obrigatória. Cada cena deve ter footage único, nunca reutilizar clipes de cenas anteriores. B-roll real sempre fullscreen com overlay gradiente.
+6. **CONTRASTE E LEGIBILIDADE:** Texto claro em fundo escuro e vice-versa. Textos sobre imagens/vídeos devem possuir sombra forte (`textShadow: "0 2px 20px rgba(0,0,0,0.95), 0 1px 6px rgba(0,0,0,1)"`). Vídeos/B-rolls devem ter overlay gradiente escuro (`linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 45%, transparent 100%)`).
+7. **PRINTS DE MANCHETES REAIS:** Adicionar recortes de notícias reais com bordas arredondadas (8px), sombra profunda (`boxShadow: "0 8px 32px rgba(0,0,0,0.8)"`) e leve rotação aleatória (-2° a +2°). Em caso de múltiplas fontes, exibir em cascata (delay de 8 frames). Nunca inventar notícias ou headlines.
+8. **TEMPO DE CENA (PACE):** Duração mínima por tipo: B-roll real mínimo 4s além do áudio. Recortes de manchete mínimo 3.5s por recorte. Cenas editoriais com dados mínimos 3s após o contador terminar. Gráficos animados completam animação + 1.5s. Fórmula: `duração_cena = max(duração_áudio + 0.5s, duração_mínima_por_tipo)`.
+9. **TELAS DE IMPACTO REAIS:** Apenas usar texto comprovável com fonte real. Usar manchetes de verdade, nunca simular subtítulos de matérias ou headlines fictícios.
+10. **ESTILO VISUAL PREMIUM:** Tipografia forte (Headline 3x maior que subtext). Contraste dramático. Badge de editoria ("FINANÇAS", "ECONOMIA") no topo. Linha divisora fina abaixo do headline. Textura de fundo e ticker lento em movimento.
+
 * **Elementos Obrigatórios por Reel:**
   - Pelo menos **2 cortes de vídeo real** fullscreen.
   - Pelo menos **3 recortes fotográficos** grandes.
@@ -211,8 +191,8 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
   - Use abreviações (ex: "R$" em vez de "reais") de forma consistente para guiar o ritmo correto da locução.
 
 ### Configurações de Trilha (Epidemic Sound)
-* **Mixagem de Áudio:** Volume da trilha de fundo entre `0.15` e `0.25`, e volume da narração em `1.0`.
-* **Duck Automático:** Reduzir o volume da música de fundo em **40%** automaticamente durante os períodos em que a narração do áudio estiver ativa.
+* **Mixagem de Áudio:** Volume da trilha de fundo em `0.70` base (reduzido automaticamente para `0.38` sob locução), e volume da narração em `1.0`.
+* **Duck Automático:** Reduzir o volume da música de fundo em **45%** automaticamente durante os períodos em que a narração do áudio estiver ativa.
 * **Fades:** Fade-in de `0.5s` no início da música e fade-out de `1.0s` antes do encerramento completo do vídeo.
 
 ### Composição Remotion
