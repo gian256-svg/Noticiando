@@ -278,6 +278,26 @@ export const ReelsComposition: React.FC<ReelsCompositionProps> = ({
   const { fps } = useVideoConfig();
   const pal = getPalette(category);
 
+  // Precompute narration segments for smooth audio ducking
+  const narrationSegments = useMemo(() => {
+    const segments: Array<{ start: number; end: number }> = [];
+    if (!scenes) return segments;
+    let currentFrameAccumulator = 0;
+    for (const s of scenes) {
+      const sceneFrames = Math.max(1, Math.round(s.duration_seconds * fps));
+      if (s.audio_url || narration_url) {
+        // Narration plays from the start of the scene up to the padding (usually ~0.4s before the end)
+        const narrationDurationFrames = sceneFrames - Math.round(0.4 * fps);
+        segments.push({
+          start: currentFrameAccumulator,
+          end: currentFrameAccumulator + Math.max(0, narrationDurationFrames),
+        });
+      }
+      currentFrameAccumulator += sceneFrames;
+    }
+    return segments;
+  }, [scenes, fps, narration_url]);
+
   if (!scenes?.length) {
     return (
       <AbsoluteFill style={{ background: pal.bg, alignItems: "center", justifyContent: "center" }}>
@@ -301,32 +321,45 @@ export const ReelsComposition: React.FC<ReelsCompositionProps> = ({
             const totalFrames = scenes.reduce((acc, s) => acc + Math.max(1, Math.round(s.duration_seconds * fps)), 0);
             
             // Fade in (0.5s = 15 frames)
-            let baseVol = interpolate(f, [0, 15], [0, 0.70], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+            let baseVol = interpolate(f, [0, 15], [0, 0.85], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
             
             // Fade out (1.0s = 30 frames)
             if (f > totalFrames - 30) {
               baseVol = interpolate(f, [totalFrames - 30, totalFrames], [baseVol, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
             }
             
-            // Ducking 45% automatically during narration scenes
-            let isNarrationActive = false;
-            let currentFrameAccumulator = 0;
-            for (const s of scenes) {
-              const sceneFrames = Math.max(1, Math.round(s.duration_seconds * fps));
-              if (f >= currentFrameAccumulator && f < currentFrameAccumulator + sceneFrames) {
-                // Audio plays until the padding at the end of the scene (usually ~0.4s)
-                const narrationEndFrame = currentFrameAccumulator + sceneFrames - Math.round(0.4 * fps);
-                if ((s.audio_url || narration_url) && f < narrationEndFrame) {
-                  isNarrationActive = true;
-                }
+            // Smooth ducking transition (fadeFrames = 8 frames)
+            const duckedMultiplier = 0.65;
+            const fadeFrames = 8;
+            
+            let minDistance = Infinity;
+            let insideSegment = false;
+            
+            for (const seg of narrationSegments) {
+              if (f >= seg.start && f <= seg.end) {
+                insideSegment = true;
                 break;
               }
-              currentFrameAccumulator += sceneFrames;
+              const distToStart = Math.abs(f - seg.start);
+              const distToEnd = Math.abs(f - seg.end);
+              const dist = Math.min(distToStart, distToEnd);
+              if (dist < minDistance) {
+                minDistance = dist;
+              }
             }
             
-            return isNarrationActive ? baseVol * 0.55 : baseVol;
+            let ducking = 1.0;
+            if (insideSegment) {
+              ducking = duckedMultiplier;
+            } else if (minDistance < fadeFrames) {
+              ducking = interpolate(minDistance, [0, fadeFrames], [duckedMultiplier, 1.0], {
+                extrapolateLeft: "clamp",
+                extrapolateRight: "clamp",
+              });
+            }
+            
+            return baseVol * ducking;
           }} 
-          loop 
         />
       )}
 
