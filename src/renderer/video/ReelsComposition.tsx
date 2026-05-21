@@ -40,19 +40,46 @@ export interface ReelsCompositionProps {
   music_url?: string;
 }
 
-interface Palette { bg: string; grad: string; accent: string; text: string; dim: string }
+interface Palette { bg: string; grad: string; bgGradient?: string; accent: string; text: string; dim: string }
 
+// ── Paletas Premium Dark — Estilo @theeconomist ───────────────────────────────
 const CATEGORY_PALETTE: Record<string, Palette> = {
-  investments:  { bg: "#F8F6F0", grad: "#EDE8DC", accent: "#0F294A", text: "#1E293B", dim: "rgba(15,41,74,0.09)" },
-  economy_br:   { bg: "#0A1628", grad: "#050C16", accent: "#00E676", text: "#FFFFFF", dim: "rgba(0,230,118,0.09)" },
-  economy_int:  { bg: "#0B0E17", grad: "#040508", accent: "#00E5FF", text: "#FFFFFF", dim: "rgba(0,229,255,0.12)" },
-  geopolitics:  { bg: "#140505", grad: "#0A0202", accent: "#FF1744", text: "#FFFFFF", dim: "rgba(255,23,68,0.12)" },
-  crypto:       { bg: "#0B0B0F", grad: "#050507", accent: "#FFEA00", text: "#FFFFFF", dim: "rgba(255,234,0,0.12)" },
-  general:      { bg: "#F8F6F0", grad: "#EDE8DC", accent: "#0F294A", text: "#1E293B", dim: "rgba(15,41,74,0.09)" },
+  // Economia / Finanças — Ciano elétrico
+  investments:  { bg: "#0a0f1e", grad: "#0a1628", bgGradient: "linear-gradient(160deg, #0a0f1e 0%, #0d2137 50%, #0a1628 100%)", accent: "#00d4ff", text: "#FFFFFF", dim: "rgba(0,212,255,0.12)" },
+  economy_br:   { bg: "#0a0f1e", grad: "#0a1628", bgGradient: "linear-gradient(160deg, #0a0f1e 0%, #0d2137 50%, #0a1628 100%)", accent: "#00d4ff", text: "#FFFFFF", dim: "rgba(0,212,255,0.12)" },
+  economy_int:  { bg: "#0a0f1e", grad: "#0a1628", bgGradient: "linear-gradient(160deg, #0a0f1e 0%, #0d2137 50%, #0a1628 100%)", accent: "#00d4ff", text: "#FFFFFF", dim: "rgba(0,212,255,0.12)" },
+  // Política — Vermelho forte
+  geopolitics:  { bg: "#1a0a0a", grad: "#1a0808", bgGradient: "linear-gradient(160deg, #1a0a0a 0%, #2d0f0f 50%, #1a0808 100%)", accent: "#ff4444", text: "#FFFFFF", dim: "rgba(255,68,68,0.12)" },
+  politics:     { bg: "#1a0a0a", grad: "#1a0808", bgGradient: "linear-gradient(160deg, #1a0a0a 0%, #2d0f0f 50%, #1a0808 100%)", accent: "#ff4444", text: "#FFFFFF", dim: "rgba(255,68,68,0.12)" },
+  // Tecnologia / Crypto — Roxo tech
+  crypto:       { bg: "#050d1a", grad: "#060e1c", bgGradient: "linear-gradient(160deg, #050d1a 0%, #0a1a2e 50%, #060e1c 100%)", accent: "#7b61ff", text: "#FFFFFF", dim: "rgba(123,97,255,0.12)" },
+  tech:         { bg: "#050d1a", grad: "#060e1c", bgGradient: "linear-gradient(160deg, #050d1a 0%, #0a1a2e 50%, #060e1c 100%)", accent: "#7b61ff", text: "#FFFFFF", dim: "rgba(123,97,255,0.12)" },
+  // Esporte — Verde neon
+  sports:       { bg: "#0a1a0a", grad: "#081508", bgGradient: "linear-gradient(160deg, #0a1a0a 0%, #0d2d0d 50%, #081508 100%)", accent: "#00ff88", text: "#FFFFFF", dim: "rgba(0,255,136,0.12)" },
+  // Internacional / Geopolítica — Âmbar
+  international:{ bg: "#0f0a1a", grad: "#0c0814", bgGradient: "linear-gradient(160deg, #0f0a1a 0%, #1a0f2d 50%, #0c0814 100%)", accent: "#ffaa00", text: "#FFFFFF", dim: "rgba(255,170,0,0.12)" },
+  // Padrão
+  general:      { bg: "#0a0f1e", grad: "#0a1628", bgGradient: "linear-gradient(160deg, #0a0f1e 0%, #0d2137 50%, #0a1628 100%)", accent: "#00d4ff", text: "#FFFFFF", dim: "rgba(0,212,255,0.12)" },
+};
+
+// ── Mapeamento de aliases de categoria ────────────────────────────────────────
+const CATEGORY_ALIASES: Record<string, string> = {
+  economics: "economy_br", economy: "economy_br",
+  "economia": "economy_br", "economia_br": "economy_br",
+  "economia_int": "economy_int", "finanças": "economy_br",
+  "financas": "economy_br", "mercado": "economy_br",
+  "política": "politics", "politica": "politics",
+  "geopolitica": "geopolitics", "geopolítica": "geopolitics",
+  "tecnologia": "tech", "technology": "tech",
+  "criptomoedas": "crypto", "cryptocurrency": "crypto",
+  "esportes": "sports", "sport": "sports", "esporte": "sports",
+  "internacional": "international", "world": "international", "global": "international",
 };
 
 function getPalette(category?: string) {
-  return CATEGORY_PALETTE[category ?? "general"] ?? CATEGORY_PALETTE.general;
+  const key = (category ?? "general").toLowerCase();
+  const resolved = CATEGORY_ALIASES[key] ?? key;
+  return CATEGORY_PALETTE[resolved] ?? CATEGORY_PALETTE.general;
 }
 
 export const ReelsComposition: React.FC<ReelsCompositionProps> = ({
@@ -77,7 +104,7 @@ export const ReelsComposition: React.FC<ReelsCompositionProps> = ({
   }
 
   return (
-    <AbsoluteFill style={{ background: `linear-gradient(170deg, ${pal.bg} 0%, ${pal.grad} 100%)` }}>
+    <AbsoluteFill style={{ background: pal.bgGradient ?? `linear-gradient(170deg, ${pal.bg} 0%, ${pal.grad} 100%)` }}>
       {/* 🎙️ Premium ElevenLabs Brazilian Voice Narration */}
       {narration_url && <Audio src={narration_url} volume={1.0} />}
 
@@ -383,7 +410,7 @@ const CaptionEngine: React.FC<{
   return (
     <div style={{
       position: "absolute",
-      bottom: 120, // ajustado para evitar sobrepor a headline
+      bottom: 300, // 82% do height ≈ 345px do fundo, acima do safe zone inferior
       left: 0,
       right: 0,
       display: "flex",
@@ -906,6 +933,15 @@ const NewsScene: React.FC<SceneProps> = ({
       })
     : 1;
 
+  const assetSide = sceneIndex % 2 === 0 ? "right" : "left";
+
+  // ── Cutout slide lateral (pré-computado para evitar spring inline) ───────────
+  const _cutoutSpring       = spring({ frame, fps, config: { damping: 22, stiffness: 200, mass: 0.9 } });
+  const _cutoutSlideFrom    = assetSide === "right" ? 340 : -340;
+  const _cutoutTranslateX   = interpolate(_cutoutSpring, [0, 1], [_cutoutSlideFrom, 0]);
+  const _cutoutEntryOpacity = interpolate(frame, [0, 8], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const _cutoutExitX        = interpolate(exitProgress, [0, 1], [0, -_cutoutSlideFrom * 0.45]);
+
   const isHook = sceneIndex === 0 || scene.visual_type === "hook";
   const isData = scene.visual_type === "data";
   const isMap = scene.visual_type === "map";
@@ -921,8 +957,6 @@ const NewsScene: React.FC<SceneProps> = ({
   const hasSideAsset = (scene.visual_type === "cutout" && scene.cutout_url) ||
                        (scene.visual_type === "illustration" && (scene.illustration_url || scene.media_url));
 
-  const assetSide = sceneIndex % 2 === 0 ? "right" : "left";
-
   // Force text to center horizontally
   const textAlignment = "center";
   const containerAlignItems = "center";
@@ -930,8 +964,8 @@ const NewsScene: React.FC<SceneProps> = ({
   // Keep colors high-contrast (dark on light gradient, white on full-bleed video)
   const textColor = (isCinematicVideo || isCollage) ? "#FFFFFF" : ((isMap || isTimeline) ? "#1A1A1A" : pal.text);
 
-  const isLightAccent = pal.accent === "#1A3A6B" || pal.accent === "#1A0A0A" || pal.accent === "#0A1628";
-  const highlightColor = (isCinematicVideo || isCollage) && isLightAccent ? "#FFC107" : pal.accent; // Destaque em ouro para B-roll em temas escuros
+  // Paletas premium já usam acentos vibrantes em todos os contextos
+  const highlightColor = pal.accent;
 
   // Brand Badge Detector (JBS, VALE, etc)
   const brandLayout = useMemo(() => {
@@ -946,11 +980,32 @@ const NewsScene: React.FC<SceneProps> = ({
     return null;
   }, [scene.headline]);
 
-  // Slow dynamic camera zoom-in effect (Ken Burns)
-  const cameraScale = interpolate(frame, [0, durationInFrames], [1.0, 1.12], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  // ── Ken Burns Direcional ──────────────────────────────────────────────────────
+  // Zoom in  (1.0→1.12): tensão, conflito, urgência, economia negativa
+  // Zoom out (1.12→1.0): revelação, anúncio positivo, contexto geográfico
+  // Pan horizontal: cenas neutras sem assets laterais (nunca combinado com zoom)
+  const _tensionKeywords = ["queda", "crise", "guerra", "conflito", "colapso", "perde", "cai", "caiu", "caem", "risco", "crash", "falência", "alerta", "alertas", "pânico", "sanções", "bombas", "ataque", "déficit", "caindo", "corte", "inflação"];
+  const _revealKeywords  = ["alta", "sobe", "cresceu", "crescimento", "positivo", "recorde", "novo", "abre", "lança", "aprovado", "ganhou", "ganhos", "vence", "expande", "supera", "acordo", "recupera", "aumenta", "atingiu"];
+  const _headlineLower   = scene.headline.toLowerCase();
+  const _hasTension  = _tensionKeywords.some(k => _headlineLower.includes(k));
+  const _hasReveal   = !_hasTension && _revealKeywords.some(k => _headlineLower.includes(k));
+  // Pan horizontal apenas quando não há zoom direcional forte e sem assets laterais
+  const _usePan      = !isFullVideo && !isSplitVideo && !_hasTension && !_hasReveal && !hasSideAsset;
+  const _panDir      = sceneIndex % 2 === 0 ? 1 : -1;
+  const _zoomIn      = _hasTension || (!_hasReveal && sceneIndex % 2 === 0);
+  const _kbStart     = _zoomIn ? 1.0 : 1.12;
+  const _kbEnd       = _zoomIn ? 1.12 : 1.0;
+
+  const cameraPanX = _usePan
+    ? interpolate(frame, [0, durationInFrames], [0, _panDir * 2], { extrapolateRight: "clamp" })
+    : 0;
+
+  const cameraScale = _usePan
+    ? 1.0
+    : interpolate(frame, [0, durationInFrames], [_kbStart, _kbEnd], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
 
   // Diagonal animated grid offset
   const gridOff = (frame * 0.6) % 80;
@@ -1158,7 +1213,7 @@ const NewsScene: React.FC<SceneProps> = ({
       {/* ── Brand Watermark (NOTICIANDO) Removed ── */}
 
       {/* ── Content Container with camera zoom (Parallax layout) ── */}
-      <AbsoluteFill style={{ transform: `scale(${cameraScale})`, transformOrigin: "center center" }}>
+      <AbsoluteFill style={{ transform: `scale(${cameraScale}) translateX(${cameraPanX}%)`, transformOrigin: "center center" }}>
         
         {/* ── Animated Sliding Grid Background ── */}
         <div style={{
@@ -1247,40 +1302,26 @@ const NewsScene: React.FC<SceneProps> = ({
           />
         )}
 
+        {/* ── Cutout: slide lateral do lado oposto ao texto ──────────────── */}
         {scene.visual_type === "cutout" && scene.cutout_url && scene.cutout_url !== "newspaper" && (
           <div style={{
             position: "absolute",
             bottom: 80,
             left: "6%",
-            height: "46%",
+            height: "58%",
             width: "88%",
             zIndex: 4,
-            opacity: 1 - exitProgress,
-            transform: `translateY(${
-              interpolate(
-                spring({ frame, fps, config: { damping: 13, stiffness: 85 } }),
-                [0, 1],
-                [380, 0]
-              ) + 
-              interpolate(exitProgress, [0, 1], [0, 380]) +
-              Math.cos(frame / 12) * 8
-            }px) scale(${
-              interpolate(
-                spring({ frame, fps, config: { damping: 13, stiffness: 85 } }),
-                [0, 1],
-                [0.6, 1]
-              ) * interpolate(exitProgress, [0, 1], [1, 0.7])
-            }) rotate(${Math.sin(frame / 15) * 2 + (sceneIndex % 2 === 0 ? 2 : -2) + interpolate(exitProgress, [0, 1], [0, sceneIndex % 2 === 0 ? -12 : 12])}deg)`,
+            opacity: (1 - exitProgress) * _cutoutEntryOpacity,
+            transform: `translateX(${_cutoutTranslateX + _cutoutExitX}px)`,
           }}>
-            {/* Outline backdrop removed by user request for organic look */}
-            
             <Img
               src={scene.cutout_url}
               style={{
                 width: "100%",
                 height: "100%",
                 objectFit: "contain",
-                filter: "url(#sticker-outline) drop-shadow(0 20px 35px rgba(0,0,0,0.65))",
+                // Drop-shadow lateral para separar recorte do fundo
+                filter: "url(#sticker-outline) drop-shadow(-8px 8px 24px rgba(0,0,0,0.7))",
               }}
             />
           </div>
@@ -1292,7 +1333,7 @@ const NewsScene: React.FC<SceneProps> = ({
             position: "absolute",
             bottom: 80,
             left: "6%",
-            height: "46%",
+            height: "58%",
             width: "88%",
             zIndex: 4,
             opacity: 1 - exitProgress,
@@ -1389,6 +1430,19 @@ const NewsScene: React.FC<SceneProps> = ({
           opacity: 1 - exitProgress,
         }}>
 
+          {/* ── Glow editorial radial atrás do headline (cenas não-video) ── */}
+          {!isCinematicVideo && !isAnalogBg && (
+            <div style={{
+              position: "absolute",
+              left: 0, right: 0,
+              top: "30%",
+              height: 520,
+              background: `radial-gradient(ellipse 80% 40% at 50% 50%, ${pal.accent}1c 0%, transparent 70%)`,
+              pointerEvents: "none",
+              zIndex: 0,
+            }} />
+          )}
+
           {/* Kinetic Headline - Overshoot spring & Neon glow */}
           {brandLayout ? (
             <div style={{
@@ -1446,6 +1500,9 @@ const NewsScene: React.FC<SceneProps> = ({
               zIndex: 10,
               width: "100%",
               wordBreak: "break-word",
+              // ── Entrada do bloco: fade + translateY premium (12 frames) ──
+              opacity: interpolate(frame, [0, 12], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
+              transform: `translateY(${interpolate(frame, [0, 12], [24, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px)`,
             }}>
               {words.map((word, i) => {
                 const isHighlighted = accentSet.has(i);
@@ -1459,14 +1516,14 @@ const NewsScene: React.FC<SceneProps> = ({
                 const animStyle = sceneIndex % 3;
 
                 if (animStyle === 0) {
-                  // Style 0: Slide Up + Rotate Stagger
+                  // Style 0: Slide Up + Rotate Stagger — translateY calibrado (24px, editorial preciso)
                   const s = spring({
                     frame: wordFrame,
                     fps,
-                    config: { damping: 12, stiffness: 140 },
+                    config: { damping: 14, stiffness: 150 },
                   });
-                  const y = interpolate(s, [0, 1], [40, 0]);
-                  const rot = interpolate(s, [0, 1], [-6, 0]);
+                  const y = interpolate(s, [0, 1], [24, 0]);
+                  const rot = interpolate(s, [0, 1], [-4, 0]);
                   const o = interpolate(wordFrame, [0, 5], [0, 1], { extrapolateRight: "clamp" });
                   
                   transform = `scale(${s * (isHighlighted ? 1.12 : 1.0)}) translateY(${y}px) rotate(${rot + (isHighlighted ? 1.5 : 0)}deg)`;
@@ -1514,9 +1571,10 @@ const NewsScene: React.FC<SceneProps> = ({
                       letterSpacing: isCinematicVideo ? "0em" : "-0.015em", // Slightly relaxed kerning to prevent overlap
                       lineHeight: isCinematicVideo ? 1.15 : 1.05, // Slightly increased height to prevent vertical overlap
                       color: isTimeline && !isHighlighted ? "transparent" : (isHighlighted ? (isTimeline ? "#D32F2F" : highlightColor) : textColor),
-                      textShadow: isHighlighted 
-                        ? (isTimeline ? "none" : (isCinematicVideo ? "0 4px 18px rgba(0,0,0,0.95)" : `0 4px 22px rgba(0,0,0,0.9), 0 0 10px ${highlightColor}60`))
-                        : (textColor === "#FFFFFF" ? "0 4px 18px rgba(0,0,0,0.85)" : "none"),
+                      // Sombra sempre presente para separação do fundo (spec editorial)
+                      textShadow: isHighlighted
+                        ? (isTimeline ? "none" : `0 4px 22px rgba(0,0,0,0.9), 0 0 12px ${highlightColor}60`)
+                        : "0 2px 16px rgba(0,0,0,0.8), 0 1px 4px rgba(0,0,0,0.9)",
                       transform,
                       transformOrigin: "center center",
                       opacity,
