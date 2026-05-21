@@ -76,11 +76,24 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
 
   const handleOpenMyhub = async () => {
     if (!news) return;
-    try { await navigator.clipboard.writeText(prompt); } catch {}
-    if (window.noticiando) {
-      await window.noticiando.invoke("shell:open-external", MYHUB_URL);
-    } else {
-      window.open(MYHUB_URL, "_blank");
+    try {
+      await navigator.clipboard.writeText(prompt);
+    } catch (err) {
+      console.warn("Failed to write to clipboard:", err);
+    }
+    try {
+      if (window.noticiando) {
+        await window.noticiando.invoke("shell:open-external", MYHUB_URL);
+      } else {
+        window.open(MYHUB_URL, "_blank");
+      }
+    } catch (err) {
+      console.error("Failed to open MyHub URL:", err);
+      try {
+        window.open(MYHUB_URL, "_blank");
+      } catch (fallbackErr) {
+        console.error("Fallback open URL failed:", fallbackErr);
+      }
     }
     setOpened(true);
     setTimeout(() => setOpened(false), 3000);
@@ -227,10 +240,28 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
           </button>
 
           {showPrompt && (
-            <div className="mt-2 bg-background/60 rounded-lg border border-border/40 p-3 max-h-48 overflow-y-auto">
-              <pre className="text-[10px] text-text-secondary/80 whitespace-pre-wrap font-mono leading-relaxed">
-                {prompt}
-              </pre>
+            <div className="mt-2 space-y-2">
+              <div className="bg-background/60 rounded-lg border border-border/40 p-3 max-h-48 overflow-y-auto">
+                <pre className="text-[10px] text-text-secondary/80 whitespace-pre-wrap font-mono leading-relaxed">
+                  {prompt}
+                </pre>
+              </div>
+              <button
+                onClick={handleCopy}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-medium text-text-secondary border border-border/60 rounded-lg hover:text-text-primary hover:border-border transition-all"
+              >
+                {copied ? (
+                  <>
+                    <Check size={10} className="text-live" />
+                    <span className="text-live font-semibold">Prompt copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={10} />
+                    <span>Copiar prompt</span>
+                  </>
+                )}
+              </button>
             </div>
           )}
         </div>
@@ -349,23 +380,6 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
             <Zap size={12} />
             Abrir no myhub
             <ExternalLink size={11} className="opacity-70" />
-          </button>
-
-          <button
-            onClick={handleCopy}
-            className="w-full flex items-center justify-center gap-2 py-2 text-xs text-text-secondary hover:text-text-primary border border-border/60 hover:border-border rounded-xl transition-all"
-          >
-            {copied ? (
-              <>
-                <Check size={12} className="text-live" />
-                <span className="text-live">Prompt copiado!</span>
-              </>
-            ) : (
-              <>
-                <Copy size={12} />
-                Copiar prompt
-              </>
-            )}
           </button>
         </div>
       </div>

@@ -45,7 +45,15 @@ export function setupIpcHandlers() {
     }).show();
   });
 
-  ipcMain.handle("shell:open-external", (_e, url: string) => shell.openExternal(url));
+  ipcMain.handle("shell:open-external", async (_e, url: string) => {
+    try {
+      await shell.openExternal(url);
+      return { success: true };
+    } catch (err) {
+      console.error("[shell:open-external] Failed to open external URL:", err);
+      return { success: false, error: String(err) };
+    }
+  });
   ipcMain.handle("app:version", () => app.getVersion());
 
   // video:generate-scenes — calls Python sidecar (Gemini → Groq cascade)

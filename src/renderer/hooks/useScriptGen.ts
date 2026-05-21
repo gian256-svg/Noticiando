@@ -35,10 +35,19 @@ Duração: ${duration} segundos`;
         await navigator.clipboard.writeText(prompt);
       } catch {}
 
-      if (window.noticiando) {
-        await window.noticiando.invoke("shell:open-external", MYHUB_URL);
-      } else {
-        window.open(MYHUB_URL, "_blank");
+      try {
+        if (window.noticiando) {
+          await window.noticiando.invoke("shell:open-external", MYHUB_URL);
+        } else {
+          window.open(MYHUB_URL, "_blank");
+        }
+      } catch (err) {
+        console.error("Failed to open MyHub URL in useScriptGen:", err);
+        try {
+          window.open(MYHUB_URL, "_blank");
+        } catch (fallbackErr) {
+          console.error("Fallback open URL failed in useScriptGen:", fallbackErr);
+        }
       }
     },
     [duration]
