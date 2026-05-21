@@ -41,56 +41,84 @@ _BIG_NUMBER_RE = re.compile(
 )
 
 
-def _freshness_score(published_at: datetime) -> float:
+# Caches para carregar informações das fontes dinamicamente
+_source_tiers_cache: dict[str, int] = {}
+_source_categories_cache: dict[str, str] = {}
+
+def get_source_tier(source_name: str) -> int:
+    if not _source_tiers_cache:
+        from crawler.sources import DEFAULT_SOURCES
+        for src in DEFAULT_SOURCES:
+            _source_tiers_cache[src.name] = src.credibility_tier
+    return _source_tiers_cache.get(source_name, 2)  # Default para Tier 2 se desconhecido
+
+def get_source_category(source_name: str) -> str:
+    if not _source_categories_cache:
+        from crawler.sources import DEFAULT_SOURCES
+        for src in DEFAULT_SOURCES:
+            _source_categories_cache[src.name] = src.category
+    return _source_categories_cache.get(source_name, "general")
+
+
+def _freshness_score(published_at: datetime, category: str = "general") -> float:
     now = datetime.now(timezone.utc)
     if published_at.tzinfo is None:
         published_at = published_at.replace(tzinfo=timezone.utc)
     age_min = (now - published_at).total_seconds() / 60
 
-    if age_min < 30:
+    # Fatores de decaimento por categoria (maior fator = decai mais rápido)
+    decay_factors = {
+        "crypto": 2.0,       # Decai muito rápido (notícias frias em poucas horas)
+        "investments": 1.5,  # Decai rápido
+        "economy_br": 1.0,   # Padrão
+        "general": 1.0,      # Padrão
+        "economy_int": 0.5,  # Decai devagar (permanece relevante por mais tempo)
+        "geopolitics": 0.5,  # Decai devagar
+    }
+    factor = decay_factors.get(category, 1.0)
+    scaled_age_min = age_min * factor
+
+    if scaled_age_min < 30:
         return 25.0
-    if age_min < 60:
+    if scaled_age_min < 60:
         return 20.0
-    if age_min < 180:
+    if scaled_age_min < 180:
         return 15.0
-    if age_min < 360:
+    if scaled_age_min < 360:
         return 10.0
-    if age_min < 720:
+    if scaled_age_min < 720:
         return 5.0
     return 0.0
 
 
-# Fontes de Tier 1 para bônus de credibilidade
-TIER_1_SOURCES = {
-    "Reuters", "Reuters Markets", "Associated Press Business",
-    "Valor Econômico", "Folha Mercado", "Estadão Economia", "G1 Economia",
-    "Bloomberg", "Financial Times", "Wall Street Journal Markets",
-    "BBC Business", "The Guardian Economy", "CNBC", "MarketWatch", "Barron's",
-    "The New York Times Business", "The New York Times World", "The Washington Post",
-    "Al Jazeera English", "Nikkei Asia", "South China Morning Post",
-    "Der Spiegel International", "Le Monde", "Foreign Affairs", "Foreign Policy",
-    "Council on Foreign Relations", "Carnegie Endowment", "Chatham House",
-    "CSIS", "Brookings Institution", "Atlantic Council", "RAND Corporation", "IMF News"
-}
-
-
 def _source_score(item: "NewsItem") -> float:
-    source_count = item.source_count or 1
-    if source_count >= 5:
-        base = 30.0
-    elif source_count >= 3:
-        base = 25.0
-    elif source_count >= 2:
-        base = 15.0
-    else:
-        base = 5.0
+    sources = item.sources or []
+    if not sources:
+        return 6.0  # Default para uma única fonte desconhecida (Tier 2)
 
-    # Bônus para fontes com credibilidade Tier 1 (+5 pontos)
-    sources_set = set(item.sources or [])
-    if sources_set & TIER_1_SOURCES:
-        base += 5.0
+    score = 0.0
+    for src in sources:
+        tier = get_source_tier(src)
+        if tier == 1:
+            score += 10.0
+        elif tier == 2:
+            score += 6.0
+        else:
+            score += 3.0
 
-    return min(base, 30.0)
+    return min(score, 30.0)
+
+
+def _cross_category_boost(item: "NewsItem") -> float:
+    sources = item.sources or []
+    if len(sources) < 2:
+        return 0.0
+
+    categories = {get_source_category(src) for src in sources}
+    # Se atraiu interesse de fontes com categorias padrão diferentes
+    if len(categories) >= 2:
+        return 10.0
+    return 0.0
 
 
 def _keyword_score(text: str) -> float:
@@ -157,10 +185,11 @@ def score_news(item: "NewsItem", all_items: list["NewsItem"]) -> float:
 
     s = (
         _source_score(item)
-        + _freshness_score(item.published_at or datetime.now(timezone.utc))
+        + _freshness_score(item.published_at or datetime.now(timezone.utc), item.category or "general")
         + _keyword_score(text)
         + _propagation_velocity(item, all_items)
         + CATEGORY_WEIGHTS.get(item.category or "general", 3.0)
+        + _cross_category_boost(item)
         + _penalty_score(text)
     )
 

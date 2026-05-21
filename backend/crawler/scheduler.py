@@ -136,12 +136,15 @@ def _process_crawl_results(raw_items: list[dict]) -> list[dict]:
             return all(require_cross_ref_map.get(s, False) for s in sources_list)
 
         for item in merged_raw_items:
-            # Buscar correspondência semântica recente no banco
-            existing = None
-            for db_item in recent_items:
-                if titles_are_similar(item["title"], db_item.title, threshold=0.65):
-                    existing = db_item
-                    break
+            # 1. Buscar primeiro por title_hash exato no banco (evita erros de UNIQUE constraint)
+            existing = db.query(NewsItem).filter_by(title_hash=item["title_hash"]).first()
+            
+            # 2. Se não achar por hash, buscar por correspondência semântica recente no banco (últimas 24 horas)
+            if not existing:
+                for db_item in recent_items:
+                    if titles_are_similar(item["title"], db_item.title, threshold=0.65):
+                        existing = db_item
+                        break
 
             best_thumb = item.get("thumbnail_url")
             if not best_thumb:

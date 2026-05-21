@@ -328,6 +328,30 @@ DEFAULT_SOURCES: list[Source] = [
         credibility_tier=2,
     ),
     Source(
+        name="Brazil Journal",
+        url="https://braziljournal.com/feed",
+        category="investments",
+        credibility_tier=2,
+    ),
+    Source(
+        name="NeoFeed",
+        url="https://neofeed.com.br/feed/",
+        category="investments",
+        credibility_tier=2,
+    ),
+    Source(
+        name="Poder360",
+        url="https://www.poder360.com.br/feed/",
+        category="economy_br",
+        credibility_tier=2,
+    ),
+    Source(
+        name="JOTA",
+        url="https://www.jota.info/feed/",
+        category="economy_br",
+        credibility_tier=2,
+    ),
+    Source(
         name="Investing.com — Crypto",
         url="https://br.investing.com/rss/crypto.rss",
         category="crypto",
