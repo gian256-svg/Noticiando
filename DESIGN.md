@@ -34,16 +34,15 @@ Para garantir que cada Reels se destaque no feed com uma identidade altamente so
 
 ## 🎨 2. Paletas de Cores por Tema de Notícia
 
-A paleta de cores deve ser coesa e se adaptar instantaneamente conforme o tema da notícia:
+Cada tema de notícia possui uma paleta de cores correspondente para garantir harmonia visual e contexto temático:
 
-| Categoria / Tema | Identidade Visual | Fundo (`bg`) | Gradiente (`grad`) | Destaque (`accent`) | Brilho Dim (`dim`) |
+| Categoria / Tema | Identidade Visual | Fundo (`bg`) | Gradiente Completo (`bgGradient`) | Destaque (`accent`) | Brilho Dim (`dim`) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Investimentos / Finanças** | Deep Blue & Orange | `#060A12` | `#0C172A` | `#F97316` (Laranja) | `#F9731620` |
-| **Economia BR (Quente)** | Forest Green & Emerald | `#040D0A` | `#0A1F18` | `#10B981` (Verde Esmeralda) | `#10B98120` |
-| **Mercado INT / Política (Frio)** | Indigo & Cyber Blue | `#07070C` | `#0F112D` | `#6366F1` (Indigo Neon) | `#6366F120` |
-| **Geopolítica / Tensões** | Crimson & Blood Red | `#0E0505` | `#220909` | `#EF4444` (Vermelho) | `#EF444420` |
-| **Cripto / Tecnologia** | Cyberpunk Gold & Amber | `#070B06` | `#0D1A0B` | `#F59E0B` (Amber Gold) | `#F59E0B20` |
-| **Geral / Outros** | Beige & Textured Charcoal | `#07070C` | `#10101B` | `#FFFFFF` (Branco Puro) | `#F5F0E840` |
+| **Investimentos / Economia BR / Geral** | Deep Navy & Electric Cyan | `#0a0f1e` | `linear-gradient(160deg, #0a0f1e 0%, #0d2137 50%, #0a1628 100%)` | `#00d4ff` (Ciano Elétrico) | `rgba(0,212,255,0.12)` |
+| **Política / Geopolítica** | Crimson & Blood Red | `#1a0a0a` | `linear-gradient(160deg, #1a0a0a 0%, #2d0f0f 50%, #1a0808 100%)` | `#ff4444` (Vermelho Forte) | `rgba(255,68,68,0.12)` |
+| **Crypto / Tecnologia** | Tech Purple & Blue | `#050d1a` | `linear-gradient(160deg, #050d1a 0%, #0a1a2e 50%, #060e1c 100%)` | `#7b61ff` (Roxo Tech) | `rgba(123,97,255,0.12)` |
+| **Esportes** | Neon Green & Dark Forest | `#0a1a0a` | `linear-gradient(160deg, #0a1a0a 0%, #0d2d0d 50%, #081508 100%)` | `#00ff88` (Verde Neon) | `rgba(0,255,136,0.12)` |
+| **Internacional** | Amber Gold & Violet | `#0f0a1a` | `linear-gradient(160deg, #0f0a1a 0%, #1a0f2d 50%, #0c0814 100%)` | `#ffaa00` (Âmbar) | `rgba(255,170,0,0.12)` |
 
 ---
 
@@ -58,6 +57,7 @@ A tipografia deve manter contraste extremo e excelente legibilidade, mesmo em te
 2. **Subtexto / Narrativa / Legendas:**
    - Fonte: **Inter** ou **Roboto** (Regular ou Light).
    - Tamanho mínimo na tela: **52px** (para legendas principais do Reels, nunca abaixo disso).
+   - **Posicionamento (CaptionEngine):** Posicionado em `bottom: 300` (cerca de 82% da altura vertical da tela, mantendo o texto perfeitamente legível e acima da safe-zone inferior das redes sociais).
 3. **Keyword Highlighting (Destaque de Palavras-Chave):**
    - Palavras com score de engajamento alto ou de foco recebem a cor `accent` da paleta do nicho correspondente e um leve efeito de brilho (`text-shadow`).
 
@@ -178,11 +178,11 @@ const scale = spring({
 ### PhotoCutout & Illustration Sticker (`visual_type: "cutout" | "illustration"`)
 - **Não Repetição:** Não repetir imagens ao longo das cenas (exceto se for uma bandeira ou figura pública proeminente).
 - **Sem Feather:** O recorte da imagem deve ser nítido e seco, sem feather/suavização de borda.
-- **Empilhamento Vertical e Margin-to-Margin:** O contêiner de texto principal fica posicionado no topo, liberando a metade inferior para o asset visual. Os stickers ocupam **88% da largura da tela** (centralizados com `left: "6%"`) e altura de `46%` (com `bottom: 110-120px`) para maximizar o preenchimento da tela e evitar grandes vazios.
+- **Empilhamento Vertical e Margin-to-Margin:** O contêiner de texto principal fica posicionado no topo, liberando a metade inferior para o asset visual. Os stickers ocupam **88% da largura da tela** (centralizados com `left: "6%"`) e altura de `58%` (com `bottom: 80px`) para maximizar o preenchimento da tela e evitar grandes vazios.
 - **Moldura Scrapbook Tracejada (Glow & Depth):** O sticker fica envelopado em um contêiner com um cartão de fundo tracejado deslocado (`border: "2px dashed ...", background: "..."`), criando profundidade tridimensional física.
 - **Contorno de Sticker:** Borda branca sólida de **4px de espessura, completamente nítida e sem blur** (filtro `#sticker-outline`).
 - Posicionamento alternado: cenas pares → `right: 50px`; ímpares → `left: 50px`.
-- Entrada: spring `translateY` (380px → 0), delay 6 frames + float `cos(frame/12)*8px`.
+- Entrada: slide-in a partir do lado oposto ao alinhamento do texto usando mola (spring) com `damping: 22`, `stiffness: 200`, `mass: 0.9` (com delay de 6 frames) + float contínuo de `cos(frame/12)*8px`.
 - **Obrigatório**: Filtro drop-shadow editorial de sombra projetada forte.
 
 ### DecoratorElement & Context-Aware Arrow

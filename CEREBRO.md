@@ -32,6 +32,28 @@ O **CEREBRO** gerencia duas pipelines principais de forma assíncrona e resilien
    - Se o score for inferior a `10.0`, o artigo não é salvo (ou é desativado se já existir).
 5. **Notificação SSE (Live-Update):** Dispara atualizações em tempo real para o frontend Electron através do canal Server-Sent Events (SSE).
 
+### 🧪 1.4. Algoritmo de Scoring e Validação Anti-Fake News
+
+Para garantir que apenas notícias altamente qualificadas, relevantes e verificadas entrem em produção, o **CEREBRO** implementa as seguintes regras na pipeline:
+
+1. **Scoring Ponderado (Teto 100):**
+   - **Fontes (Máx +30 pts):** Divididas em Tier 1 (+10 pts por fonte, ex: *InfoMoney*, *Valor*), Tier 2 (+6 pts, ex: *Brazil Journal*), e Tier 3 (+3 pts, ex: *UOL Economia*).
+   - **Palavras-chave Financeiras (Máx +15 pts):** Presença de termos chave de finanças/macroeconomia.
+   - **Métricas e Dados (+10 pts):** Presença de números ou porcentagens que denotam dados reais.
+   - **Decisão do Investidor (+10 pts):** Notícias que afetam diretamente decisões de investimento ou rentabilidade.
+   - **Nome da Empresa/Ticker (+8 pts):** Menções a tickers de ações (ex: PETR4, VALE3) ou nomes de empresas.
+   - **Bônus de Cruzamento (+10 pts):** Repercussão do mesmo evento em categorias diferentes (ex: Cripto + Macroeconomia).
+   - **Penalidade Extra-Nicho (-50 pts):** Descarte imediato caso contenha termos vetados (futebol, celebridades, etc.).
+
+2. **Decaimento Temporal Conforme Dinamismo:**
+   - **Crypto (2.0x)** e **Investments (1.5x)** sofrem decaimento de score acelerado devido à volatilidade desses mercados.
+   - **Geopolitics (0.5x)** e **Economy_int (0.5x)** possuem decaimento desacelerado para reter notícias estruturais por mais tempo no feed.
+
+3. **Validação Cruzada Anti-Fake News (Filtro Tier 3):**
+   - Notícias oriundas de fontes Tier 3 (*UOL Economia*, *Exame*, *G1*, *Forbes*, *CNN*) são salvas inicialmente em estado inativo (`is_active = False`).
+   - O sistema realiza uma varredura para comparar semanticamente o conteúdo com notícias de fontes independentes utilizando similaridade de cosseno (`Cosine Similarity >= 0.65`).
+   - O artigo é ativado (`is_active = True`) somente após essa validação cruzada ser bem-sucedida, prevenindo o vazamento de fake news.
+
 ### 🎬 Pipeline B: Criação de Conteúdo & Sonorização (Geração de Reels)
 1. **Geração de Cenas (LLMs):**
    - Roda em cascata inteligente: **Gemini 2.5 Flash** (Chave 1) → **Gemini 2.5 Flash** (Chave 2) → **Groq (Llama 3.3)** → **OpenRouter (Llama/Gemma)** → **Ollama (Local)**.

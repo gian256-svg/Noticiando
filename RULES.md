@@ -60,27 +60,28 @@ Artigos com `viral_score < 10` após o score de nicho devem ser descartados sile
 
 O `viral_score` deve refletir o potencial de engajamento financeiro, não popularidade geral.
 
-### Critérios de pontuação (0–100)
-| Critério | Peso | Lógica |
-|---|---|---|
-| **Multi-fonte** | +20 pts | Mesma notícia em 2+ fontes = confirmada e relevante |
-| **Palavras-chave financeiras** | +15 pts | "Selic", "Fed", "Bitcoin", "ações", "juros", "IPCA" etc. |
-| **Novidade** (< 2h) | +15 pts | Notícias frescas têm vantagem |
-| **Números e dados** | +10 pts | "caiu X%", "subiu R$ Y", "recorde de Z" |
-| **Impacto direto ao investidor** | +10 pts | Afeta carteira, rentabilidade, tomada de decisão |
-| **Nome de empresa/ticker** | +8 pts | Menção a PETR4, VALE3, ITUB4 etc. |
-| **Penalidade: fora do nicho** | −50 pts | Esporte, celebridade, entretenimento sem impacto financeiro |
+### Novo Sistema Ponderado de Relevância (Teto 100)
+1. **Mix Ponderado de Fontes (Máx +30 pts):**
+   - **Tier 1 (Alta Credibilidade/Foco):** +10 pontos por fonte (ex: *InfoMoney*, *Valor Econômico*).
+   - **Tier 2 (Especializadas/Nacionais):** +6 pontos por fonte (ex: *Brazil Journal*, *NeoFeed*, *Poder360*, *JOTA*).
+   - **Tier 3 (Amplas/Lifestyle):** +3 pontos por fonte (ex: *Exame*, *Forbes Brasil*, *CNN Brasil*, *G1*, *UOL Economia*).
+2. **Palavras-chave Financeiras (Máx +15 pts):** "Selic", "Fed", "Bitcoin", "ações", "juros", "IPCA" etc.
+3. **Números e Dados (+10 pts):** Presença de métricas (porcentagens, valores monetários).
+4. **Impacto Direto ao Investidor (+10 pts):** Decisões de investimento e rentabilidade.
+5. **Nome de Empresa/Ticker (+8 pts):** Menção a marcas ou códigos de negociação (ex: PETR4, VALE3).
+6. **Bônus de Cruzamento Inter-Categorias (+10 pts):** Adicionado caso a mesma notícia repercuta em fontes com categorias de foco distintas (ex: uma fonte de Cripto e outra de Economia Internacional), demonstrando impacto sistêmico.
+7. **Penalidade Extra-Nicho (-50 pts):** Descarte imediato caso contenha termos vetados (futebol, celebridades, etc.).
 
-### Palavras de penalidade (nicho errado)
-Se o título ou resumo contiver qualquer uma das palavras abaixo, aplicar −50 pts:
-```
-futebol, copa do mundo, seleção, convocação, gol, artilheiro, campeão
-celebridade, ator, atriz, cantor, cantora, show, álbum, música
-gta, playstation, xbox, nintendo, game, jogo eletrônico
-novela, série, netflix, disney, streaming (exceto negócios)
-vinho, gastronomia, receita, culinária
-moda, beleza, estilo, lifestyle
-```
+### Fatores de Decaimento Temporal por Categoria
+O decaimento temporal (`_freshness_score`) é ajustado conforme o dinamismo inerente à categoria:
+* **Crypto (2.0x) / Investments (1.5x):** Decaimento acelerado devido à velocidade orgânica desses mercados.
+* **Geopolitics (0.5x) / Economy_int (0.5x):** Decaimento muito suave para que conflitos e decisões macroeconômicas globais fiquem em destaque por mais tempo.
+* **Demais categorias (1.0x):** Fator padrão de envelhecimento.
+
+### Validação Cruzada Anti-Fake News (Tier 3)
+* Fontes com `require_cross_reference=True` (*UOL Economia*, *Exame*, *Forbes*, *CNN*, *G1*) têm suas notícias geradas em estado inativo (`is_active = False`).
+* **Regra de Correspondência:** A notícia só é ativada (`is_active = True`) quando o crawler detecta similaridade semântica (limiar de cosseno `Cosine Similarity >= 0.65`) com outro artigo de fonte independente. Isso garante que fake news não vazem para a timeline sem validação cruzada.
+
 
 ---
 
@@ -163,25 +164,39 @@ Para essas fontes, pular direto para `GenerativeThumbnail` sem tentar o fetch (e
 
 ### Diretrizes Gráficas e Tipografia (Diretor de Arte DESIGN.md / The Economist Style)
 * **Tipografia:** Fontes super dimensionadas. **Oswald** (Bold/SemiBold) para títulos (110px para Hook, 76px para o resto); **Inter/Roboto** para legendas (mínimo 52px).
-* **Alinhamento e Diagramação:** Todo texto é centralizado horizontalmente e empilhado verticalmente com o conteúdo visual. Proibido jogar textos nos cantos superior esquerdo/direito. O subtext e os contadores de métricas/porcentagens são ocultados no Hook (cena index 0) para evitar duplicação redundante de informações na tela.
-* **Remoção de Watermarks e Pills:** A marca d'água "NOTICIANDO" no topo direito e a categoria "BREAKING" no topo esquerdo foram removidas permanentemente de todas as telas.
-* **Dinâmica Ken Burns:** Aplicar Ken Burns agressivo e contínuo nas mídias de vídeo e foto (escala de 1.0 a 1.12 no mínimo) para garantir dinamismo.
-* **Pacing Ultra Dinâmico e Exceção para Vídeos:** Nenhuma cena estática (cutout, data, newspaper, etc.) pode ficar mais de 3.0 segundos na tela. O subtext do roteiro de cenas estáticas tem limite de 10-12 palavras, e o backend limita a duração calculada da cena a no máximo 3.0s. Como exceção, cenas do tipo `video` ou `split_video` (vídeos em tela cheia) não são limitadas ao teto de 3 segundos, mantendo a duração real correspondente à locução ElevenLabs para aproveitar o b-roll sem cortes abruptos.
-* **Texto Sempre em Movimento:** Animar a escala do contêiner de texto (de 1.0 a 1.05) progressivamente ao longo da cena para evitar elementos de texto estáticos.
-* **Garantia de Unicidade de Mídia (Bust Cache):** Um `generation_id` gerado por request de Reels serve de sal para os hashes de imagem (`image_generator.py`) e vídeos (`media_fetcher.py`), forçando o download e a geração de mídias novas. Além disso, o download de B-roll extrai os top 5 resultados do YouTube e escolhe uma URL aleatória do top 3.
-* **Gramática Flexível de Legendas:** É permitido quebrar regras rígidas de parágrafos/pontuação, inserindo palavras isoladas ou frases curtas de impacto para reforçar a narração.
-* **Layout Fullscreen:** Sempre que houver vídeo (b-roll), ele DEVE ocupar a tela inteira (100% fullscreen), contendo um gradient overlay sombrio editorial por cima. A borda flutuante limitante não deve ser utilizada para vídeo.
-* **Layout Margin-to-Margin (Preenchimento de Tela):** Os elementos gráficos de dados (`isData`), recortes de jornal (`NewspaperCutout`), cutouts e illustrations devem ocupar de ponta a ponta da margem do vídeo (largura de ~88%, centralizados com `left: 6%`, e largura máxima dos cards de gráficos expandida para 1020px com padding reduzido de 80px para 30px nas laterais). Isso reduz espaços em branco vazios na tela e maximiza o impacto visual.
-* **Qualidade dos Recortes:** Recortes secos ocupando cerca de 88% da largura da tela (sem limitação máxima de altura), estilo sticker com contorno branco nítido de ~4px de largura, sem blur.
-* **Evitar Falsos Positivos de Bandeiras:** A correspondência de termos de países para exibição de bandeiras deve usar limites de palavras exatas (word-boundary) e não simples substrings, para evitar que termos como "financeira" insiram erroneamente a bandeira do Irã ("ira").
-* **Footage Real (yt-dlp):** Obrigatório extrair os primeiros 10 segundos reais do YouTube (sec 0:00-0:10) via queries específicas e contextuais.
-* **Paletas Editoriais:** Utilizar paletas de cor sólidas (dark themes como Navy/Green ou Black/Crimson) com glows radiais para não deixar a imagem chapada.
-* **Duração Flexível e Sincronismo Fino:** A duração de cada cena é calculada proporcionalmente ao tempo falado exato do subtext e mapeada no backend no nível de palavra de locução (ElevenLabs). O mapeamento de legendas no frontend segue o tempo absoluto de visualização para evitar qualquer dessincronização progressiva.
+* **Alinhamento e Diagramação:** Todo texto é centralizado horizontalmente e empilhado verticalmente com o conteúdo visual. Proibido jogar textos nos cantos. O subtext e os contadores de métricas são ocultados no Hook (cena index 0).
+* **Remoção de Watermarks e Pills:** A marca d'água "NOTICIANDO" no topo direito e a categoria "BREAKING" no topo esquerdo foram removidas permanentemente.
+* **Ken Burns Direcional (Sem Conflitos):** 
+  - **Zoom In (1.0 → 1.12):** Usado para notícias de tensão, conflito, urgência ou economia negativa (ex: palavras-chave *queda, crise, guerra, crash*).
+  - **Zoom Out (1.12 → 1.0):** Usado para revelações, anúncios positivos ou contextualizações geográficas (*alta, recorde, acordo*).
+  - **Pan Horizontal (translateX -2% → +2%):** Usado em cenas neutras sem assets laterais.
+  - **Exclusividade:** Zoom e Pan nunca devem ser combinados na mesma cena (o scale é fixado em 1.0 se o pan estiver rodando).
+* **Glow Editorial:** Glow radial usando gradiente na cor de destaque (`accent`) da paleta correspondente com **11% de opacidade** posicionado atrás do bloco de headline em todas as cenas que não sejam vídeos ou cenários analógicos.
+* **Entrada do Headline:** O bloco inteiro do headline entra com **fade + translateY de 24px → 0px** em 12 frames (100% de opacidade final).
+* **Animações de Palavra (Stagger):**
+  - `animStyle 0` (Slide Up + Rotate) ajustado para **translateY de 24px → 0px**, com mola (spring) calibrada em `damping: 14, stiffness: 150`.
+* **Sombra de Texto (Text Shadow):** Sombra forte sempre ativa. Cenas destacadas (highlighted) usam `rgba(0,0,0,0.9)` + glow da cor acentuada; textos normais usam `0 2px 16px rgba(0,0,0,0.8), 0 1px 4px rgba(0,0,0,0.9)`.
+* **Cutout Lateral (Personagens/Recortes):**
+  - **Duração e Dimensões:** Altura fixada em **58%** sem limitação máxima.
+  - **Entrada:** Slide-in a partir do lado oposto ao alinhamento do texto usando mola calibrada em `damping: 22, stiffness: 200, mass: 0.9`.
+  - **Sombra Projetada:** Filtro de drop-shadow lateral (`drop-shadow(-8px 8px 24px rgba(0,0,0,0.7))`) para profundidade 3D física.
+* **Illustration Height:** Elevado para **58%** (mesmo tamanho do cutout) para máximo aproveitamento da tela vertical.
+* **CaptionEngine Position:** Ajustado para `bottom: 300` (posicionado a cerca de 82% da altura vertical da tela, acima da safe-zone inferior).
+* **Pacing Ultra Dinâmico e Exceção para Vídeos:** Cenas estáticas têm limite rígido de 3.0s e frases com no máximo 12 palavras. Cenas do tipo `video` ou `split_video` (vídeos em tela cheia) estão isentas da limitação de 3 segundos, mantendo a duração real correspondente à locução ElevenLabs.
+* **Layout Fullscreen:** Sempre que houver vídeo (b-roll), ele DEVE ocupar a tela inteira (100% fullscreen) com um gradient overlay sombrio por cima.
+* **Layout Margin-to-Margin (Preenchimento de Tela):** Os elementos gráficos de dados (`isData`), recortes de jornal (`NewspaperCutout`), cutouts e illustrations devem ocupar largura de ~88% (centralizados com `left: 6%`), e largura máxima dos cards de gráficos expandida para 1020px com padding de 30px nas laterais para evitar grandes vazios na tela.
+* **Evitar Falsos Positivos de Bandeiras:** Correspondência por limites exatos de palavras (Regex `\b`) para evitar falsos positivos (ex: "financeira" ativando a bandeira do Irã).
+* **Footage Real (yt-dlp):** Obrigatório extrair os primeiros 10 segundos reais do YouTube (sec 0:00-0:10).
+* **Paletas Premium Dark por Categoria:**
+  - *Economia/Finanças:* Fundo gradiente 3-stops escuro, destaque ciano elétrico (`#00d4ff`).
+  - *Política:* Fundo escuro com tons avermelhados, destaque vermelho forte (`#ff4444`).
+  - *Tecnologia/Crypto:* Fundo azul-marinho profundo, destaque roxo tech (`#7b61ff`).
+  - *Esportes:* Fundo verde escuro, destaque verde neon (`#00ff88`).
+  - *Internacional:* Fundo violeta escuro, destaque âmbar (`#ffaa00`).
 * **Elementos Obrigatórios por Reel:**
-  - Pelo menos **2 cortes de vídeo real** fullscreen (fins informativos/editoriais).
-  - Pelo menos **3 recortes fotográficos** grandes flutuantes.
+  - Pelo menos **2 cortes de vídeo real** fullscreen.
+  - Pelo menos **3 recortes fotográficos** grandes.
   - Pelo menos **2 elementos gráficos decorativos** animados.
-
 
 ### Configurações de Locução (ElevenLabs)
 * **Voice Model:** `eleven_multilingual_v2`
