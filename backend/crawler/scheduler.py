@@ -73,27 +73,46 @@ def _process_crawl_results(raw_items: list[dict]) -> list[dict]:
     Synchronous DB phase — runs in a thread to avoid blocking the event loop.
     Returns a list of item.to_dict() payloads to push via SSE.
     """
-    from crawler.deduplicator import normalize_title
+    from crawler.deduplicator import normalize_title, titles_are_similar
     from scoring.viral_scorer import score_news
+    from datetime import timedelta
 
     db = SessionLocal()
     try:
-        hash_groups: dict[str, list[dict]] = {}
-        for item in raw_items:
-            h = item["title_hash"]
-            hash_groups.setdefault(h, []).append(item)
+        # 1. Agrupar itens dentro do batch de crawl atual usando similaridade semântica (Jaccard >= 0.65)
+        merged_raw_items: list[dict] = []
+        for raw in raw_items:
+            found_in_batch = False
+            for grouped in merged_raw_items:
+                if titles_are_similar(raw["title"], grouped["title"], threshold=0.65):
+                    grouped_sources = set(grouped["sources"])
+                    new_srcs = set(raw["sources"]) - grouped_sources
+                    if new_srcs:
+                        grouped["sources"] = list(grouped_sources | new_srcs)
+                        grouped["source_count"] = len(grouped["sources"])
+                    if not grouped.get("thumbnail_url") and raw.get("thumbnail_url"):
+                        grouped["thumbnail_url"] = raw["thumbnail_url"]
+                    if raw["published_at"] < grouped["published_at"]:
+                        grouped["published_at"] = raw["published_at"]
+                    found_in_batch = True
+                    break
+            if not found_in_batch:
+                merged_raw_items.append(dict(raw))
 
         new_items: list[NewsItem] = []
         updated_items: list[NewsItem] = []
 
-        existing_active = db.query(NewsItem).filter(NewsItem.is_active == True).all()
+        # 2. Buscar notícias recentes no banco (últimas 24 horas) para comparação
+        cutoff = datetime.utcnow() - timedelta(hours=24)
+        recent_items = db.query(NewsItem).filter(NewsItem.published_at >= cutoff).all()
+        existing_active = [it for it in recent_items if it.is_active]
 
         def _bigrams(title: str) -> set[str]:
             words = normalize_title(title).split()
             return {f"{words[i]} {words[i+1]}" for i in range(len(words) - 1)} if len(words) > 1 else set(words)
 
         active_candidates = [(it.thumbnail_url, _bigrams(it.title)) for it in existing_active if it.thumbnail_url]
-        raw_candidates = [(it["thumbnail_url"], _bigrams(it["title"])) for it in raw_items if it.get("thumbnail_url")]
+        raw_candidates = [(it["thumbnail_url"], _bigrams(it["title"])) for it in merged_raw_items if it.get("thumbnail_url")]
 
         def _borrow_thumb(title: str) -> str | None:
             bg_a = _bigrams(title)
@@ -109,58 +128,92 @@ def _process_crawl_results(raw_items: list[dict]) -> list[dict]:
                     return thumb_url
             return None
 
-        for h, group in hash_groups.items():
-            existing = db.query(NewsItem).filter_by(title_hash=h).first()
-            merged_sources = list({s for it in group for s in it["sources"]})
-            best_thumb = next((it.get("thumbnail_url") for it in group if it.get("thumbnail_url")), None)
+        # Carregar configurações de require_cross_reference das fontes padrão
+        from crawler.sources import DEFAULT_SOURCES
+        require_cross_ref_map = {src.name: src.require_cross_reference for src in DEFAULT_SOURCES}
+
+        def _needs_cross_reference(sources_list: list[str]) -> bool:
+            return all(require_cross_ref_map.get(s, False) for s in sources_list)
+
+        for item in merged_raw_items:
+            # Buscar correspondência semântica recente no banco
+            existing = None
+            for db_item in recent_items:
+                if titles_are_similar(item["title"], db_item.title, threshold=0.65):
+                    existing = db_item
+                    break
+
+            best_thumb = item.get("thumbnail_url")
             if not best_thumb:
-                base_title = existing.title if existing else group[0]["title"]
+                base_title = existing.title if existing else item["title"]
                 best_thumb = _borrow_thumb(base_title)
 
             if existing:
                 changed = False
                 existing_sources = set(existing.sources or [])
-                new_src = set(merged_sources) - existing_sources
+                new_src = set(item["sources"]) - existing_sources
                 if new_src:
                     existing.sources = list(existing_sources | new_src)
                     existing.source_count = len(existing.sources)
                     changed = True
+                
                 if not existing.thumbnail_url and best_thumb:
                     existing.thumbnail_url = best_thumb
                     changed = True
+
+                # Regra Anti-Fake News: se estava inativo (pendente) e agora foi confirmado
+                if not existing.is_active:
+                    if existing.source_count >= 2 or not _needs_cross_reference(existing.sources):
+                        existing.is_active = True
+                        changed = True
+                        logger.info(f"News item activated via cross-reference: {existing.title[:80]}")
+
                 if changed:
                     updated_items.append(existing)
             else:
-                base = group[0]
-                if _is_off_topic(base["title"], base.get("summary", ""), merged_sources):
-                    logger.debug(f"Off-topic rejected: {base['title'][:80]}")
+                if _is_off_topic(item["title"], item.get("summary", ""), item["sources"]):
+                    logger.debug(f"Off-topic rejected: {item['title'][:80]}")
                     continue
-                # Dedup por URL: evita inserir o mesmo artigo com título levemente diferente
-                url_existing = db.query(NewsItem).filter_by(url=base["url"]).first()
+
+                # Dedup por URL
+                url_existing = db.query(NewsItem).filter_by(url=item["url"]).first()
                 if url_existing:
-                    logger.debug(f"URL duplicate skipped: {base['url'][:80]}")
+                    logger.debug(f"URL duplicate skipped: {item['url'][:80]}")
                     continue
+
+                # Regra Anti-Fake News: fontes de baixo tier começam pendentes (inativas) se fonte única
+                initial_active = True
+                if len(item["sources"]) < 2 and _needs_cross_reference(item["sources"]):
+                    initial_active = False
+                    logger.info(f"News item marked pending (inactive) due to low tier source: {item['title'][:80]}")
+
                 temp_item = NewsItem(
-                    title=base["title"],
-                    title_hash=h,
-                    url=base["url"],
-                    summary=base.get("summary", ""),
-                    sources=merged_sources,
-                    source_count=len(merged_sources),
-                    category=base["category"],
+                    title=item["title"],
+                    title_hash=item["title_hash"],
+                    url=item["url"],
+                    summary=item.get("summary", ""),
+                    sources=item["sources"],
+                    source_count=len(item["sources"]),
+                    category=item["category"],
                     thumbnail_url=best_thumb,
-                    published_at=base["published_at"],
+                    published_at=item["published_at"],
+                    is_active=initial_active,
                 )
-                prelim_score = score_news(temp_item, existing_active + new_items)
+
+                # Avaliar score preliminar (apenas contra itens atualmente ativos)
+                active_list = [it for it in recent_items if it.is_active] + [it for it in new_items if it.is_active]
+                prelim_score = score_news(temp_item, active_list)
                 if prelim_score < 10.0:
-                    logger.info(f"Relevance rejected (score {prelim_score:.1f}): {base['title'][:80]}")
+                    logger.info(f"Relevance rejected (score {prelim_score:.1f}): {item['title'][:80]}")
                     continue
+
                 temp_item.viral_score = prelim_score
                 db.add(temp_item)
                 new_items.append(temp_item)
 
         db.commit()
 
+        # Recalcular score de todos os itens ativos recentes
         all_recent = db.query(NewsItem).filter(NewsItem.is_active == True).all()
         scores = score_all(all_recent)
         for item_id, score in scores.items():

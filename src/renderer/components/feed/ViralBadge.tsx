@@ -8,7 +8,7 @@ interface ViralBadgeProps {
 }
 
 function getScoreConfig(score: number) {
-  if (score >= 80) {
+  if (score >= 75) {
     return {
       color: "text-red-300",
       bg: "bg-red-500/25 backdrop-blur-sm",
@@ -56,7 +56,7 @@ export function ViralBadge({ score, size = "md", showLabel = false }: ViralBadge
         s.wrapper
       )}
     >
-      <Flame size={s.icon} className={cn(config.flameColor, score >= 80 && "animate-pulse")} />
+      <Flame size={s.icon} className={cn(config.flameColor, score >= 75 && "animate-pulse")} />
       <span className={s.text}>{score}</span>
       {showLabel && config.label && (
         <span className={cn(s.text, "tracking-wide ml-0.5")}>{config.label}</span>

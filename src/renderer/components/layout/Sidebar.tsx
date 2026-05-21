@@ -25,7 +25,7 @@ export function Sidebar() {
   const { filters, setFilters, newsCount, crawlerStatus, filteredNews, lastRefreshed } = useFeedStore();
   const { setSettingsOpen } = useConfigStore();
 
-  const hotCount = filteredNews.filter((n) => n.viral_score >= 80).length;
+  const hotCount = filteredNews.filter((n) => n.viral_score >= 75).length;
 
   return (
     <div className="w-[220px] shrink-0 h-full flex flex-col bg-surface/60 border-r border-border/60 overflow-hidden">
@@ -79,7 +79,7 @@ export function Sidebar() {
               <span className="text-[10px] text-text-secondary">Mostrar a partir de</span>
               <span className={cn(
                 "text-[11px] font-bold tabular-nums",
-                filters.minScore >= 80 ? "text-red-400" : filters.minScore >= 50 ? "text-accent" : "text-text-secondary"
+                filters.minScore >= 75 ? "text-red-400" : filters.minScore >= 50 ? "text-accent" : "text-text-secondary"
               )}>
                 {filters.minScore}+
               </span>
@@ -127,7 +127,7 @@ export function Sidebar() {
           <SectionLabel>Resumo</SectionLabel>
           <div className="mt-2 space-y-1.5">
             <StatRow icon={TrendingUp} label="Notícias" value={String(newsCount)} color="text-text-secondary" />
-            <StatRow icon={Flame} label="Virais (80+)" value={String(hotCount)} color="text-red-400" />
+            <StatRow icon={Flame} label="Virais (75+)" value={String(hotCount)} color="text-red-400" />
             <StatRow icon={Clock} label="Atualização"
               value={crawlerStatus === "crawling" ? "Buscando..." : crawlerStatus === "error" ? "Erro" : "Live"}
               color={crawlerStatus === "error" ? "text-red-400" : "text-live"}

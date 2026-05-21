@@ -382,25 +382,28 @@ DEFAULT_SOURCES: list[Source] = [
         category="economy_br",
         enabled=False,
         credibility_tier=3,
-        require_cross_reference=False,  # Popular mas amplo — filtrar por nicho
+        require_cross_reference=True,  # Popular mas amplo — filtrar por nicho e exigir confirmação
     ),
     Source(
         name="Forbes Brasil",
         url="https://forbes.com.br/feed/",
         category="investments",
         credibility_tier=3,
+        require_cross_reference=True,
     ),
     Source(
         name="CNN Brasil Economia",
         url="https://www.cnnbrasil.com.br/economy/feed/",
         category="economy_br",
         credibility_tier=3,
+        require_cross_reference=True,
     ),
     Source(
         name="UOL Economia",
         url="https://rss.uol.com.br/feed/economia.xml",
         category="economy_br",
-        enabled=False,
+        enabled=True,
         credibility_tier=3,
+        require_cross_reference=True,
     ),
 ]

@@ -60,14 +60,37 @@ def _freshness_score(published_at: datetime) -> float:
     return 0.0
 
 
-def _source_score(source_count: int) -> float:
+# Fontes de Tier 1 para bônus de credibilidade
+TIER_1_SOURCES = {
+    "Reuters", "Reuters Markets", "Associated Press Business",
+    "Valor Econômico", "Folha Mercado", "Estadão Economia", "G1 Economia",
+    "Bloomberg", "Financial Times", "Wall Street Journal Markets",
+    "BBC Business", "The Guardian Economy", "CNBC", "MarketWatch", "Barron's",
+    "The New York Times Business", "The New York Times World", "The Washington Post",
+    "Al Jazeera English", "Nikkei Asia", "South China Morning Post",
+    "Der Spiegel International", "Le Monde", "Foreign Affairs", "Foreign Policy",
+    "Council on Foreign Relations", "Carnegie Endowment", "Chatham House",
+    "CSIS", "Brookings Institution", "Atlantic Council", "RAND Corporation", "IMF News"
+}
+
+
+def _source_score(item: "NewsItem") -> float:
+    source_count = item.source_count or 1
     if source_count >= 5:
-        return 30.0
-    if source_count >= 3:
-        return 25.0
-    if source_count >= 2:
-        return 15.0
-    return 5.0
+        base = 30.0
+    elif source_count >= 3:
+        base = 25.0
+    elif source_count >= 2:
+        base = 15.0
+    else:
+        base = 5.0
+
+    # Bônus para fontes com credibilidade Tier 1 (+5 pontos)
+    sources_set = set(item.sources or [])
+    if sources_set & TIER_1_SOURCES:
+        base += 5.0
+
+    return min(base, 30.0)
 
 
 def _keyword_score(text: str) -> float:
@@ -102,13 +125,15 @@ def _propagation_velocity(item: "NewsItem", all_items: list["NewsItem"]) -> floa
     if (now - pub).total_seconds() > 1800:
         return 0.0
 
-    # Count other items with same title_hash or high source count
+    from crawler.deduplicator import titles_are_similar
+
+    # Conta outros itens semelhantes publicados nos últimos 30 minutos
     similar_recent = [
         x for x in all_items
         if x.id != item.id
-        and x.source_count > 1
         and x.published_at
         and abs(((x.published_at.replace(tzinfo=timezone.utc) if x.published_at.tzinfo is None else x.published_at) - pub).total_seconds()) < 1800
+        and (x.source_count > 1 or titles_are_similar(item.title, x.title, threshold=0.65))
     ]
 
     if len(similar_recent) >= 3:
@@ -131,7 +156,7 @@ def score_news(item: "NewsItem", all_items: list["NewsItem"]) -> float:
     text = f"{item.title} {item.summary or ''}"
 
     s = (
-        _source_score(item.source_count or 1)
+        _source_score(item)
         + _freshness_score(item.published_at or datetime.now(timezone.utc))
         + _keyword_score(text)
         + _propagation_velocity(item, all_items)
