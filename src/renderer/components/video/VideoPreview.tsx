@@ -1,6 +1,6 @@
 import { Player } from "@remotion/player";
 import { X, Download, Loader2, Clapperboard, AlertCircle } from "lucide-react";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { ReelsComposition, ReelsCompositionProps } from "@/video/ReelsComposition";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +13,20 @@ interface VideoPreviewProps {
 export function VideoPreview({ props, newsTitle, onClose }: VideoPreviewProps) {
   const [rendering, setRendering] = useState(false);
   const [renderResult, setRenderResult] = useState<{ ok: boolean; path?: string; error?: string } | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setIsMounted(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 280);
+  }, [onClose]);
 
   const totalFrames = Math.max(
     1,
@@ -57,15 +71,25 @@ export function VideoPreview({ props, newsTitle, onClose }: VideoPreviewProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)" }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-[6px] transition-opacity duration-300 ease-out motion-reduce:transition-none",
+        (isMounted && !isClosing) ? "opacity-100" : "opacity-0 pointer-events-none"
+      )}
+      onClick={(e) => e.target === e.currentTarget && handleClose()}
     >
-      <div className="relative flex flex-col items-center gap-5" style={{ maxHeight: "95vh" }}>
+      <div
+        className={cn(
+          "relative flex flex-col items-center gap-5 transition-all duration-300 ease-out motion-reduce:transition-none",
+          (isMounted && !isClosing)
+            ? "opacity-100 scale-100 translate-y-0"
+            : "opacity-0 scale-95 translate-y-4"
+        )}
+        style={{ maxHeight: "95vh" }}
+      >
 
         {/* Close */}
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="absolute -top-2 -right-2 z-10 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
         >
           <X size={14} className="text-white" />

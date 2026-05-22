@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Noticiando motion audit — 2026-05-22</title>
+  <style>
+    :root {
+      --bg: #0D0E1A;
+      --fg: #E8EAF6;
+      --border: #252845;
+      --accent: #F97316;
+      --surface: #141528;
+      --surface-2: #1C1E38;
+      --loop-dim: #8892B0;
+      --card-radius: 16px;
+      --card-padding: 24px;
+      --gap: 16px;
+      --sans: "Inter", system-ui, -apple-system, sans-serif;
+      --mono: ui-monospace, "SF Mono", Menlo, monospace;
+      --live: #22C55E;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--sans);
+      margin: 0 auto;
+      padding: 48px 24px;
+      max-width: 960px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Hero */
+    .report-hero {
+      margin-bottom: 40px;
+      padding-bottom: 24px;
+      border-b: 1px solid var(--border);
+    }
+    .report-hero h1 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      margin: 0 0 8px;
+      letter-spacing: -0.025em;
+    }
+    .report-hero__date {
+      font-family: var(--mono);
+      color: var(--loop-dim);
+      font-size: 0.875rem;
+      margin: 0 0 20px;
+    }
+    .report-hero__counts {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0 0 12px;
+      display: flex;
+      gap: 16px;
+    }
+    .report-hero__counts a {
+      color: inherit;
+      text-decoration: none;
+      border-bottom: 1px dashed var(--border);
+      padding-bottom: 2px;
+      transition: border-bottom-color 0.2s;
+    }
+    .report-hero__counts a:hover {
+      border-bottom-style: solid;
+      border-bottom-color: var(--accent);
+    }
+    .report-hero__primary {
+      font-family: var(--mono);
+      color: var(--loop-dim);
+      font-size: 0.875rem;
+      margin: 0;
+    }
+
+    /* Overall Assessment */
+    .report-assessment {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      padding: var(--card-padding);
+      margin: 32px 0 48px;
+      font-size: 1.05rem;
+      line-height: 1.6;
+      border-left: 4px solid var(--accent);
+    }
+    .report-assessment p {
+      margin: 0;
+    }
+
+    /* Per-lens sections */
+    .perspective-section {
+      margin: 64px 0;
+      padding-top: 32px;
+      border-top: 1px solid var(--border);
+    }
+    .perspective-section h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 0 0 24px;
+      letter-spacing: -0.02em;
+    }
+    
+    .perspective-section__working-well,
+    .perspective-section__opportunities,
+    .perspective-section__issues {
+      margin-bottom: 32px;
+    }
+    
+    .perspective-section h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0 0 16px;
+      color: var(--fg);
+    }
+    
+    .perspective-section ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+    
+    .perspective-section li {
+      margin-bottom: 12px;
+      font-size: 0.95rem;
+    }
+    
+    .perspective-section code {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      background: var(--surface-2);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--accent);
+    }
+
+    .perspective-section__quote {
+      margin-top: 32px;
+      padding: 16px var(--card-padding);
+      background: var(--surface);
+      border-left: 3px solid var(--accent);
+      font-size: 0.95rem;
+      border-radius: 0 8px 8px 0;
+    }
+
+    /* Finding row layout */
+    .finding-row {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 32px;
+      align-items: start;
+      margin: 32px 0;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      padding: var(--card-padding);
+    }
+    
+    .finding-row__prose {
+      display: flex;
+      flex-col: column;
+      height: 100%;
+      justify-content: center;
+    }
+    .finding-row__severity {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 0 0 8px;
+    }
+    .finding-row__severity.critical {
+      color: #EF4444;
+    }
+    .finding-row__severity.important {
+      color: #F59E0B;
+    }
+    .finding-row h4 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin: 0 0 12px;
+    }
+    .finding-row__prose p {
+      font-size: 0.9rem;
+      color: var(--loop-dim);
+      margin: 0 0 16px;
+      line-height: 1.5;
+    }
+    .finding-row__location {
+      margin-top: auto;
+      font-size: 0.8rem;
+    }
+
+    /* Demo Cards */
+    .demo-card {
+      position: relative;
+      background: var(--bg);
+      color: var(--fg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: var(--card-padding);
+      max-width: 360px;
+      min-width: 280px;
+      font-family: var(--sans);
+      outline: none;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+    .demo-card:focus-visible {
+      outline: none;
+    }
+    .demo-card__header {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--fg);
+      margin-bottom: 4px;
+      padding-right: 72px;
+    }
+    .demo-card__subhead {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--loop-dim);
+      margin-bottom: var(--gap);
+    }
+    .demo-card__stage {
+      background: #090a10;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      min-height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .demo-card__loop-indicator {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--loop-dim);
+      letter-spacing: 0.02em;
+      user-select: none;
+    }
+
+    /* Recommendations Table */
+    .recommendations {
+      margin: 64px 0;
+    }
+    .recommendations h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+    .recommendations table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .recommendations th,
+    .recommendations td {
+      text-align: left;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .recommendations th {
+      background: var(--surface-2);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+    .recommendations tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* Reference Summary */
+    .reference-summary {
+      margin-top: 80px;
+      padding: 32px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+    }
+    .reference-summary h2 {
+      font-size: 1.35rem;
+      margin: 0 0 16px;
+    }
+    .reference-summary p {
+      font-size: 0.95rem;
+      margin-bottom: 16px;
+    }
+    .reference-summary ul {
+      margin: 16px 0 0;
+      padding-left: 20px;
+    }
+    .reference-summary li {
+      font-size: 0.9rem;
+      margin-bottom: 10px;
+      color: var(--loop-dim);
+    }
+
+    @media (max-width: 768px) {
+      .finding-row {
+        grid-template-columns: 1fr;
+      }
+      .demo-card {
+        max-width: 100%;
+      }
+      body {
+        padding: 24px 16px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .demo-card__loop-indicator {
+        display: none;
+      }
+      [class*="__motion-target"] {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+
+    /* ── Finding 1: Onboarding Modal Exit ── */
+    @keyframes motion-1-modal {
+      0% { opacity: 0; transform: scale(0.95) translateY(12px); filter: blur(4px); }
+      12% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+      60% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+      72% { opacity: 0; transform: scale(0.95) translateY(12px); filter: blur(4px); }
+      100% { opacity: 0; transform: scale(0.95) translateY(12px); filter: blur(4px); }
+    }
+    .demo-card-1__motion-target {
+      animation: motion-1-modal 3.5s infinite ease-out;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .demo-card-1__title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--fg);
+      margin: 0 0 4px;
+    }
+    .demo-card-1__body {
+      font-size: 0.75rem;
+      color: var(--loop-dim);
+      margin-bottom: 12px;
+    }
+    .demo-card-1__button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 6px;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    /* ── Finding 2: Video Preview Modal ── */
+    @keyframes motion-2-backdrop {
+      0% { opacity: 0; backdrop-filter: blur(0px); }
+      12% { opacity: 1; backdrop-filter: blur(6px); }
+      60% { opacity: 1; backdrop-filter: blur(6px); }
+      72% { opacity: 0; backdrop-filter: blur(0px); }
+      100% { opacity: 0; backdrop-filter: blur(0px); }
+    }
+    @keyframes motion-2-card {
+      0% { opacity: 0; transform: scale(0.9) translateY(20px); }
+      12% { opacity: 1; transform: scale(1.02) translateY(-2px); }
+      16% { opacity: 1; transform: scale(1) translateY(0); }
+      60% { opacity: 1; transform: scale(1) translateY(0); }
+      72% { opacity: 0; transform: scale(0.95) translateY(15px); }
+      100% { opacity: 0; transform: scale(0.95) translateY(15px); }
+    }
+    .demo-card-2__backdrop {
+      animation: motion-2-backdrop 3.5s infinite ease-in-out;
+      background: rgba(0, 0, 0, 0.75);
+      border-radius: 8px;
+      position: absolute;
+      inset: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .demo-card-2__motion-target {
+      animation: motion-2-card 3.5s infinite cubic-bezier(0.34, 1.56, 0.64, 1);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      width: 80%;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    }
+    .demo-card-2__icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(249, 115, 22, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 8px;
+      color: var(--accent);
+      font-weight: bold;
+      font-size: 0.8rem;
+    }
+
+    /* ── Finding 3: Collapsible Panels ── */
+    @keyframes motion-3-panel {
+      0% { opacity: 0; transform: translateY(-8px); filter: blur(2px); max-height: 0; margin-top: 0; }
+      10% { opacity: 1; transform: translateY(0); filter: blur(0); max-height: 120px; margin-top: 8px; }
+      60% { opacity: 1; transform: translateY(0); filter: blur(0); max-height: 120px; margin-top: 8px; }
+      70% { opacity: 0; transform: translateY(-8px); filter: blur(2px); max-height: 0; margin-top: 0; }
+      100% { opacity: 0; transform: translateY(-8px); filter: blur(2px); max-height: 0; margin-top: 0; }
+    }
+    .demo-card-3__container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .demo-card-3__trigger {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--fg);
+      cursor: pointer;
+    }
+    .demo-card-3__motion-target {
+      animation: motion-3-panel 3.5s infinite cubic-bezier(0.16, 1, 0.3, 1);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--loop-dim);
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="report-hero">
+    <h1>Noticiando motion audit</h1>
+    <p class="report-hero__date">2026-05-22</p>
+    <p class="report-hero__counts">
+      <a href="#critical-findings">🔴 Critical: 2</a> ·
+      <a href="#important-findings">🟡 Important: 1</a> ·
+      <a href="#opportunity-findings">🟢 Opportunities: 2</a>
+    </p>
+    <p class="report-hero__primary">Primary: Emil Kowalski — Restraint & Speed</p>
+  </header>
+
+  <section class="report-assessment">
+    <p><strong>Avaliação Geral:</strong> O Noticiando é um aplicativo desktop de alta produtividade (Electron + React) para geração de Reels. Enquanto as regras de motion do vídeo gerado no Remotion são extremamente robustas e detalhadas, o cliente desktop carece de polimento e feedback visual. A interface sofre com transições secas ("snapping") em modais de alta visibilidade e painéis expansivos. Adotar a filosofia de <em>restrição e velocidade</em> de Emil Kowalski para menus e utilitários, complementada pelo <em>polimento invisível</em> de Jakub Krehel para transições estruturais, tornará o aplicativo significativamente mais fluido e responsivo sem comprometer o desempenho.</p>
+  </section>
+
+  <!-- Section 1: Emil Kowalski -->
+  <section class="perspective-section" id="perspective-emil">
+    <h2>Emil Kowalski — Restraint &amp; Speed</h2>
+
+    <div class="perspective-section__working-well">
+      <h3>What's Working Well</h3>
+      <ul>
+        <li>✓ Loader de carregamento simples <code>Loader2</code> com animação rápida e contínua — <code>ApiKeyInput.tsx:65</code></li>
+        <li>✓ Feedback tátil imediato com transição de escala de mola no botão de geração de vídeo — <code>ScriptPanel.tsx:350</code></li>
+      </ul>
+    </div>
+
+    <div class="perspective-section__issues" id="emil-issues">
+      <h3>Issues to Address</h3>
+      
+      <!-- Finding 1: Onboarding Modal Exit -->
+      <div class="finding-row" id="finding-1">
+        <div class="finding-row__prose">
+          <p class="finding-row__severity critical">🔴 Critical</p>
+          <h4>Remoção instantânea do OnboardingModal</h4>
+          <p>O modal de onboarding desaparece abruptamente quando o usuário clica em "Começar a monitorar", cortando o fluxo visual de forma seca e transmitindo instabilidade.</p>
+          <p class="finding-row__location"><code>App.tsx:51</code> e <code>OnboardingModal.tsx:78</code></p>
+        </div>
+        <article class="demo-card" tabindex="-1">
+          <div class="demo-card__loop-indicator">↻ looping</div>
+          <div class="demo-card__header">Desmonte suave: Opacidade + Escala + Translação</div>
+          <div class="demo-card__subhead">250ms · cubic-bezier(0.16, 1, 0.3, 1)</div>
+          <div class="demo-card__stage">
+            <div class="demo-card-1__motion-target">
+              <div class="demo-card-1__title">👋 Noticiando</div>
+              <div class="demo-card-1__body">Cadastrando canais de monitoramento...</div>
+              <div class="demo-card-1__button">Começar a monitorar</div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <!-- Finding 3: Dropdowns and collapsible panels -->
+      <div class="finding-row" id="finding-3">
+        <div class="finding-row__prose">
+          <p class="finding-row__severity important">🟡 Important</p>
+          <h4>Abertura instantânea de painéis retráteis</h4>
+          <p>Os painéis de visualização do Prompt e área de colagem de roteiro surgem de forma instantânea sem transição de altura ou opacidade, causando um salto de layout agressivo.</p>
+          <p class="finding-row__location"><code>ScriptPanel.tsx:243</code>, <code>ScriptPanel.tsx:287</code> e <code>ScriptPanel.tsx:320</code></p>
+        </div>
+        <article class="demo-card" tabindex="-1">
+          <div class="demo-card__loop-indicator">↻ looping</div>
+          <div class="demo-card__header">Dropdown: Opacidade + Altura + Blur sutil</div>
+          <div class="demo-card__subhead">200ms · ease-out</div>
+          <div class="demo-card__stage">
+            <div class="demo-card-3__container">
+              <div class="demo-card-3__trigger">
+                <span>Prompt Preparado</span>
+                <span>▼</span>
+              </div>
+              <div class="demo-card-3__motion-target">
+                Notícia para roteiro:<br>
+                Título: Exemplo de Notícia<br>
+                Duração: 30s
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+    </div>
+
+    <div class="perspective-section__opportunities">
+      <h3>Opportunities</h3>
+      <ul>
+        <li>💡 <strong>Origin-aware dropdowns:</strong> Animar a abertura de seletores (como o seletor de duração) partindo do botão de gatilho em vez de apenas aparecerem. — <code>FormatSelector.tsx:1</code></li>
+        <li>💡 <strong>Pre-emptive API indicators:</strong> Usar uma transição de opacidade sutil de 150ms na entrada do spinner de carregamento de chave de API em vez de montagem seca. — <code>ApiKeyInput.tsx:65</code></li>
+      </ul>
+    </div>
+
+    <p class="perspective-section__quote"><strong>Through Emil's lens:</strong> Animações devem existir apenas para guiar a atenção do usuário ou dar feedback físico de ações. Em painéis de alta frequência, prefira transições curtas e lineares menores que 250ms, evitando molas excessivamente saltitantes que geram cansaço visual.</p>
+  </section>
+
+  <!-- Section 2: Jakub Krehel -->
+  <section class="perspective-section" id="perspective-jakub">
+    <h2>Jakub Krehel — Production Polish</h2>
+
+    <div class="perspective-section__working-well">
+      <h3>What's Working Well</h3>
+      <ul>
+        <li>✓ O feed de notícias possui hove-states bem calibrados que guiam o mouse de forma limpa, sem layout-shifts. — <code>NewsCard.tsx:10</code></li>
+      </ul>
+    </div>
+
+    <div class="perspective-section__issues" id="jakub-issues">
+      <h3>Issues to Address</h3>
+
+      <!-- Finding 2: Video Preview Modal -->
+      <div class="finding-row" id="finding-2">
+        <div class="finding-row__prose">
+          <p class="finding-row__severity critical">🔴 Critical</p>
+          <h4>Montagem e desmonte abruptos do VideoPreview</h4>
+          <p>O modal do player de preview ocupa a tela inteira com um backdrop escuro, mas surge instantaneamente sem transição de fade ou zoom, gerando um forte impacto visual indesejado.</p>
+          <p class="finding-row__location"><code>ScriptPanel.tsx:177</code> e <code>VideoPreview.tsx:59</code></p>
+        </div>
+        <article class="demo-card" tabindex="-1" style="height: 220px; overflow: hidden; position: relative;">
+          <div class="demo-card__loop-indicator">↻ looping</div>
+          <div class="demo-card-2__backdrop">
+            <div class="demo-card-2__motion-target">
+              <div class="demo-card-2__icon">▶</div>
+              <div style="font-size: 0.75rem; font-weight: 600;">Visualização Reels</div>
+              <div style="font-size: 0.6rem; color: var(--loop-dim); margin-top: 4px;">Carregando Player...</div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+    </div>
+
+    <p class="perspective-section__quote"><strong>Through Jakub's lens:</strong> A ausência de transições de entrada e saída em modais tira o aspecto "premium" do aplicativo. Ao materializar caixas de diálogo, aplique sempre o combo de opacidade + translação com desmonte sutil de saída para que a UI pareça polida e tridimensional.</p>
+  </section>
+
+  <!-- Section 3: Jhey Tompkins -->
+  <section class="perspective-section" id="perspective-jhey">
+    <h2>Jhey Tompkins — Experimentation &amp; Delight</h2>
+
+    <div class="perspective-section__working-well">
+      <h3>What's Working Well</h3>
+      <ul>
+        <li>✓ Animações e recortes tridimensionais tracejados no Reels de Remotion aplicam muito bem o conceito de colagem editorial scrapbook. — <code>ReelsComposition.tsx:181</code></li>
+      </ul>
+    </div>
+
+    <div class="perspective-section__opportunities">
+      <h3>Opportunities</h3>
+      <ul>
+        <li>💡 <strong>Sparkle micro-particles:</strong> Ao finalizar a geração do vídeo com sucesso, disparar uma micro-explosão de partículas ou estrelas de brilho (SVG) a partir do botão "Gerar Reels" para celebrar a conclusão. — <code>ScriptPanel.tsx:350</code></li>
+        <li>💡 <strong>Glitch effect on preview hover:</strong> Adicionar um micro-efeito de glitch ou ruído de TV nos cantos da moldura de preview do vídeo durante o hover do mouse. — <code>VideoPreview.tsx:83</code></li>
+      </ul>
+    </div>
+
+    <p class="perspective-section__quote"><strong>Through Jhey's lens:</strong> Isole animações divertidas e extravagantes de celebração apenas para eventos de fechamento de ciclo (como o término de uma renderização), mantendo as barras de ferramentas limpas e focadas.</p>
+  </section>
+
+  <!-- Combined Recommendations Tables -->
+  <section class="recommendations" id="critical-findings">
+    <h2>🔴 Critical (Must Fix)</h2>
+    <table>
+      <thead>
+        <tr><th>Issue</th><th>File</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Remoção instantânea do OnboardingModal (desmonte seco)</td>
+          <td><code>src/renderer/App.tsx:51</code></td>
+          <td>Implementar um estado local <code>isClosing</code> no modal. Adicionar classe de transição de fade-out e translação de saída (translate-y-4) e aguardar 250ms antes de atualizar o estado do Zustand.</td>
+        </tr>
+        <tr>
+          <td>Montagem e desmonte abruptos do VideoPreview (modal de preview)</td>
+          <td><code>src/renderer/components/video/VideoPreview.tsx:59</code></td>
+          <td>Implementar classes do <code>tailwindcss-animate</code> (<code>animate-in fade-in zoom-in-95 duration-300</code>) no contêiner do modal e aplicar uma transição suave de opacidade no backdrop desfocado de fundo.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="recommendations" id="important-findings">
+    <h2>🟡 Important (Should Fix)</h2>
+    <table>
+      <thead>
+        <tr><th>Issue</th><th>File</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Abertura e fechamento instantâneos de painéis colapsáveis (Prompt e Paste Area)</td>
+          <td><code>src/renderer/components/script/ScriptPanel.tsx:243</code></td>
+          <td>Adicionar classes de animação de entrada (<code>animate-in fade-in slide-in-from-top-2 duration-200 ease-out</code>) nos contêineres exibidos condicionalmente para atenuar o salto visual de layout.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="recommendations" id="opportunity-findings">
+    <h2>🟢 Opportunities (Could Enhance)</h2>
+    <table>
+      <thead>
+        <tr><th>Enhancement</th><th>Where</th><th>Impact</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Sparkle micro-particles de celebração ao gerar Reels com sucesso</td>
+          <td><code>src/renderer/components/script/ScriptPanel.tsx:350</code></td>
+          <td>Adiciona um momento de delight e feedback de ciclo concluído para o usuário.</td>
+        </tr>
+        <tr>
+          <td>Origin-aware transitions nos seletores dropdown secundários</td>
+          <td><code>src/renderer/components/script/FormatSelector.tsx:1</code></td>
+          <td>Substitui o surgimento seco de submenus por uma transição baseada na origem do botão gatilho.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Lens Reference Summary -->
+  <section class="reference-summary">
+    <h2>Lens Reference Summary</h2>
+    <p><strong>Which lens was referenced most:</strong> Emil Kowalski — Restraint & Speed</p>
+    <p><strong>Why:</strong> O Noticiando é um painel administrativo e ferramenta de produtividade para criação de vídeos. Para criadores de conteúdo que usam a ferramenta com alta frequência, as animações do aplicativo devem ser discretas, rápidas (<250ms) e focadas em não obstruir o fluxo de trabalho.</p>
+    <p><strong>If you want to lean differently:</strong></p>
+    <ul>
+      <li>To follow Emil more strictly: Remover transições sutilmente até mesmo dos painéis colapsáveis do ScriptPanel e manter apenas as animações de feedback ativo (active-scale) nos botões de clique.</li>
+      <li>To follow Jakub more strictly: Instalar o <code>framer-motion</code> e envolver as seções condicionais em <code>AnimatePresence</code> para suavizar tanto a entrada quanto a saída em todos os dropdowns de status.</li>
+      <li>To follow Jhey more strictly: Trazer micro-interações animadas em todos os badges de "viral score" no feed de notícias, fazendo os números rolarem dinamicamente com hover e aplicando gradientes coloridos flutuantes.</li>
+    </ul>
+  </section>
+
+</body>
+</html>

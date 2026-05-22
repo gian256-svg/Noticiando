@@ -289,6 +289,9 @@ def parse_custom_script(text: str, category: str) -> dict[str, Any]:
         timeline_points = None
         tag_badge = None
         secondary_assets: list[str] = []
+        map_country = None
+        comparison_country = None
+        comparison_brand_domain = None
 
         for line in scene_body.split("\n"):
             line = line.strip()
@@ -324,6 +327,12 @@ def parse_custom_script(text: str, category: str) -> dict[str, Any]:
                 raw_badge = clean_script_text(line.split(":", 1)[1])
                 if raw_badge.lower() not in ("null", "none", ""):
                     tag_badge = raw_badge.upper()
+            elif "map_country:" in lower_line or "map country:" in lower_line or "país do mapa:" in lower_line:
+                map_country = clean_script_text(line.split(":", 1)[1]).upper()
+            elif "comparison_country:" in lower_line or "comparison country:" in lower_line or "país de comparação:" in lower_line:
+                comparison_country = clean_script_text(line.split(":", 1)[1]).upper()
+            elif "comparison_brand_domain:" in lower_line or "comparison brand domain:" in lower_line or "marca de comparação:" in lower_line:
+                comparison_brand_domain = clean_script_text(line.split(":", 1)[1])
             elif "keyword:" in lower_line or "media_keyword:" in lower_line:
                 val = line.split(":", 1)[1].strip().strip('"').strip("'").lower()
                 valid_keywords = ["money", "growth", "crypto", "chart", "bitcoin", "briefcase", "newspaper"]
@@ -368,6 +377,9 @@ def parse_custom_script(text: str, category: str) -> dict[str, Any]:
             "timeline_points": timeline_points,
             "tag_badge": tag_badge,
             "secondary_assets": secondary_assets,
+            "map_country": map_country,
+            "comparison_country": comparison_country,
+            "comparison_brand_domain": comparison_brand_domain,
         })
         
     return {"scenes": scenes}

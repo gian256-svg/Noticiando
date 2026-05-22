@@ -241,7 +241,7 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
           </button>
 
           {showPrompt && (
-            <div className="mt-2 space-y-2">
+            <div className="mt-2 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200 ease-out motion-reduce:animate-none">
               <div className="bg-background/60 rounded-lg border border-border/40 p-3 max-h-48 overflow-y-auto">
                 <pre className="text-[10px] text-text-secondary/80 whitespace-pre-wrap font-mono leading-relaxed">
                   {prompt}
@@ -285,7 +285,7 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
           </button>
 
           {showPasteArea && (
-            <div className="mt-2 space-y-2">
+            <div className="mt-2 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200 ease-out motion-reduce:animate-none">
               <textarea
                 value={pastedScript}
                 onChange={(e) => setPastedScript(e.target.value)}
@@ -318,7 +318,7 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
 
           {/* Formatted roteiro display when content is pasted */}
           {pastedScript && !showPasteArea && (
-            <div className="mt-2 max-h-52 overflow-y-auto bg-background/40 rounded-lg border border-accent/20 p-3">
+            <div className="mt-2 max-h-52 overflow-y-auto bg-background/40 rounded-lg border border-accent/20 p-3 animate-in fade-in slide-in-from-top-2 duration-200 ease-out motion-reduce:animate-none">
               <pre className="text-[10px] text-text-secondary whitespace-pre-wrap font-mono leading-relaxed">
                 {pastedScript}
               </pre>
@@ -329,7 +329,7 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
         {/* CTAs */}
         <div className="px-5 py-4 border-t border-border/50 shrink-0 space-y-2">
           {opened && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-live/10 border border-live/20 rounded-lg mb-1">
+            <div className="flex items-center gap-2 px-3 py-2 bg-live/10 border border-live/20 rounded-lg mb-1 animate-in fade-in slide-in-from-bottom-2 duration-200 ease-out motion-reduce:animate-none">
               <Check size={12} className="text-live" />
               <p className="text-[11px] text-live font-medium">
                 myhub aberto! Cole o prompt no agente PrimoScript.
@@ -338,7 +338,7 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
           )}
 
           {videoError && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg">
+            <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg animate-in fade-in slide-in-from-bottom-2 duration-200 ease-out motion-reduce:animate-none">
               <p className="text-[11px] text-red-400 font-medium truncate">{videoError}</p>
             </div>
           )}

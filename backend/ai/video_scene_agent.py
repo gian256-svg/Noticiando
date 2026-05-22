@@ -45,7 +45,7 @@ Retorne APENAS JSON válido, sem markdown, sem explicações.
 ║  "subtext"  = NARRAÇÃO (voice-over, NÃO aparece na tela)  ║
 ║    • Frase fluida de 12-20 palavras para o narrador falar ║
 ║    • Ex: "O banco central americano surpreendeu o mercado ║
-║           ao manter os juros acima de 5% pela 6ª vez"    ║
+║           ao manter os juros acima de 5% pela 6ª vez"     ║
 ║    • NÃO use aqui palavras que já estão no headline       ║
 ╚═══════════════════════════════════════════════════════════╝
 
@@ -65,6 +65,9 @@ Schema obrigatório:
       "person_name": "Full name of any public figure mentioned in this scene, or null if none",
       "tag_badge": "Short floating label near cutout/illustration (max 4 words, UPPERCASE). Use for: titles ('CEO DESDE 2015'), stats ('+12,3% A.A.', 'R$ 4,5 TRI'), context ('83 ANOS', 'DESDE 1964'). Only fill when visual_type is 'cutout' or 'illustration'. Otherwise null.",
       "brand_domain": "brand-domain.com or null",
+      "map_country": "US" | "CN" | "BR" | "RU" | "IR" | "IL" | "UA" | "SA" | "GB" | "DE" | "FR" | "IN" | "JP" | "KP" | "VE" | "IT" | "CA" | "AR" | "MX" | "ZA" | null,
+      "comparison_country": "US" | "CN" | "BR" | "RU" | "IR" | "IL" | "UA" | "SA" | "GB" | "DE" | "FR" | "IN" | "JP" | "KP" | "VE" | "IT" | "CA" | "AR" | "MX" | "ZA" | null,
+      "comparison_brand_domain": "another-brand-domain.com or null",
       "secondary_assets": ["keyword1", "keyword2"],
       "timeline_points": [
         {"label": "ANTERIOR", "value": "Real value"},
@@ -104,8 +107,8 @@ REGRA 4 — DISTRIBUIÇÃO VISUAL RICA (mínimos por reel):
   * "data": MÍNIMO 1 cena. Métricas reais com números expressivos (% ou valores absolutos grandes).
   * "newspaper_clip": MÍNIMO 1 cena. Mostrar manchetes reais das fontes da notícia.
   * "timeline": Usar quando há sequência temporal relevante (marcos históricos, projeções).
-  * "map": Usar quando há componente geográfico (conflito, rota comercial, país específico).
-  * "split_video": Usar para contrastes dramáticos (antes/depois, país A vs país B).
+  * "map": Usar quando há componente geográfico (conflito, rota comercial, país específico). Preencher map_country se pertencer à lista de 20 suportados.
+  * "split_video": Usar para contrastes dramáticos de países (A vs B) ou marcas (A vs B). É OBRIGATÓRIO preencher map_country (país A) e comparison_country (país B), OU brand_domain (marca A) e comparison_brand_domain (marca B). Exemplo: BR vs US, ou petrobras.com.br vs exxonmobil.com.
   * NÃO crie cenas de CTA, encerramento, pedido de curtir/seguir.
 
 REGRA 5 — CONTADORES NUMÉRICOS (data scenes):

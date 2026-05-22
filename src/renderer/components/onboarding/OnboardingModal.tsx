@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sparkles, ArrowRight, Zap, Globe, TrendingUp } from "lucide-react";
 import { useConfigStore } from "@/store/configStore";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,13 @@ export function OnboardingModal() {
   const [categories, setCategories] = useState(
     CATEGORY_OPTIONS.filter((c) => c.default).map((c) => c.id)
   );
+  const [isClosing, setIsClosing] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setIsMounted(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   const toggle = (id: string) =>
     setCategories((prev) =>
@@ -25,12 +32,27 @@ export function OnboardingModal() {
 
   const handleStart = () => {
     setActiveCategories(categories);
-    setOnboarded(true);
+    setIsClosing(true);
+    setTimeout(() => {
+      setOnboarded(true);
+    }, 280);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm">
-      <div className="w-[460px] bg-surface border border-border/60 rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.6)] animate-fade-in overflow-hidden">
+    <div
+      className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm transition-opacity duration-300 ease-out motion-reduce:transition-none",
+        (isMounted && !isClosing) ? "opacity-100" : "opacity-0 pointer-events-none"
+      )}
+    >
+      <div
+        className={cn(
+          "w-[460px] bg-surface border border-border/60 rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.6)] overflow-hidden transition-all duration-300 ease-out motion-reduce:transition-none",
+          (isMounted && !isClosing)
+            ? "opacity-100 scale-100 translate-y-0"
+            : "opacity-0 scale-95 translate-y-4"
+        )}
+      >
         {/* Hero */}
         <div className="px-8 pt-8 pb-6 text-center border-b border-border/50">
           <div className="w-14 h-14 rounded-2xl bg-accent/15 border border-accent/25 flex items-center justify-center mx-auto mb-4">
