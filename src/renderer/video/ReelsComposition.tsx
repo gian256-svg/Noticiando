@@ -101,8 +101,22 @@ const getEditorialLabel = (cat?: string): string => {
   return labels[resolved] ?? "NOTÍCIA";
 };
 
-const EditorialTickerBackground: React.FC<{ frame: number; accentColor: string }> = ({ frame, accentColor }) => {
-  const text = "MERCADO • ECONOMIA • TENDÊNCIA • INVESTIMENTOS • GLOBAL • DADOS • ANÁLISE • PROJEÇÃO • RELATÓRIO • ";
+const TICKER_WORDS: Record<string, string> = {
+  investments:   "MERCADO • BOLSA • JUROS • DIVIDENDOS • RENTABILIDADE • PORTFÓLIO • AÇÕES • TESOURO • RENDA FIXA • ",
+  economy_br:    "SELIC • IPCA • PIB • COPOM • CÂMBIO • BANCO CENTRAL • SUPERÁVIT • DEFICIT • INFLAÇÃO • CRISE • ",
+  economy_int:   "FEDERAL RESERVE • GDP • INFLATION • RATE HIKE • RECESSION • TRADE • BONDS • YIELD • WALL STREET • ",
+  geopolitics:   "DIPLOMACIA • CONFLITO • ALIANÇA • SANÇÕES • TRATADO • SOBERANIA • FRONTEIRA • OTAN • ONU • CRISE • ",
+  politics:      "CONGRESSO • ELEIÇÃO • VOTO • PARTIDO • GOVERNO • DECRETO • REFORMA • MINISTÉRIO • CÂMARA • SENADO • ",
+  crypto:        "BLOCKCHAIN • BITCOIN • ETHEREUM • DEFI • TOKEN • EXCHANGE • WALLET • NFT • HALVING • MINERAÇÃO • ",
+  tech:          "INTELIGÊNCIA ARTIFICIAL • STARTUP • INOVAÇÃO • CHIP • DATA CENTER • NUVEM • CÓDIGO • AUTOMAÇÃO • ",
+  sports:        "CAMPEONATO • TÍTULO • TEMPORADA • TRANSFERÊNCIA • GOLS • RANKING • ATLETA • ESCALAÇÃO • TORNEIO • ",
+  international: "GEOPOLÍTICA • COMÉRCIO • EMBARGO • ALIADO • CONFLITO • DIPLOMACIA • ONU • CÚPULA • TRATADO • ",
+  general:       "MERCADO • ECONOMIA • TENDÊNCIA • INVESTIMENTOS • GLOBAL • DADOS • ANÁLISE • PROJEÇÃO • RELATÓRIO • ",
+};
+
+const EditorialTickerBackground: React.FC<{ frame: number; accentColor: string; category?: string }> = ({ frame, accentColor, category }) => {
+  const catKey = CATEGORY_ALIASES[(category ?? "general").toLowerCase()] ?? (category ?? "general").toLowerCase();
+  const text = TICKER_WORDS[catKey] ?? TICKER_WORDS.general;
   const offset1 = (frame * 0.8) % 1000;
   const offset2 = -(frame * 0.6) % 1000;
   return (
@@ -674,11 +688,18 @@ const NewspaperCollage: React.FC<{
 }> = ({ sources, frame, fps, fallbackHeadline, fallbackSourceName, sceneSubtext }) => {
   const fallbackOutlets = ["Bloomberg", "Reuters", "The Wall Street Journal", "Financial Times", "New York Times", "BBC News"];
 
-  // Split subtext into sentences to use as variant titles per clip
+  // Newspaper headlines must be SHORT — truncate anything over 8 words with ellipsis
+  const truncateHeadline = (s: string, maxWords = 8): string => {
+    const words = s.trim().split(/\s+/);
+    return words.length <= maxWords ? s.trim() : words.slice(0, maxWords).join(" ") + "…";
+  };
+
+  // Split subtext into short headline fragments (first clause of each sentence, max 8 words)
   const subtextSentences = (sceneSubtext || "")
     .split(/[.!?]+/)
     .map(s => s.trim())
-    .filter(s => s.length > 15);
+    .filter(s => s.length > 8)
+    .map(s => truncateHeadline(s, 8));
 
   const list = [...(sources || [])];
   while (list.length < 3) {
@@ -689,14 +710,14 @@ const NewspaperCollage: React.FC<{
     });
   }
 
-  // Assign unique titles: real source title if available, else subtext sentence, else fallback
+  // Assign unique titles: real source title (truncated) if available, else subtext snippet, else fallback
   const visibleSources = list.slice(0, 3).map((src, idx) => {
     const allSameTitles = list.every(s => s.title === list[0].title);
     let title = src.title;
     if (!title || allSameTitles) {
-      title = subtextSentences[idx] || fallbackHeadline || "Fato confirmado pelas fontes de mercado";
+      title = subtextSentences[idx] || fallbackHeadline || "Fato confirmado pelas fontes";
     }
-    return { ...src, title };
+    return { ...src, title: truncateHeadline(title, 8) };
   });
 
   const layouts = [
@@ -2286,7 +2307,7 @@ const NewsScene: React.FC<SceneProps> = ({
 
       {/* Ticker scrolling text in text/editorial scenes */}
       {!isCinematicVideo && !isAnalogBg && (
-        <EditorialTickerBackground frame={frame} accentColor={pal.accent} />
+        <EditorialTickerBackground frame={frame} accentColor={pal.accent} category={category} />
       )}
 
       {/* ── Rule 4: Brand Logo Resolver ── */}
@@ -2756,8 +2777,11 @@ const NewsScene: React.FC<SceneProps> = ({
           zIndex: 10,
           opacity: 1 - exitProgress,
         }}>
-          {/* Big metric/percentage counter animation — only for % / monetary / large numbers ≥ 100 */}
-          {dataMetric && !isHook && !isData && (dataMetric.unit !== "" || dataMetric.num >= 100) && (
+          {/* Big metric/percentage counter animation — only for % / monetary / large numbers ≥ 100
+              Skip: years (1800-2100), map scenes, hook scenes, data scenes */}
+          {dataMetric && !isHook && !isData && !isMap &&
+           (dataMetric.unit !== "" || dataMetric.num >= 100) &&
+           !(dataMetric.unit === "" && dataMetric.num >= 1800 && dataMetric.num <= 2100) && (
             <BigMetricCounter
               value={dataMetric.rawString || `${dataMetric.num}${dataMetric.unit}`}
               color={highlightColor}

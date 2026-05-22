@@ -218,7 +218,29 @@ def clean_script_text(val: str) -> str:
 
 def parse_custom_script(text: str, category: str) -> dict[str, Any]:
     text = text.strip()
-    
+
+    # ── Strip footer section (hashtags, images, music style) before any parsing ──
+    # This prevents footer lines from leaking into the last scene's subtext.
+    # Strategy: find the LAST separator block (═══ / ---) that is followed by emoji/keyword sections,
+    # or find the first emoji-section header (📋 / 🖼 / 🎵 / HASHTAGS) that comes AFTER a timestamp.
+    timestamp_pat = re.compile(r'\[\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\]')
+    last_ts = list(timestamp_pat.finditer(text))
+    footer_search_start = last_ts[-1].end() if last_ts else 0
+
+    footer_match = re.search(
+        r'\n[ \t]*[═─━=\-]{5,}|'          # separator line (any ═/─/= style)
+        r'\n[ \t]*📋|'                      # hashtags block
+        r'\n[ \t]*🖼|'                      # images block
+        r'\n[ \t]*🎵|'                      # music block
+        r'\n[ \t]*HASHTAGS[ \t]*:|'         # text fallback
+        r'\n[ \t]*ACERVO[ \t]|'
+        r'\n[ \t]*ESTILO DE TRILHA',
+        text[footer_search_start:],
+        re.IGNORECASE,
+    )
+    if footer_match:
+        text = text[:footer_search_start + footer_match.start()].rstrip()
+
     # If it is JSON, parse directly
     if text.startswith("{") or (text.startswith("```") and "{" in text):
         try:
