@@ -2278,17 +2278,13 @@ const NewsScene: React.FC<SceneProps> = ({
         <BrandLogo logoUrl={scene.logo_url} frame={frame} fps={fps} />
       )}
 
-      {/* ── Single Continuous Progress Bar (not segmented/stories style) ── */}
+      {/* ── Single Continuous Progress Bar ── */}
       {(() => {
-        // Compute overall progress across all scenes
-        const totalFramesAll = scenesWithOffsets.reduce((a, s) => a + s.durationFrames, 0);
-        const elapsedFrames = sceneIndex > 0
-          ? scenesWithOffsets.slice(0, sceneIndex).reduce((a, s) => a + s.durationFrames, 0)
+        // Simple approximate: (sceneIndex + frame/durationInFrames) / totalScenes
+        const overallProgress = totalScenes > 0
+          ? (sceneIndex + (durationInFrames > 0 ? frame / durationInFrames : 0)) / totalScenes
           : 0;
-        const overallProgress = totalFramesAll > 0
-          ? (elapsedFrames + frame) / totalFramesAll
-          : 0;
-        const barWidth = interpolate(overallProgress, [0, 1], [0, 100], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+        const barWidth = Math.min(100, overallProgress * 100);
         return (
           <div style={{
             position: "absolute",
