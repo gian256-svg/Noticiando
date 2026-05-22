@@ -55,10 +55,16 @@ export const Root: React.FC = () => (
   <Composition
     id="Reels"
     component={ReelsComposition}
-    durationInFrames={TOTAL_FRAMES}
     fps={30}
     width={1080}
     height={1920}
     defaultProps={DEMO_PROPS}
+    calculateMetadata={({ props }) => {
+      const scenes = (props as ReelsCompositionProps).scenes ?? [];
+      const durationSeconds = scenes.reduce((acc, s) => acc + (s.duration_seconds ?? 0), 0);
+      return {
+        durationInFrames: Math.round(durationSeconds * 30) || 450,
+      };
+    }}
   />
 );

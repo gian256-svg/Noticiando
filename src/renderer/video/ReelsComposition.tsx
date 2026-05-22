@@ -31,6 +31,9 @@ export interface ReelsScene {
   logo_url?: string;
   timeline_points?: Array<{ label: string; value: string | number }>;
   brand_domain?: string;
+  person_name?: string;
+  tag_badge?: string; // Short floating label near cutout, e.g. "CEO DESDE 2015" or "R$ 4,5 TRI"
+  secondary_asset_urls?: string[]; // Decorative satellite images orbiting the main asset
 }
 
 export interface ReelsCompositionProps {
@@ -129,6 +132,503 @@ const EditorialTickerBackground: React.FC<{ frame: number; accentColor: string }
   );
 };
 
+// ── GlitchFlash — Brief chromatic aberration flash at hook scene start ──────────
+const GlitchFlash: React.FC<{ frame: number; accentColor: string }> = ({ frame, accentColor }) => {
+  // Fire 3 flash frames at frame 2, 4, 7 — then gone forever
+  const flashFrames = [2, 4, 7];
+  const isFlashFrame = flashFrames.includes(frame);
+  const glitchX = frame === 4 ? 6 : frame === 7 ? -4 : 3;
+
+  if (!isFlashFrame) return null;
+
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 50, pointerEvents: "none", overflow: "hidden" }}>
+      {/* Red channel shift */}
+      <div style={{
+        position: "absolute", inset: 0,
+        background: `${accentColor}22`,
+        transform: `translateX(${glitchX}px)`,
+        mixBlendMode: "screen",
+      }} />
+      {/* Horizontal glitch bars */}
+      {[20, 38, 57, 73].map((top, i) => (
+        <div key={i} style={{
+          position: "absolute",
+          top: `${top}%`,
+          left: 0, right: 0,
+          height: Math.random() < 0.5 ? 2 : 4,
+          background: i % 2 === 0 ? accentColor : "#ffffff",
+          opacity: 0.35,
+          transform: `translateX(${i % 2 === 0 ? glitchX * 2 : -glitchX}px)`,
+        }} />
+      ))}
+    </div>
+  );
+};
+
+// ── CornerBrackets — Cinematic frame brackets for video scenes ───────────────────
+const CornerBrackets: React.FC<{
+  frame: number;
+  fps: number;
+  accentColor: string;
+  size?: number;
+  thickness?: number;
+}> = ({ frame, fps, accentColor, size = 48, thickness = 3 }) => {
+  const entrance = spring({ frame: Math.max(0, frame - 4), fps, config: { damping: 18, stiffness: 80 } });
+  const pulse = 0.55 + Math.sin(frame / 45) * 0.15;
+  const corners = [
+    { top: 24, left: 24, borderTop: thickness, borderLeft: thickness, borderBottom: 0, borderRight: 0, borderRadius: "4px 0 0 0" },
+    { top: 24, right: 24, borderTop: thickness, borderRight: thickness, borderBottom: 0, borderLeft: 0, borderRadius: "0 4px 0 0" },
+    { bottom: 24, left: 24, borderBottom: thickness, borderLeft: thickness, borderTop: 0, borderRight: 0, borderRadius: "0 0 0 4px" },
+    { bottom: 24, right: 24, borderBottom: thickness, borderRight: thickness, borderTop: 0, borderLeft: 0, borderRadius: "0 0 4px 0" },
+  ];
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 8, pointerEvents: "none", opacity: entrance * pulse }}>
+      {corners.map((c, i) => (
+        <div key={i} style={{
+          position: "absolute",
+          ...c,
+          width: size,
+          height: size,
+          borderStyle: "solid",
+          borderColor: accentColor,
+          borderTopWidth: c.borderTop || 0,
+          borderLeftWidth: c.borderLeft || 0,
+          borderRightWidth: c.borderRight || 0,
+          borderBottomWidth: c.borderBottom || 0,
+        }} />
+      ))}
+    </div>
+  );
+};
+
+// ── ScanlineOverlay — CRT scanline texture for cinematic video scenes ────────────
+const ScanlineOverlay: React.FC<{ frame: number }> = ({ frame }) => {
+  const drift = (frame * 0.4) % 4;
+  return (
+    <div style={{
+      position: "absolute",
+      inset: 0,
+      zIndex: 9,
+      pointerEvents: "none",
+      backgroundImage: `repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0, 0, 0, 0.06) 3px,
+        rgba(0, 0, 0, 0.06) 4px
+      )`,
+      backgroundPosition: `0 ${drift}px`,
+      mixBlendMode: "multiply",
+      opacity: 0.55,
+    }} />
+  );
+};
+
+// ── DiagonalStripe — Editorial accent stripe for hook scenes (The Economist aesthetic) ──
+const DiagonalStripe: React.FC<{
+  frame: number;
+  fps: number;
+  accentColor: string;
+}> = ({ frame, fps, accentColor }) => {
+  const entrance = spring({ frame: Math.max(0, frame - 3), fps, config: { damping: 22, stiffness: 60 } });
+  const translateX = interpolate(entrance, [0, 1], [800, 0]);
+  const pulse = Math.sin(frame / 40) * 0.015 + 1;
+
+  return (
+    <>
+      {/* Primary diagonal stripe — wide, semi-transparent */}
+      <div style={{
+        position: "absolute",
+        top: -300,
+        right: -100,
+        width: 560,
+        height: 2600,
+        background: `linear-gradient(to bottom, ${accentColor}22 0%, ${accentColor}10 50%, transparent 100%)`,
+        transform: `translateX(${translateX}px) rotate(-22deg) scale(${pulse})`,
+        transformOrigin: "top right",
+        zIndex: 2,
+        pointerEvents: "none",
+      }} />
+      {/* Secondary narrower stripe with solid edge */}
+      <div style={{
+        position: "absolute",
+        top: -300,
+        right: 60,
+        width: 8,
+        height: 2600,
+        background: `linear-gradient(to bottom, ${accentColor}70 0%, ${accentColor}30 60%, transparent 100%)`,
+        transform: `translateX(${translateX * 0.85}px) rotate(-22deg)`,
+        transformOrigin: "top right",
+        zIndex: 2,
+        pointerEvents: "none",
+        boxShadow: `0 0 20px ${accentColor}40`,
+      }} />
+      {/* Third accent sliver */}
+      <div style={{
+        position: "absolute",
+        top: -300,
+        right: 160,
+        width: 3,
+        height: 2600,
+        background: `linear-gradient(to bottom, ${accentColor}40 0%, transparent 80%)`,
+        transform: `translateX(${translateX * 0.7}px) rotate(-22deg)`,
+        transformOrigin: "top right",
+        zIndex: 2,
+        pointerEvents: "none",
+      }} />
+    </>
+  );
+};
+
+// ── CutoutHalo — SVG ring that draws itself around person cutouts ──────────────
+const CutoutHalo: React.FC<{
+  frame: number;
+  fps: number;
+  accentColor: string;
+  assetSide: "left" | "right";
+  entranceDelay: number;
+}> = ({ frame, fps, accentColor, assetSide, entranceDelay }) => {
+  const entrance = spring({
+    frame: Math.max(0, frame - entranceDelay - 8),
+    fps,
+    config: { damping: 18, stiffness: 90 },
+  });
+  const drawProgress = interpolate(entrance, [0, 1], [0, 1]);
+  const pulse = Math.sin(frame / 22) * 0.025 + 0.975;
+  const opacity = interpolate(entrance, [0, 0.4], [0, 1]);
+
+  const r1 = 240;
+  const r2 = 210;
+  const cx = 270;
+  const cy = 270;
+  const c1 = 2 * Math.PI * r1;
+  const c2 = 2 * Math.PI * r2;
+
+  // Glow dot position (end of inner arc)
+  const arcAngle = drawProgress * 0.4 * 2 * Math.PI - Math.PI / 2;
+  const dotX = cx + r2 * Math.cos(arcAngle);
+  const dotY = cy + r2 * Math.sin(arcAngle);
+
+  return (
+    <div style={{
+      position: "absolute",
+      bottom: "5%",
+      [assetSide]: "2%",
+      width: 540,
+      height: 540,
+      opacity: opacity * pulse,
+      zIndex: 3,
+      pointerEvents: "none",
+    }}>
+      <svg width="540" height="540" style={{ overflow: "visible" }}>
+        <defs>
+          <filter id="halo-glow">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        {/* Outer dashed orbit ring */}
+        <circle
+          cx={cx} cy={cy} r={r1}
+          fill="none"
+          stroke={accentColor}
+          strokeWidth="1.5"
+          strokeDasharray={`${c1 * drawProgress * 0.65} ${c1}`}
+          strokeLinecap="round"
+          opacity={0.35}
+        />
+        {/* Inner bold arc */}
+        <circle
+          cx={cx} cy={cy} r={r2}
+          fill="none"
+          stroke={accentColor}
+          strokeWidth="4"
+          strokeDasharray={`${c2 * drawProgress * 0.40} ${c2}`}
+          strokeDashoffset={-c2 * 0.05}
+          strokeLinecap="round"
+          opacity={0.75}
+          filter="url(#halo-glow)"
+        />
+        {/* Glowing dot at the arc tip */}
+        {drawProgress > 0.15 && (
+          <>
+            <circle cx={dotX} cy={dotY} r={10} fill={accentColor} opacity={0.3} />
+            <circle cx={dotX} cy={dotY} r={5} fill={accentColor} opacity={0.9} />
+          </>
+        )}
+        {/* Small tick marks at cardinal angles */}
+        {[0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].map((angle, i) => {
+          const tx = cx + (r1 + 12) * Math.cos(angle);
+          const ty = cy + (r1 + 12) * Math.sin(angle);
+          const tick = drawProgress > i * 0.2 ? 1 : 0;
+          return (
+            <circle key={i} cx={tx} cy={ty} r={3 * tick} fill={accentColor} opacity={0.5 * tick} />
+          );
+        })}
+      </svg>
+    </div>
+  );
+};
+
+// ── FloatingTagBadge — hand-tag label near cutout (Pelé "83 ANO" aesthetic) ────
+const FloatingTagBadge: React.FC<{
+  text: string;
+  frame: number;
+  fps: number;
+  accentColor: string;
+  assetSide: "left" | "right";
+  entranceDelay: number;
+  verticalOffset?: string;
+}> = ({ text, frame, fps, accentColor, assetSide, entranceDelay, verticalOffset = "42%" }) => {
+  const entrance = spring({
+    frame: Math.max(0, frame - entranceDelay),
+    fps,
+    config: { damping: 10, stiffness: 140, mass: 0.7 },
+  });
+  const bounce = Math.sin(frame / 28) * 7;
+  const sway = Math.cos(frame / 45) * 2.5;
+  const opacity = interpolate(entrance, [0, 1], [0, 1]);
+  const scale = interpolate(entrance, [0, 1], [0.5, 1]);
+  const translateY = interpolate(entrance, [0, 1], [-60, 0]);
+
+  // Badge appears on opposite side to cutout
+  const opposite = assetSide === "left" ? "right" : "left";
+
+  return (
+    <div style={{
+      position: "absolute",
+      bottom: verticalOffset,
+      [opposite]: "6%",
+      zIndex: 22,
+      opacity,
+      transform: `translateY(${translateY + bounce}px) scale(${scale}) rotate(${sway - 5}deg)`,
+      pointerEvents: "none",
+    }}>
+      {/* Tag string (thin line from top) */}
+      <div style={{
+        width: 2,
+        height: 28,
+        background: `${accentColor}80`,
+        margin: "0 auto 0",
+        position: "absolute",
+        top: -28,
+        left: "50%",
+        transform: "translateX(-50%)",
+      }} />
+      {/* Tag hole */}
+      <div style={{
+        width: 14,
+        height: 14,
+        borderRadius: "50%",
+        border: `2px solid ${accentColor}`,
+        background: "rgba(0,0,0,0.3)",
+        position: "absolute",
+        top: 10,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 2,
+      }} />
+      {/* Tag body */}
+      <div style={{
+        background: "#FFFDE7",
+        border: `2.5px solid ${accentColor}`,
+        borderRadius: "8px",
+        padding: "20px 28px 14px",
+        boxShadow: `5px 5px 0px ${accentColor}50, 0 25px 50px rgba(0,0,0,0.65)`,
+        minWidth: 160,
+        textAlign: "center",
+      }}>
+        <span style={{
+          fontFamily: "'Oswald', 'Montserrat', sans-serif",
+          fontSize: 30,
+          fontWeight: 900,
+          color: "#1a1a1a",
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+          display: "block",
+          textShadow: "none",
+        }}>
+          {text}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// ── AmbientParticles — floating dots that add depth to dark backgrounds ─────────
+const AmbientParticles: React.FC<{
+  frame: number;
+  accentColor: string;
+  count?: number;
+}> = ({ frame, accentColor, count = 16 }) => {
+  const particles = useMemo(() =>
+    Array.from({ length: count }, (_, i) => ({
+      x: (i * 97 + 43) % 100,
+      baseY: (i * 73 + 21) % 100,
+      size: (i % 3) * 1.5 + 1.5,
+      speed: 0.12 + (i % 5) * 0.07,
+      delay: (i * 17) % 80,
+      opacity: 0.03 + (i % 4) * 0.015,
+    })),
+  [count]);
+
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 1, pointerEvents: "none" }}>
+      {particles.map((p, i) => {
+        const yFrac = ((frame * p.speed + p.delay * 25) % 2400) / 2400;
+        const y = ((p.baseY - yFrac * 130 + 130) % 115) - 15;
+        const xWobble = Math.sin(frame / 60 + i) * 1.2;
+        return (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              left: `${p.x + xWobble}%`,
+              top: `${y}%`,
+              width: p.size,
+              height: p.size,
+              borderRadius: "50%",
+              background: accentColor,
+              opacity: p.opacity,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+};
+
+// ── SecondaryAssetOrbit — satellite images orbiting the main cutout/illustration ──
+const SecondaryAssetOrbit: React.FC<{
+  urls: string[];
+  frame: number;
+  fps: number;
+  accentColor: string;
+  assetSide: "left" | "right";
+  entranceDelay: number;
+}> = ({ urls, frame, fps, accentColor, assetSide, entranceDelay }) => {
+  if (!urls || urls.length === 0) return null;
+
+  // Positions: top-opposite-side, upper-corner, lower-corner
+  const positions: Array<{ top: string; left?: string; right?: string; delay: number; rotate: number }> = [
+    { top: "12%", ...(assetSide === "right" ? { left: "4%" } : { right: "4%" }), delay: 0,  rotate: -8 },
+    { top: "38%", ...(assetSide === "right" ? { left: "2%" } : { right: "2%" }), delay: 8,  rotate:  5 },
+    { top: "62%", ...(assetSide === "right" ? { left: "5%" } : { right: "5%" }), delay: 16, rotate: -4 },
+  ];
+
+  return (
+    <>
+      {urls.slice(0, 3).map((url, i) => {
+        const pos = positions[i] || positions[0];
+        const localDelay = entranceDelay + pos.delay;
+        const entryProgress = spring({
+          frame: Math.max(0, frame - localDelay),
+          fps,
+          config: { damping: 14, stiffness: 90 },
+        });
+        const floatY = Math.sin(frame / 40 + i * 1.3) * 6;
+        const floatRotate = Math.cos(frame / 55 + i * 0.9) * 2;
+
+        return (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              top: pos.top,
+              left: pos.left,
+              right: pos.right,
+              width: 110,
+              height: 110,
+              zIndex: 6,
+              opacity: entryProgress * 0.92,
+              transform: `
+                translateY(${interpolate(entryProgress, [0, 1], [-80, 0]) + floatY}px)
+                scale(${entryProgress})
+                rotate(${pos.rotate + floatRotate}deg)
+              `,
+              borderRadius: 12,
+              overflow: "hidden",
+              boxShadow: `0 8px 32px rgba(0,0,0,0.55), 0 0 0 2px ${accentColor}40`,
+            }}
+          >
+            <Img
+              src={url}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+            {/* Accent corner bracket */}
+            <div style={{
+              position: "absolute",
+              top: 4, left: 4,
+              width: 18, height: 18,
+              borderTop: `2px solid ${accentColor}`,
+              borderLeft: `2px solid ${accentColor}`,
+              borderRadius: "3px 0 0 0",
+            }} />
+            <div style={{
+              position: "absolute",
+              bottom: 4, right: 4,
+              width: 18, height: 18,
+              borderBottom: `2px solid ${accentColor}`,
+              borderRight: `2px solid ${accentColor}`,
+              borderRadius: "0 0 3px 0",
+            }} />
+          </div>
+        );
+      })}
+    </>
+  );
+};
+
+// ── NotebookLinesBg — lined paper texture for illustration/cutout scenes ────────
+const NotebookLinesBg: React.FC<{ accentColor: string }> = ({ accentColor }) => (
+  <AbsoluteFill style={{
+    background: "#F5F1E8",
+    backgroundImage: `
+      repeating-linear-gradient(
+        transparent, transparent 59px,
+        rgba(100, 149, 237, 0.22) 59px, rgba(100, 149, 237, 0.22) 61px
+      )
+    `,
+    backgroundPosition: "0 20px",
+    zIndex: 0,
+  }}>
+    {/* Red margin line */}
+    <div style={{
+      position: "absolute",
+      top: 0, bottom: 0,
+      left: "13%",
+      width: 2,
+      background: "rgba(210, 40, 40, 0.28)",
+    }} />
+    {/* Subtle paper grain overlay */}
+    <div style={{
+      position: "absolute", inset: 0,
+      backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E")`,
+      backgroundSize: "200px 200px",
+      opacity: 0.6,
+      mixBlendMode: "multiply",
+    }} />
+    {/* Top vignette to keep text readable */}
+    <div style={{
+      position: "absolute",
+      top: 0, left: 0, right: 0,
+      height: "35%",
+      background: "linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, transparent 100%)",
+    }} />
+    {/* Bottom vignette */}
+    <div style={{
+      position: "absolute",
+      bottom: 0, left: 0, right: 0,
+      height: "30%",
+      background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%)",
+    }} />
+  </AbsoluteFill>
+);
+
 const BrandLogo: React.FC<{ logoUrl: string; frame: number; fps: number }> = ({ logoUrl, frame, fps }) => {
   const entrance = spring({
     frame,
@@ -171,16 +671,22 @@ const NewspaperCollage: React.FC<{
   fallbackHeadline?: string;
   fallbackSourceName?: string;
 }> = ({ sources, frame, fps, fallbackHeadline, fallbackSourceName }) => {
-  const list = sources && sources.length > 0 ? sources : [
-    { source: fallbackSourceName || "VERIFICADO", title: fallbackHeadline || "Fato confirmado pelas fontes de mercado" }
-  ];
+  const fallbackOutlets = ["Bloomberg", "Reuters", "The Wall Street Journal", "Financial Times", "New York Times", "BBC News"];
+  const list = [...(sources || [])];
+  while (list.length < 3) {
+    const fallbackOutlet = fallbackOutlets[list.length % fallbackOutlets.length];
+    list.push({
+      source: fallbackOutlet,
+      title: fallbackHeadline || "Fato confirmado pelas fontes de mercado",
+    });
+  }
 
   const visibleSources = list.slice(0, 3);
 
   const layouts = [
-    { left: "10%", top: "15%", rotation: -1.8, delay: 0 },
-    { left: "15%", top: "22%", rotation: 1.5, delay: 8 },
-    { left: "8%", top: "29%", rotation: -1.2, delay: 16 },
+    { left: "6%", top: "42%", rotation: -1.5, delay: 0 },
+    { left: "6%", top: "60%", rotation: 1.2, delay: 8 },
+    { left: "6%", top: "78%", rotation: -0.8, delay: 16 },
   ];
 
   return (
@@ -212,7 +718,7 @@ const NewspaperCollage: React.FC<{
               position: "absolute",
               top: layout.top,
               left: layout.left,
-              width: "80%",
+              width: "88%",
               backgroundColor: "#f4f1ea",
               backgroundImage: "radial-gradient(#e5dec9 1px, transparent 1px)",
               backgroundSize: "16px 16px",
@@ -244,7 +750,7 @@ const NewspaperCollage: React.FC<{
 
             <h4 style={{
               margin: 0,
-              fontSize: 22,
+              fontSize: 30,
               lineHeight: 1.2,
               fontWeight: "bold",
               color: "#000000",
@@ -271,6 +777,7 @@ export const ReelsComposition: React.FC<ReelsCompositionProps> = ({
   thumbnail_url,
   source_name,
   category,
+  news_title,
   narration_url,
   music_url,
   sources,
@@ -278,25 +785,29 @@ export const ReelsComposition: React.FC<ReelsCompositionProps> = ({
   const { fps } = useVideoConfig();
   const pal = getPalette(category);
 
-  // Precompute narration segments for smooth audio ducking
-  const narrationSegments = useMemo(() => {
-    const segments: Array<{ start: number; end: number }> = [];
-    if (!scenes) return segments;
-    let currentFrameAccumulator = 0;
-    for (const s of scenes) {
-      const sceneFrames = Math.max(1, Math.round(s.duration_seconds * fps));
-      if (s.audio_url || narration_url) {
-        // Narration plays from the start of the scene up to the padding (usually ~0.4s before the end)
-        const narrationDurationFrames = sceneFrames - Math.round(0.4 * fps);
-        segments.push({
-          start: currentFrameAccumulator,
-          end: currentFrameAccumulator + Math.max(0, narrationDurationFrames),
-        });
+  const scenesWithOffsets = useMemo(() => {
+    if (!scenes) return [];
+    const firstAppearance: Record<string, number> = {};
+    let currentAbsoluteFrame = 0;
+    return scenes.map((scene) => {
+      const durationFrames = Math.max(1, Math.round(scene.duration_seconds * fps));
+      const startFrame = currentAbsoluteFrame;
+      let videoOffset = 0;
+      if (scene.media_url) {
+        if (firstAppearance[scene.media_url] === undefined) {
+          firstAppearance[scene.media_url] = startFrame;
+        }
+        videoOffset = startFrame - firstAppearance[scene.media_url];
       }
-      currentFrameAccumulator += sceneFrames;
-    }
-    return segments;
-  }, [scenes, fps, narration_url]);
+      currentAbsoluteFrame += durationFrames;
+      return {
+        ...scene,
+        startFrame,
+        videoOffset,
+        durationFrames,
+      };
+    });
+  }, [scenes, fps]);
 
   if (!scenes?.length) {
     return (
@@ -318,48 +829,35 @@ export const ReelsComposition: React.FC<ReelsCompositionProps> = ({
         <Audio 
           src={music_url} 
           volume={(f) => {
-            const totalFrames = scenes.reduce((acc, s) => acc + Math.max(1, Math.round(s.duration_seconds * fps)), 0);
+            const totalFrames = scenesWithOffsets.reduce((acc, s) => acc + s.durationFrames, 0);
             
             // Fade in (0.5s = 15 frames)
-            let baseVol = interpolate(f, [0, 15], [0, 0.85], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+            let baseVol = interpolate(f, [0, 15], [0, 0.25], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
             
             // Fade out (1.0s = 30 frames)
             if (f > totalFrames - 30) {
               baseVol = interpolate(f, [totalFrames - 30, totalFrames], [baseVol, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
             }
             
-            // Smooth ducking transition (fadeFrames = 8 frames)
-            const duckedMultiplier = 0.65;
-            const fadeFrames = 8;
-            
-            let minDistance = Infinity;
-            let insideSegment = false;
-            
-            for (const seg of narrationSegments) {
-              if (f >= seg.start && f <= seg.end) {
-                insideSegment = true;
+            // Ducking 40% automatically during narration scenes
+            let isNarrationActive = false;
+            let currentFrameAccumulator = 0;
+            for (const s of scenesWithOffsets) {
+              const sceneFrames = s.durationFrames;
+              if (f >= currentFrameAccumulator && f < currentFrameAccumulator + sceneFrames) {
+                // Audio plays until the padding at the end of the scene (usually ~0.4s)
+                const narrationEndFrame = currentFrameAccumulator + sceneFrames - Math.round(0.4 * fps);
+                if ((s.audio_url || narration_url) && f < narrationEndFrame) {
+                  isNarrationActive = true;
+                }
                 break;
               }
-              const distToStart = Math.abs(f - seg.start);
-              const distToEnd = Math.abs(f - seg.end);
-              const dist = Math.min(distToStart, distToEnd);
-              if (dist < minDistance) {
-                minDistance = dist;
-              }
+              currentFrameAccumulator += sceneFrames;
             }
             
-            let ducking = 1.0;
-            if (insideSegment) {
-              ducking = duckedMultiplier;
-            } else if (minDistance < fadeFrames) {
-              ducking = interpolate(minDistance, [0, fadeFrames], [duckedMultiplier, 1.0], {
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-              });
-            }
-            
-            return baseVol * ducking;
+            return isNarrationActive ? baseVol * 0.60 : baseVol;
           }} 
+          loop 
         />
       )}
 
@@ -383,20 +881,23 @@ export const ReelsComposition: React.FC<ReelsCompositionProps> = ({
       </svg>
 
       <Series>
-        {scenes.map((scene, idx) => {
-          const frames = Math.max(1, Math.round(scene.duration_seconds * fps));
+        {scenesWithOffsets.map((scene, idx) => {
+          const frames = scene.durationFrames;
           return (
             <Series.Sequence key={scene.id || idx} durationInFrames={frames}>
               <NewsScene
                 scene={scene}
                 sceneIndex={idx}
-                totalScenes={scenes.length}
+                totalScenes={scenesWithOffsets.length}
                 durationInFrames={frames}
                 pal={pal}
                 sourceName={source_name}
                 thumbnailUrl={idx === 0 ? thumbnail_url : undefined}
                 sources={sources}
                 category={category}
+                newsTitle={news_title}
+                hasGlobalNarration={!!narration_url}
+                videoOffset={scene.videoOffset}
               />
             </Series.Sequence>
           );
@@ -547,13 +1048,16 @@ const BigMetricCounter: React.FC<{
 
   const rawNumStr = numberMatch[1].replace(/,/g, ".");
   const rawNum = parseFloat(rawNumStr);
-  
+
   const countEnd = Math.round(durationInFrames * 0.7);
-  
-  const animatedVal = interpolate(frame, [0, countEnd], [0, rawNum], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+
+  // Only animate the roll for numbers ≥ 100 — rolling "2" or "4" looks absurd
+  const animatedVal = rawNum < 100
+    ? rawNum
+    : interpolate(frame, [0, countEnd], [0, rawNum], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      });
   
   const decimalPlaces = rawNumStr.includes(".") ? rawNumStr.split(".")[1].length : 0;
   const formattedVal = animatedVal.toFixed(decimalPlaces).replace(/\./g, ",");
@@ -611,6 +1115,9 @@ interface SceneProps {
   thumbnailUrl?: string;
   sources?: Array<{ source: string; title: string; url?: string }>;
   category?: string;
+  newsTitle?: string;
+  hasGlobalNarration?: boolean;
+  videoOffset?: number;
 }
 
 const CaptionEngine: React.FC<{
@@ -805,7 +1312,7 @@ const NewspaperCutout: React.FC<{
         margin: "0 0 14px 0",
         fontFamily: "'Georgia', serif",
         fontWeight: "bold",
-        fontSize: 28,
+        fontSize: 38,
         lineHeight: 1.15,
         color: "#000000",
         textAlign: "left",
@@ -1089,7 +1596,8 @@ const VideoElement: React.FC<{
   frame: number;
   durationInFrames: number;
   fps: number;
-}> = ({ src, frame, durationInFrames }) => {
+  videoOffset?: number;
+}> = ({ src, frame, durationInFrames, videoOffset = 0 }) => {
   const scale = interpolate(frame, [0, durationInFrames], [1.0, 1.08], {
     extrapolateLeft: "clamp", extrapolateRight: "clamp"
   });
@@ -1098,6 +1606,7 @@ const VideoElement: React.FC<{
     <>
       <OffthreadVideo
         src={src}
+        startFrom={videoOffset}
         style={{
           position: "absolute", inset: 0,
           width: "100%", height: "100%",
@@ -1126,7 +1635,8 @@ const SplitVideoElement: React.FC<{
   src: string;
   frame: number;
   durationInFrames: number;
-}> = ({ src, frame, durationInFrames }) => {
+  videoOffset?: number;
+}> = ({ src, frame, durationInFrames, videoOffset = 0 }) => {
   const scale = interpolate(frame, [0, durationInFrames], [1.0, 1.05], {
     extrapolateLeft: "clamp", extrapolateRight: "clamp"
   });
@@ -1148,6 +1658,7 @@ const SplitVideoElement: React.FC<{
           }}>
             <OffthreadVideo
               src={src}
+              startFrom={videoOffset}
               style={{
                 position: "absolute", width: "100%", height: "300%", top: `-${i * 100}%`,
                 objectFit: "cover",
@@ -1175,6 +1686,259 @@ const SplitVideoElement: React.FC<{
   );
 };
 
+// ── LowerThird — Bottom anchor that fills the dead zone ──────────────────────
+const LowerThird: React.FC<{
+  sourceName?: string;
+  category?: string;
+  frame: number;
+  fps: number;
+  accentColor: string;
+  sceneIndex: number;
+  totalScenes: number;
+  durationInFrames: number;
+  personName?: string;
+  isHook: boolean;
+}> = ({ sourceName, category, frame, fps, accentColor, sceneIndex, totalScenes, durationInFrames, personName, isHook }) => {
+  const entrance = spring({ frame: Math.max(0, frame - 8), fps, config: { damping: 20, stiffness: 130 } });
+  const exit = spring({ frame: Math.max(0, frame - (durationInFrames - 10)), fps, config: { damping: 15, stiffness: 100 } });
+  const translateY = interpolate(entrance, [0, 1], [120, 0]);
+  const opacity = interpolate(entrance, [0, 1], [0, 1]) * (1 - exit);
+
+  // Animated accent bar width
+  const barWidth = interpolate(frame, [8, Math.round(durationInFrames * 0.5)], [0, 100], {
+    extrapolateLeft: "clamp", extrapolateRight: "clamp",
+  });
+
+  const label = getEditorialLabel(category);
+
+  return (
+    <div style={{
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      zIndex: 48,
+      padding: "0 48px 54px",
+      transform: `translateY(${translateY}px)`,
+      opacity,
+      pointerEvents: "none",
+    }}>
+      {/* Gradient fade from transparent to dark at the very bottom */}
+      <div style={{
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 280,
+        background: "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.75) 100%)",
+        zIndex: -1,
+      }} />
+
+      {/* Animated horizontal accent bar */}
+      <div style={{
+        height: 3,
+        background: `linear-gradient(to right, ${accentColor}, ${accentColor}60, transparent)`,
+        width: `${barWidth}%`,
+        marginBottom: 20,
+        boxShadow: `0 0 12px ${accentColor}80`,
+        borderRadius: 2,
+      }} />
+
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-end",
+      }}>
+        {/* Left: source name + category */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {personName && (
+            <div style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 10,
+              backgroundColor: accentColor,
+              padding: "5px 16px",
+              borderRadius: 4,
+              marginBottom: 4,
+              width: "fit-content",
+            }}>
+              <span style={{
+                fontFamily: "'Oswald', sans-serif",
+                fontSize: 18,
+                fontWeight: 900,
+                color: "#000000",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              }}>
+                ◉ {personName}
+              </span>
+            </div>
+          )}
+          <div style={{
+            fontFamily: "'Oswald', sans-serif",
+            fontSize: 26,
+            fontWeight: 900,
+            color: "rgba(255,255,255,0.75)",
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+          }}>
+            {sourceName || "NOTICIANDO"}
+          </div>
+          <div style={{
+            fontFamily: "'Inter', sans-serif",
+            fontSize: 18,
+            fontWeight: 700,
+            color: accentColor,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            opacity: 0.8,
+          }}>
+            {label}
+          </div>
+        </div>
+
+        {/* Right: scene position indicator (dots) */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", paddingBottom: 4 }}>
+          {Array.from({ length: totalScenes }).map((_, i) => (
+            <div key={i} style={{
+              width: i === sceneIndex ? 20 : 8,
+              height: 8,
+              borderRadius: 4,
+              background: i === sceneIndex ? accentColor : "rgba(255,255,255,0.25)",
+              transition: "width 0.3s",
+              boxShadow: i === sceneIndex ? `0 0 8px ${accentColor}` : undefined,
+            }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── HookBottomFeature — Large bottom graphic element for hook scenes ───────────
+const HookBottomFeature: React.FC<{
+  frame: number;
+  fps: number;
+  accentColor: string;
+  newsTitle?: string;
+  durationInFrames: number;
+}> = ({ frame, fps, accentColor, newsTitle, durationInFrames }) => {
+  const entrance = spring({ frame: Math.max(0, frame - 15), fps, config: { damping: 14, stiffness: 90 } });
+  const opacity = interpolate(entrance, [0, 1], [0, 1]);
+  const translateY = interpolate(entrance, [0, 1], [80, 0]);
+
+  const pulse = Math.sin(frame / 15) * 0.03 + 0.97;
+
+  return (
+    <div style={{
+      position: "absolute",
+      bottom: "16%",
+      left: "8%",
+      right: "8%",
+      zIndex: 20,
+      opacity,
+      transform: `translateY(${translateY}px)`,
+      pointerEvents: "none",
+    }}>
+      {/* Accent border top */}
+      <div style={{
+        height: 4,
+        background: `linear-gradient(to right, transparent, ${accentColor}, transparent)`,
+        marginBottom: 20,
+        transform: `scaleX(${pulse})`,
+      }} />
+
+      {/* "URGENTE" badge */}
+      <div style={{
+        display: "flex",
+        justifyContent: "center",
+        marginBottom: 16,
+      }}>
+        <div style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 12,
+          border: `2px solid ${accentColor}`,
+          padding: "8px 24px",
+          borderRadius: 4,
+          boxShadow: `0 0 20px ${accentColor}40, inset 0 0 20px ${accentColor}08`,
+        }}>
+          <div style={{
+            width: 10, height: 10, borderRadius: "50%",
+            background: accentColor,
+            boxShadow: `0 0 12px ${accentColor}`,
+            animation: "none",
+            opacity: Math.sin(frame / 8) * 0.4 + 0.6,
+          }} />
+          <span style={{
+            fontFamily: "'Oswald', sans-serif",
+            fontSize: 22,
+            fontWeight: 900,
+            color: accentColor,
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+          }}>
+            ANÁLISE EXCLUSIVA
+          </span>
+        </div>
+      </div>
+
+      {/* News title teaser */}
+      {newsTitle && (
+        <p style={{
+          fontFamily: "'Inter', 'Montserrat', sans-serif",
+          fontSize: 28,
+          fontWeight: 600,
+          color: "rgba(255,255,255,0.65)",
+          textAlign: "center",
+          lineHeight: 1.35,
+          margin: 0,
+          textShadow: "0 2px 12px rgba(0,0,0,0.9)",
+          overflow: "hidden",
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+        }}>
+          {newsTitle}
+        </p>
+      )}
+
+      {/* Bottom accent line */}
+      <div style={{
+        height: 2,
+        background: `linear-gradient(to right, transparent, ${accentColor}50, transparent)`,
+        marginTop: 20,
+      }} />
+    </div>
+  );
+};
+
+const getEntranceDelayInFrames = (
+  captionWords: ReelsScene["caption_words"],
+  keywords: (string | undefined)[],
+  fps: number,
+  fallbackFrames: number = 15
+): number => {
+  if (!captionWords || captionWords.length === 0) return fallbackFrames;
+  
+  const cleanKeywords = keywords
+    .filter((k): k is string => !!k)
+    .map(k => k.toLowerCase().replace(/[,.;:!?()"[\]]/g, "").trim())
+    .flatMap(k => k.split(/\s+/))
+    .filter(k => k.length > 2);
+
+  if (cleanKeywords.length === 0) return fallbackFrames;
+
+  for (const w of captionWords) {
+    const wClean = w.word.toLowerCase().replace(/[,.;:!?()"[\]]/g, "").trim();
+    if (cleanKeywords.some(kw => wClean.includes(kw) || kw.includes(wClean))) {
+      return Math.round(w.start * fps);
+    }
+  }
+
+  return fallbackFrames;
+};
+
 const NewsScene: React.FC<SceneProps> = ({
   scene,
   sceneIndex,
@@ -1185,9 +1949,21 @@ const NewsScene: React.FC<SceneProps> = ({
   thumbnailUrl,
   sources,
   category,
+  newsTitle,
+  hasGlobalNarration,
+  videoOffset = 0,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+
+  const entranceDelay = useMemo(() => {
+    return getEntranceDelayInFrames(
+      scene.caption_words,
+      [scene.person_name, scene.media_keyword],
+      fps,
+      15
+    );
+  }, [scene.caption_words, scene.person_name, scene.media_keyword, fps]);
 
   // Entrance & Exit animations
   const entrance = spring({ frame, fps, config: { damping: 16, stiffness: 130 } });
@@ -1206,10 +1982,11 @@ const NewsScene: React.FC<SceneProps> = ({
   const assetSide = sceneIndex % 2 === 0 ? "right" : "left";
 
   // ── Cutout slide lateral ──
-  const _cutoutSpring       = spring({ frame, fps, config: { damping: 22, stiffness: 200, mass: 0.9 } });
+  const cutoutFrame = Math.max(0, frame - entranceDelay);
+  const _cutoutSpring       = spring({ frame: cutoutFrame, fps, config: { damping: 22, stiffness: 200, mass: 0.9 } });
   const _cutoutSlideFrom    = assetSide === "right" ? 340 : -340;
   const _cutoutTranslateX   = interpolate(_cutoutSpring, [0, 1], [_cutoutSlideFrom, 0]);
-  const _cutoutEntryOpacity = interpolate(frame, [0, 8], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const _cutoutEntryOpacity = interpolate(cutoutFrame, [0, 8], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const _cutoutExitX        = interpolate(exitProgress, [0, 1], [0, -_cutoutSlideFrom * 0.45]);
 
   const isHook = sceneIndex === 0 || scene.visual_type === "hook";
@@ -1370,7 +2147,7 @@ const NewsScene: React.FC<SceneProps> = ({
     return Math.max(...filteredWordsWithIndices.map(w => w.word.length), 0);
   }, [filteredWordsWithIndices]);
 
-  const baseTitleFontSize = isHook ? 100 : 76;
+  const baseTitleFontSize = isHook ? 112 : 76;
   const titleFontSize = useMemo(() => {
     if (longestWordLength > 12) {
       return Math.max(48, baseTitleFontSize - (longestWordLength - 12) * 4);
@@ -1409,13 +2186,15 @@ const NewsScene: React.FC<SceneProps> = ({
   const strokeDashoffsetDonut = 640 - (Math.min(parsedValue, 100) / 100) * interpolate(frame, [0, donutAnimFrames], [0, 1], { extrapolateRight: "clamp" }) * 640;
 
   const currentCountText = dataMetric
-    ? interpolate(frame, [0, Math.round(durationInFrames * 0.7)], [0, dataMetric.num], { extrapolateRight: "clamp" }).toFixed(dataMetric.num % 1 === 0 ? 0 : 1)
+    ? (Math.abs(dataMetric.num) <= 9
+        ? dataMetric.num.toFixed(dataMetric.num % 1 === 0 ? 0 : 1)
+        : interpolate(frame, [0, Math.round(durationInFrames * 0.7)], [0, dataMetric.num], { extrapolateRight: "clamp" }).toFixed(dataMetric.num % 1 === 0 ? 0 : 1))
     : interpolate(frame, [0, Math.round(durationInFrames * 0.7)], [0, 75], { extrapolateRight: "clamp" }).toFixed(0);
 
   return (
     <AbsoluteFill style={{ opacity: exitOpacity, overflow: "hidden" }}>
       {/* 🎙️ Local Scene Narration Audio */}
-      {scene.audio_url && <Audio src={scene.audio_url} volume={1.0} />}
+      {scene.audio_url && !hasGlobalNarration && <Audio src={scene.audio_url} volume={1.0} />}
 
       {/* ── Global Film Grain ── */}
       <div style={{
@@ -1438,16 +2217,46 @@ const NewsScene: React.FC<SceneProps> = ({
       }} />
 
       {isFullVideo && scene.media_url && (
-        <VideoElement src={scene.media_url} sceneIndex={sceneIndex} frame={frame} durationInFrames={durationInFrames} fps={fps} />
+        <VideoElement src={scene.media_url} sceneIndex={sceneIndex} frame={frame} durationInFrames={durationInFrames} fps={fps} videoOffset={videoOffset} />
       )}
       
       {isSplitVideo && scene.media_url && (
-        <SplitVideoElement src={scene.media_url} frame={frame} durationInFrames={durationInFrames} />
+        <SplitVideoElement src={scene.media_url} frame={frame} durationInFrames={durationInFrames} videoOffset={videoOffset} />
       )}
 
       {isMap && <MapBackground frame={frame} fps={fps} mapImageUrl={scene.map_image_url} />}
       {isTimeline && <TimelineBackground frame={frame} fps={fps} durationInFrames={durationInFrames} timelinePoints={scene.timeline_points} />}
       {isCollage && <CollageBackground frame={frame} fps={fps} cutoutUrl={scene.cutout_url} />}
+
+      {/* ── Notebook paper background for illustration scenes (paper/research aesthetic) ── */}
+      {scene.visual_type === "illustration" && !isCinematicVideo && (
+        <NotebookLinesBg accentColor={pal.accent} />
+      )}
+
+      {/* ── Editorial diagonal accent stripe — hook scenes only ── */}
+      {isHook && (
+        <DiagonalStripe frame={frame} fps={fps} accentColor={pal.accent} />
+      )}
+
+      {/* ── Glitch flash — hook scene opening impact ── */}
+      {isHook && (
+        <GlitchFlash frame={frame} accentColor={pal.accent} />
+      )}
+
+      {/* ── CRT Scanline texture — video/cinematic scenes ── */}
+      {isCinematicVideo && (
+        <ScanlineOverlay frame={frame} />
+      )}
+
+      {/* ── Cinematic corner brackets — video scenes ── */}
+      {isCinematicVideo && (
+        <CornerBrackets frame={frame} fps={fps} accentColor={pal.accent} />
+      )}
+
+      {/* ── Ambient particles — dark scene backgrounds for depth ── */}
+      {!isAnalogBg && !isCinematicVideo && (
+        <AmbientParticles frame={frame} accentColor={pal.accent} count={14} />
+      )}
 
       {/* Ticker scrolling text in text/editorial scenes */}
       {!isCinematicVideo && !isAnalogBg && (
@@ -1566,65 +2375,138 @@ const NewsScene: React.FC<SceneProps> = ({
 
         {/* ── Cutout sliding from bottom ── */}
         {scene.visual_type === "cutout" && scene.cutout_url && scene.cutout_url !== "newspaper" && (
-          <div style={{
-            position: "absolute",
-            bottom: "10%",
-            left: "10%",
-            right: "10%",
-            height: "50%",
-            zIndex: 4,
-            opacity: (1 - exitProgress) * _cutoutEntryOpacity,
-            transform: `translateX(${_cutoutTranslateX + _cutoutExitX}px)`,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "flex-end",
-          }}>
-            <Img
-              src={scene.cutout_url}
-              style={{
-                maxHeight: "100%",
-                maxWidth: "100%",
-                objectFit: "contain",
-                filter: "url(#sticker-outline) drop-shadow(-8px 8px 24px rgba(0,0,0,0.7))",
-              }}
+          <>
+            {/* Halo ring — draws itself in behind the person */}
+            <CutoutHalo
+              frame={frame}
+              fps={fps}
+              accentColor={pal.accent}
+              assetSide={assetSide}
+              entranceDelay={entranceDelay}
             />
-          </div>
+
+            {/* Secondary satellite images orbiting the cutout */}
+            {scene.secondary_asset_urls && scene.secondary_asset_urls.length > 0 && (
+              <SecondaryAssetOrbit
+                urls={scene.secondary_asset_urls}
+                frame={frame}
+                fps={fps}
+                accentColor={pal.accent}
+                assetSide={assetSide}
+                entranceDelay={entranceDelay + 12}
+              />
+            )}
+
+            {/* The actual cutout photo */}
+            <div style={{
+              position: "absolute",
+              bottom: "8%",
+              left: "5%",
+              right: "5%",
+              height: "72%",
+              zIndex: 4,
+              opacity: (1 - exitProgress) * _cutoutEntryOpacity,
+              transform: `translateX(${_cutoutTranslateX + _cutoutExitX}px)`,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "flex-end",
+            }}>
+              <Img
+                src={scene.cutout_url}
+                style={{
+                  maxHeight: "100%",
+                  maxWidth: "100%",
+                  objectFit: "contain",
+                  filter: "url(#sticker-outline) drop-shadow(-8px 8px 24px rgba(0,0,0,0.7))",
+                }}
+              />
+            </div>
+
+            {/* Floating tag badge — appears after cutout enters */}
+            {scene.tag_badge && (
+              <FloatingTagBadge
+                text={scene.tag_badge}
+                frame={frame}
+                fps={fps}
+                accentColor={pal.accent}
+                assetSide={assetSide}
+                entranceDelay={entranceDelay + 18}
+                verticalOffset="40%"
+              />
+            )}
+          </>
         )}
 
         {/* Dynamic Stylized Illustration Sticker */}
         {(scene.illustration_url || (scene.visual_type === "illustration" && scene.media_url)) && (
-          <div style={{
-            position: "absolute",
-            bottom: "10%",
-            left: "10%",
-            right: "10%",
-            height: "50%",
-            zIndex: 4,
-            opacity: 1 - exitProgress,
-            transform: `translateY(${
-              Math.sin(frame / 10) * 10 + 
-              interpolate(exitProgress, [0, 1], [0, 120])
-            }px) scale(${
-              interpolate(
-                spring({ frame, fps, config: { damping: 14, stiffness: 95 } }),
-                [0, 1],
-                [0, 1]
-              ) * interpolate(exitProgress, [0, 1], [1, 0])
-            }) rotate(${Math.cos(frame / 12) * 3 + interpolate(exitProgress, [0, 1], [0, -15])}deg)`,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "flex-end",
-          }}>
-            <Img
-              src={scene.illustration_url || scene.media_url || ""}
-              style={{
-                maxHeight: "100%",
-                maxWidth: "100%",
-                objectFit: "contain",
-                filter: "url(#sticker-outline) drop-shadow(0 20px 30px rgba(0,0,0,0.65))",
-              }}
+          <>
+            {/* Halo ring for illustrations too */}
+            <CutoutHalo
+              frame={frame}
+              fps={fps}
+              accentColor={pal.accent}
+              assetSide={assetSide}
+              entranceDelay={entranceDelay}
             />
-          </div>
+
+            {/* Secondary satellite images for illustrations */}
+            {scene.secondary_asset_urls && scene.secondary_asset_urls.length > 0 && (
+              <SecondaryAssetOrbit
+                urls={scene.secondary_asset_urls}
+                frame={frame}
+                fps={fps}
+                accentColor={pal.accent}
+                assetSide={assetSide}
+                entranceDelay={entranceDelay + 12}
+              />
+            )}
+
+            <div style={{
+              position: "absolute",
+              bottom: "8%",
+              left: "5%",
+              right: "5%",
+              height: "68%",
+              zIndex: 4,
+              opacity: 1 - exitProgress,
+              transform: `translateY(${
+                Math.sin(frame / 10) * 10 +
+                interpolate(exitProgress, [0, 1], [0, 120])
+              }px) scale(${
+                interpolate(
+                  spring({ frame: Math.max(0, frame - entranceDelay), fps, config: { damping: 14, stiffness: 95 } }),
+                  [0, 1],
+                  [0, 1]
+                ) * interpolate(exitProgress, [0, 1], [1, 0])
+              }) rotate(${Math.cos(frame / 12) * 3 + interpolate(exitProgress, [0, 1], [0, -15])}deg)`,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "flex-end",
+            }}>
+              <Img
+                src={scene.illustration_url || scene.media_url || ""}
+                style={{
+                  maxHeight: "100%",
+                  maxWidth: "100%",
+                  objectFit: "contain",
+                  filter: "url(#sticker-outline) drop-shadow(0 20px 30px rgba(0,0,0,0.65))",
+                }}
+              />
+            </div>
+
+            {/* Tag badge for illustrations */}
+            {scene.tag_badge && (
+              <FloatingTagBadge
+                text={scene.tag_badge}
+                frame={frame}
+                fps={fps}
+                accentColor={pal.accent}
+                assetSide={assetSide}
+                entranceDelay={entranceDelay + 20}
+                verticalOffset="38%"
+              />
+            )}
+          </>
         )}
 
         {/* Country Flags Overlay */}
@@ -1641,20 +2523,21 @@ const NewsScene: React.FC<SceneProps> = ({
           const scale = flagEntrance * (1 - exitProgress);
           
           const oppositeSide = assetSide === "right" ? "left" : "right";
-          const sideOffset = 60 + idx * 85;
+          const side = hasSideAsset ? oppositeSide : (idx % 2 === 0 ? "left" : "right");
+          const sideOffset = 40;
 
           return (
             <div
               key={code}
               style={{
                 position: "absolute",
-                bottom: 260 + idx * 25,
-                [hasSideAsset ? oppositeSide : (idx % 2 === 0 ? "left" : "right")]: hasSideAsset ? sideOffset : (120 + idx * 95),
-                width: 100,
-                height: 100,
+                bottom: 120 + idx * 330,
+                [side]: sideOffset,
+                width: 360,
+                height: 360,
                 borderRadius: "50%",
-                border: "4px solid #FFFFFF",
-                boxShadow: "0 15px 30px rgba(0,0,0,0.5)",
+                border: "8px solid #FFFFFF",
+                boxShadow: "0 25px 50px rgba(0,0,0,0.8)",
                 overflow: "hidden",
                 zIndex: 5,
                 transform: `translateY(${y}px) rotate(${rot}deg) scale(${scale})`,
@@ -1663,14 +2546,14 @@ const NewsScene: React.FC<SceneProps> = ({
               }}
             >
               <img
-                src={`https://flagcdn.com/w160/${code}.png`}
+                src={`https://flagcdn.com/w320/${code}.png`}
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             </div>
           );
         })}
 
-        {/* Captions Overlay */}
+        {/* Captions Overlay
         {scene.caption_words && scene.caption_words.length > 0 && !isHook && (
           <CaptionEngine
             words={scene.caption_words}
@@ -1679,11 +2562,12 @@ const NewsScene: React.FC<SceneProps> = ({
             accentColor={highlightColor}
           />
         )}
+        */}
 
         {/* ── Rule 1: Centralized Headline Container ── */}
         <div style={{
           position: "absolute",
-          top: "18%",
+          top: "8%",
           left: "8%",
           right: "8%",
           display: "flex",
@@ -1728,36 +2612,62 @@ const NewsScene: React.FC<SceneProps> = ({
             }}>
               {filteredWordsWithIndices.map(({ word, index }, i) => {
                 const isHighlighted = accentSet.has(index);
-                const delay = i * 2.5;
+                // Hook: each word slams in from a different direction with very tight delay
+                // Other: staggered by 2.5 frames
+                const delay = isHook ? i * 1.8 : i * 2.5;
                 const wordFrame = Math.max(0, frame - delay);
 
                 let transform = "";
                 let opacity = 0;
                 let filter = "";
+                let textShadowExtra = "";
 
-                const animStyle = sceneIndex % 3;
-
-                if (animStyle === 0) {
-                  const s = spring({ frame: wordFrame, fps, config: { damping: 14, stiffness: 150 } });
-                  const y = interpolate(s, [0, 1], [24, 0]);
-                  const rot = interpolate(s, [0, 1], [-4, 0]);
-                  const o = interpolate(wordFrame, [0, 5], [0, 1], { extrapolateRight: "clamp" });
-                  transform = `scale(${s * (isHighlighted ? 1.12 : 1.0)}) translateY(${y}px) rotate(${rot + (isHighlighted ? 1.5 : 0)}deg)`;
-                  opacity = o;
-                } else if (animStyle === 1) {
-                  const s = spring({ frame: wordFrame, fps, config: { damping: 10, stiffness: 180 } });
-                  const rot = interpolate(s, [0, 1], [8, 0]);
-                  const o = interpolate(wordFrame, [0, 4], [0, 1], { extrapolateRight: "clamp" });
-                  transform = `scale(${s * (isHighlighted ? 1.15 : 1.0)}) rotate(${rot}deg)`;
-                  opacity = o;
+                if (isHook) {
+                  // ── KINETIC SLAM — aggressive spring, overshoots then locks ──
+                  const slamDir = i % 3; // 0=from top, 1=from right, 2=from left
+                  const sSlam = spring({ frame: wordFrame, fps, config: { damping: 8, stiffness: 260, mass: 0.7 } });
+                  const oSlam = interpolate(wordFrame, [0, 3], [0, 1], { extrapolateRight: "clamp" });
+                  let slamTransform = `scale(${interpolate(sSlam, [0, 1], [1.6, isHighlighted ? 1.08 : 1.0])})`;
+                  if (slamDir === 0) {
+                    slamTransform += ` translateY(${interpolate(sSlam, [0, 1], [-90, 0])}px)`;
+                  } else if (slamDir === 1) {
+                    slamTransform += ` translateX(${interpolate(sSlam, [0, 1], [80, 0])}px)`;
+                  } else {
+                    slamTransform += ` translateX(${interpolate(sSlam, [0, 1], [-80, 0])}px)`;
+                  }
+                  // After impact: subtle shake at frame 3-6
+                  const shakeAmt = interpolate(wordFrame, [3, 4, 5, 6, 7], [0, 3, -2, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+                  slamTransform += ` rotate(${shakeAmt}deg)`;
+                  transform = slamTransform;
+                  opacity = oSlam;
+                  textShadowExtra = isHighlighted
+                    ? `0 0 40px ${pal.accent}CC, 0 0 80px ${pal.accent}55`
+                    : "0 0 30px rgba(0,0,0,0.9)";
                 } else {
-                  const s = spring({ frame: wordFrame, fps, config: { damping: 14, stiffness: 120 } });
-                  const x = interpolate(s, [0, 1], [-25, 0]);
-                  const blurVal = interpolate(s, [0, 1], [8, 0]);
-                  const o = interpolate(wordFrame, [0, 6], [0, 1], { extrapolateRight: "clamp" });
-                  transform = `scale(${s * (isHighlighted ? 1.12 : 1.0)}) translateX(${x}px)`;
-                  opacity = o;
-                  filter = `blur(${blurVal}px)`;
+                  const animStyle = sceneIndex % 3;
+
+                  if (animStyle === 0) {
+                    const s = spring({ frame: wordFrame, fps, config: { damping: 14, stiffness: 150 } });
+                    const y = interpolate(s, [0, 1], [24, 0]);
+                    const rot = interpolate(s, [0, 1], [-4, 0]);
+                    const o = interpolate(wordFrame, [0, 5], [0, 1], { extrapolateRight: "clamp" });
+                    transform = `scale(${s * (isHighlighted ? 1.12 : 1.0)}) translateY(${y}px) rotate(${rot + (isHighlighted ? 1.5 : 0)}deg)`;
+                    opacity = o;
+                  } else if (animStyle === 1) {
+                    const s = spring({ frame: wordFrame, fps, config: { damping: 10, stiffness: 180 } });
+                    const rot = interpolate(s, [0, 1], [8, 0]);
+                    const o = interpolate(wordFrame, [0, 4], [0, 1], { extrapolateRight: "clamp" });
+                    transform = `scale(${s * (isHighlighted ? 1.15 : 1.0)}) rotate(${rot}deg)`;
+                    opacity = o;
+                  } else {
+                    const s = spring({ frame: wordFrame, fps, config: { damping: 14, stiffness: 120 } });
+                    const x = interpolate(s, [0, 1], [-25, 0]);
+                    const blurVal = interpolate(s, [0, 1], [8, 0]);
+                    const o = interpolate(wordFrame, [0, 6], [0, 1], { extrapolateRight: "clamp" });
+                    transform = `scale(${s * (isHighlighted ? 1.12 : 1.0)}) translateX(${x}px)`;
+                    opacity = o;
+                    filter = `blur(${blurVal}px)`;
+                  }
                 }
 
                 return (
@@ -1775,7 +2685,9 @@ const NewsScene: React.FC<SceneProps> = ({
                       letterSpacing: isCinematicVideo ? "0em" : "-0.015em",
                       lineHeight: isCinematicVideo ? 1.15 : 1.05,
                       color: isHighlighted ? highlightColor : textColor,
-                      textShadow: "0 2px 20px rgba(0,0,0,0.95), 0 1px 6px rgba(0,0,0,1)",
+                      textShadow: textShadowExtra
+                        ? `0 2px 20px rgba(0,0,0,0.95), 0 1px 6px rgba(0,0,0,1), ${textShadowExtra}`
+                        : "0 2px 20px rgba(0,0,0,0.95), 0 1px 6px rgba(0,0,0,1)",
                       transform,
                       transformOrigin: "center center",
                       opacity,
@@ -1844,8 +2756,8 @@ const NewsScene: React.FC<SceneProps> = ({
           zIndex: 10,
           opacity: 1 - exitProgress,
         }}>
-          {/* Big metric/percentage counter animation */}
-          {dataMetric && !isHook && (
+          {/* Big metric/percentage counter animation — only for % / monetary / large numbers ≥ 100 */}
+          {dataMetric && !isHook && (dataMetric.unit !== "" || dataMetric.num >= 100) && (
             <BigMetricCounter
               value={dataMetric.rawString || `${dataMetric.num}${dataMetric.unit}`}
               color={highlightColor}
@@ -1861,7 +2773,7 @@ const NewsScene: React.FC<SceneProps> = ({
               sources={sources}
               frame={frame}
               fps={fps}
-              fallbackHeadline={scene.headline}
+              fallbackHeadline={newsTitle || scene.headline}
               fallbackSourceName={sourceName}
             />
           )}
@@ -2134,6 +3046,31 @@ const NewsScene: React.FC<SceneProps> = ({
           )}
         </div>
       </AbsoluteFill>
+
+      {/* ── Hook scene bottom feature ── */}
+      {isHook && (
+        <HookBottomFeature
+          frame={frame}
+          fps={fps}
+          accentColor={pal.accent}
+          newsTitle={newsTitle}
+          durationInFrames={durationInFrames}
+        />
+      )}
+
+      {/* ── LowerThird anchor for every scene ── */}
+      <LowerThird
+        sourceName={sourceName}
+        category={category}
+        frame={frame}
+        fps={fps}
+        accentColor={pal.accent}
+        sceneIndex={sceneIndex}
+        totalScenes={totalScenes}
+        durationInFrames={durationInFrames}
+        personName={scene.person_name || undefined}
+        isHook={isHook}
+      />
     </AbsoluteFill>
   );
 };

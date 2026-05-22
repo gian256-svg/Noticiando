@@ -123,6 +123,7 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
         duration,
         thumbnail_url: news.thumbnail_url ?? null,
         article_url: news.url ?? null,
+        pasted_script: pastedScript || null,
       };
 
       if (window.noticiando?.invoke) {
@@ -166,7 +167,7 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
     } finally {
       setGeneratingVideo(false);
     }
-  }, [news, duration]);
+  }, [news, duration, pastedScript]);
 
   if (!news) return <EmptyScriptPanel />;
 

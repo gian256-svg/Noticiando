@@ -147,6 +147,7 @@ class VideoSceneRequest(BaseModel):
     duration: int = 45
     thumbnail_url: str | None = None
     article_url: str | None = None
+    pasted_script: str | None = None
 
 
 class RenderVideoRequest(BaseModel):
@@ -176,6 +177,8 @@ async def render_video_endpoint(req: RenderVideoRequest):
         f"--props={props_file}",
         "--codec=h264",
         "--pixel-format=yuv420p",
+        "--crf=16",              # Near-lossless quality (lower = better, 0-51)
+        "--videoBitrate=12M",    # Target 12 Mbps — broadcast-quality for 1080x1920
         "--log=error",
     ]
 
@@ -203,18 +206,155 @@ async def render_video_endpoint(req: RenderVideoRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def clean_script_text(val: str) -> str:
+    val = val.strip()
+    return re.sub(r'^["\'\\“‘”’]+|["\'\\“‘”’]+$', '', val).strip()
+
+
+def parse_custom_script(text: str, category: str) -> dict[str, Any]:
+    text = text.strip()
+    
+    # If it is JSON, parse directly
+    if text.startswith("{") or (text.startswith("```") and "{" in text):
+        try:
+            clean_text = text.strip()
+            if "```" in clean_text:
+                match = re.search(r"```(?:json)?\s*([\s\S]+?)```", clean_text)
+                if match:
+                    clean_text = match.group(1).strip()
+            return json.loads(clean_text)
+        except Exception as e:
+            logger.warning(f"Failed to parse pasted script as JSON: {e}")
+            
+    # Regular parsing of timestamp-based text format
+    pattern = r'\[(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\]'
+    matches = list(re.finditer(pattern, text))
+    
+    scenes = []
+    
+    for i, match in enumerate(matches):
+        start_min, start_sec, end_min, end_sec = map(int, match.groups())
+        start_time = start_min * 60 + start_sec
+        end_time = end_min * 60 + end_sec
+        duration = float(end_time - start_time)
+        if duration <= 0:
+            duration = 5.0
+            
+        start_idx = match.end()
+        end_idx = matches[i+1].start() if i + 1 < len(matches) else len(text)
+        scene_body = text[start_idx:end_idx].strip()
+        
+        visual_type = "video"
+        decorator_type = "none"
+        headline = ""
+        subtext = ""
+        youtube_search = ""
+        media_keyword = ""
+        person_name = None
+        brand_domain = None
+        timeline_points = None
+        tag_badge = None
+        secondary_assets: list[str] = []
+
+        for line in scene_body.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+
+            lower_line = line.lower()
+            if "tipo visual:" in lower_line or "visual_type:" in lower_line or "visual type:" in lower_line:
+                val = line.split(":", 1)[1].strip().strip('"').strip("'").lower()
+                valid_types = ["hook", "video", "cutout", "illustration", "data", "map", "timeline", "collage", "split_video", "newspaper_clip"]
+                for vt in valid_types:
+                    if vt in val:
+                        visual_type = vt
+                        break
+            elif "decorador:" in lower_line or "decorator_type:" in lower_line or "decorator:" in lower_line:
+                val = line.split(":", 1)[1].strip().strip('"').strip("'").lower()
+                valid_decorators = ["arrow", "circle", "stripes", "star", "none"]
+                for dec in valid_decorators:
+                    if dec in val:
+                        decorator_type = dec
+                        break
+            elif "texto na tela:" in lower_line or "headline:" in lower_line or "texto:" in lower_line:
+                headline = clean_script_text(line.split(":", 1)[1])
+            elif "narração" in lower_line or "narracao" in lower_line or "subtext:" in lower_line or "voz:" in lower_line:
+                subtext = clean_script_text(line.split(":", 1)[1])
+            elif "youtube search:" in lower_line or "youtube:" in lower_line or "busca:" in lower_line:
+                youtube_search = clean_script_text(line.split(":", 1)[1])
+            elif "brand domain:" in lower_line or "brand:" in lower_line or "marca:" in lower_line:
+                brand_domain = clean_script_text(line.split(":", 1)[1])
+            elif "personagem:" in lower_line or "person_name:" in lower_line or "figura:" in lower_line or "character:" in lower_line:
+                person_name = clean_script_text(line.split(":", 1)[1])
+            elif "tag_badge:" in lower_line or "tag badge:" in lower_line or "etiqueta:" in lower_line:
+                raw_badge = clean_script_text(line.split(":", 1)[1])
+                if raw_badge.lower() not in ("null", "none", ""):
+                    tag_badge = raw_badge.upper()
+            elif "keyword:" in lower_line or "media_keyword:" in lower_line:
+                val = line.split(":", 1)[1].strip().strip('"').strip("'").lower()
+                valid_keywords = ["money", "growth", "crypto", "chart", "bitcoin", "briefcase", "newspaper"]
+                for kw in valid_keywords:
+                    if kw in val:
+                        media_keyword = kw
+                        break
+                
+        if visual_type == "timeline" or "timeline" in scene_body.lower():
+            points = []
+            for line in scene_body.split("\n"):
+                line = line.strip()
+                match_pt = re.match(r'^(?:[-•*\s]+)?([^:]+?)\s*:\s*["\']?([^"\']+)["\']?$', line)
+                if match_pt:
+                    label, val_pt = match_pt.groups()
+                    if label.lower() in ["tipo visual", "decorador", "texto na tela", "narração", "narraca", "narraçao", "áudio/sfx", "sfx", "audio/sfx", "brand domain"]:
+                        continue
+                    points.append({"label": clean_script_text(label), "value": clean_script_text(val_pt)})
+            if len(points) == 3:
+                timeline_points = points
+            elif len(points) > 0:
+                while len(points) < 3:
+                    points.append({"label": "PROJEÇÃO", "value": "Dados futuros"})
+                timeline_points = points[:3]
+                
+        if not headline and subtext:
+            headline = subtext[:30].upper()
+        if not subtext and headline:
+            subtext = headline
+            
+        scenes.append({
+            "id": f"scene_{i+1}",
+            "headline": headline,
+            "subtext": subtext,
+            "duration_seconds": duration,
+            "visual_type": visual_type,
+            "decorator_type": decorator_type,
+            "youtube_search": youtube_search or None,
+            "media_keyword": media_keyword or None,
+            "person_name": person_name,
+            "brand_domain": brand_domain,
+            "timeline_points": timeline_points,
+            "tag_badge": tag_badge,
+            "secondary_assets": secondary_assets,
+        })
+        
+    return {"scenes": scenes}
+
+
 @router.post("/generate-video-scenes")
 async def generate_scenes_endpoint(req: VideoSceneRequest):
     try:
         import uuid
         generation_id = str(uuid.uuid4())[:8]
 
-        result = await generate_video_scenes(
-            title=req.title,
-            summary=req.summary,
-            category=req.category,
-            duration=req.duration,
-        )
+        if req.pasted_script:
+            logger.info("Parsing custom script from pasted script...")
+            result = parse_custom_script(req.pasted_script, req.category)
+        else:
+            result = await generate_video_scenes(
+                title=req.title,
+                summary=req.summary,
+                category=req.category,
+                duration=req.duration,
+            )
         result["news_id"] = req.news_id
         if req.thumbnail_url:
             result["thumbnail_url"] = req.thumbnail_url
@@ -238,7 +378,7 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
         sources_count = len(clean_sources)
         result["sources"] = clean_sources
 
-        from ai.media_fetcher import fetch_article_photos, fetch_youtube_broll, fetch_youtube_thumbnail
+        from ai.media_fetcher import fetch_article_photos, fetch_youtube_broll, fetch_youtube_thumbnail, fetch_person_photo
         from ai.voice_and_sound import generate_narration, get_epidemic_soundtrack
 
         scenes = result.get("scenes", [])
@@ -282,7 +422,13 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
                     scene["youtube_search"] = "financial market chart analysis motion background loop"
 
             # 1. Resolver vídeo de fundo (background_video_url)
-            yt_query = scene.get("youtube_search") or scene.get("media_search_query") or req.title
+            yt_query = scene.get("youtube_search")
+            if not yt_query:
+                person = scene.get("person_name")
+                if person:
+                    yt_query = f"{person} interview news B-roll footage"
+                else:
+                    yt_query = scene.get("media_search_query") or req.title
             bg_video = await fetch_youtube_broll(yt_query, req.category, salt=generation_id, scene_index=scene_idx)
             scene["background_video_url"] = bg_video
             scene["media_url"] = bg_video
@@ -293,15 +439,26 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
                 if kw == "newspaper":
                     scene["cutout_url"] = "newspaper"
                 else:
+                    person_name_raw = scene.get("person_name") or ""
                     static_asset = _resolve_static_asset(kw)
-                    if static_asset:
+
+                    # ── Prioridade 1: Foto real da pessoa via Wikipedia / DuckDuckGo ──
+                    person_photo = None
+                    if person_name_raw.strip() and person_name_raw.lower() not in ("null", "none", ""):
+                        person_photo = await fetch_person_photo(person_name_raw.strip())
+
+                    if person_photo:
+                        scene["cutout_url"] = person_photo
+                        scene["person_photo_fetched"] = True
+                        logger.info(f"Foto da pessoa '{person_name_raw}' usada como cutout.")
+                    elif static_asset:
                         scene["cutout_url"] = static_asset
                     elif idx_for_photo is not None and idx_for_photo < len(article_photos):
                         scene["cutout_url"] = article_photos[idx_for_photo]
                     else:
                         # Tentar gerar imagem por IA usando person_name se disponível, ou media_keyword / headline
                         from ai.image_generator import generate_cutout_image
-                        target_kw = scene.get("person_name") or scene.get("media_keyword") or scene.get("headline") or ""
+                        target_kw = person_name_raw or scene.get("media_keyword") or scene.get("headline") or ""
                         context = scene.get("subtext") or scene.get("headline") or ""
                         generated = await generate_cutout_image(target_kw, context, req.category, salt=generation_id)
                         if generated:
@@ -316,7 +473,12 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
                             elif req.thumbnail_url:
                                 scene["cutout_url"] = req.thumbnail_url
                             else:
-                                scene["cutout_url"] = f"{_get_localhost()}/output/assets/cutout_money.png"
+                                fallbacks = [
+                                    f"{_get_localhost()}/output/assets/cutout_money.png",
+                                    f"{_get_localhost()}/output/assets/cutout_nigro.png",
+                                    f"{_get_localhost()}/output/assets/cutout_perini.png"
+                                ]
+                                scene["cutout_url"] = fallbacks[scene_idx % len(fallbacks)]
 
             # 3. Resolver ilustrações
             elif v_type == "illustration":
@@ -358,6 +520,22 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
                 generated = await generate_cutout_image(map_kw, context, req.category, salt=generation_id)
                 if generated:
                     scene["map_image_url"] = generated
+
+            # 6. Resolver secondary_assets (elementos decorativos flutuantes)
+            secondary_kws = scene.get("secondary_assets") or []
+            if v_type in ("cutout", "illustration") and secondary_kws:
+                secondary_urls: list[str] = []
+                for sec_kw in secondary_kws[:3]:  # máximo 3 decorativos
+                    if not sec_kw or not sec_kw.strip():
+                        continue
+                    try:
+                        sec_thumb = await fetch_youtube_thumbnail(sec_kw.strip())
+                        if sec_thumb:
+                            secondary_urls.append(sec_thumb)
+                    except Exception as e:
+                        logger.debug(f"Falha ao buscar secondary asset '{sec_kw}': {e}")
+                if secondary_urls:
+                    scene["secondary_asset_urls"] = secondary_urls
 
         # Organizar as tasks para rodar em paralelo
         tasks = []
@@ -412,70 +590,131 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
             except Exception as e:
                 logger.error(f"Erro ao carregar legendas do ElevenLabs: {e}")
 
-        # 2. Distribuir a duração exata proporcionalmente por cena
-        # E fatiar o áudio global em clipes por cena para esticar o visual de forma independente
+        # 2. Distribuir a duração exata por cena baseada em alinhamento de palavras
         if total_audio_duration > 0:
-            # Pass 0: Partition all_captions sequentially based on word counts of each scene's script
-            scene_captions = []
-            caption_index = 0
+            def clean_word(w: str) -> str:
+                return re.sub(r'[^\w\s]', '', w.lower().strip())
+
+            def word_similarity(w1: str, w2: str) -> float:
+                w1_c = clean_word(w1)
+                w2_c = clean_word(w2)
+                if not w1_c or not w2_c:
+                    return 0.0
+                if w1_c == w2_c:
+                    return 1.0
+                if len(w1_c) >= 3 and len(w2_c) >= 3:
+                    if w1_c in w2_c or w2_c in w1_c:
+                        return 0.8
+                num_map = {
+                    "10": ["dez"],
+                    "20": ["vinte"],
+                    "2007": ["dois", "mil", "sete", "duas", "mil"],
+                    "eua": ["estados", "unidos"],
+                    "usd": ["dólares", "dolar", "dolares"],
+                    "bilhões": ["bilhoes", "bilhão", "bilhao"],
+                    "milhões": ["milhoes", "milhão", "milhao"],
+                }
+                if w1_c in num_map:
+                    for val in num_map[w1_c]:
+                        if val in w2_c or w2_c in val:
+                            return 0.7
+                if w2_c in num_map:
+                    for val in num_map[w2_c]:
+                        if val in w1_c or w1_c in val:
+                            return 0.7
+                return 0.0
+
+            aligned = []
+            current_index = 0
             num_captions = len(all_captions)
+            
             for i, s in enumerate(scenes):
-                text = s.get("subtext") or s.get("headline", "")
-                words_count = len(text.split())
                 if i == len(scenes) - 1:
-                    slice_words = all_captions[caption_index:]
-                else:
-                    end_idx = min(caption_index + words_count, num_captions)
-                    slice_words = all_captions[caption_index:end_idx]
-                    caption_index = end_idx
-                scene_captions.append(slice_words)
+                    aligned.append(all_captions[current_index:])
+                    break
+                    
+                next_text = scenes[i+1].get("subtext") or scenes[i+1].get("headline", "") or ""
+                next_words = [w for w in next_text.split() if clean_word(w)]
+                next_compare = next_words[:4]
+                
+                curr_text = s.get("subtext") or s.get("headline", "") or ""
+                curr_words = [w for w in curr_text.split() if clean_word(w)]
+                curr_compare = curr_words[-4:]
+                
+                curr_words_count = len(curr_words)
+                
+                search_start = max(current_index + 2, current_index + curr_words_count - 10)
+                search_end = min(num_captions - 1, current_index + curr_words_count + 15)
+                
+                best_match_idx = -1
+                best_match_score = -1.0
+                
+                for j in range(search_start, search_end):
+                    next_score = 0.0
+                    for k, w_next in enumerate(next_compare):
+                        if j + k < num_captions:
+                            cap_w = all_captions[j + k]["word"]
+                            sim = word_similarity(w_next, cap_w)
+                            weight = 1.2 if k == 0 else (1.0 if k == 1 else 0.8)
+                            next_score += sim * weight
+                    
+                    curr_score = 0.0
+                    for k, w_curr in enumerate(reversed(curr_compare)):
+                        cap_idx = j - 1 - k
+                        if cap_idx >= current_index:
+                            cap_w = all_captions[cap_idx]["word"]
+                            sim = word_similarity(w_curr, cap_w)
+                            weight = 1.2 if k == 0 else (1.0 if k == 1 else 0.8)
+                            curr_score += sim * weight
+                    
+                    total_score = next_score + curr_score
+                    if total_score > best_match_score:
+                        best_match_score = total_score
+                        best_match_idx = j
+                        
+                if best_match_score < 1.0:
+                    best_match_idx = min(num_captions, current_index + curr_words_count)
+                    
+                aligned.append(all_captions[current_index:best_match_idx])
+                current_index = best_match_idx
 
-            # Para cada cena, calcular start, end e fatiar o áudio
+            # Calculate transition midpoints T_i
+            T = [0.0] * (len(scenes) + 1)
+            T[0] = 0.0
+            for i in range(1, len(scenes)):
+                prev_caps = aligned[i - 1]
+                curr_caps = aligned[i]
+                if prev_caps and curr_caps:
+                    T[i] = (prev_caps[-1]["end"] + curr_caps[0]["start"]) / 2.0
+                elif prev_caps:
+                    T[i] = prev_caps[-1]["end"] + 0.2
+                else:
+                    T[i] = T[i - 1] + 5.0
+                    
+            T[len(scenes)] = total_audio_duration
+            
+            # Ensure strictly increasing
+            for i in range(1, len(scenes) + 1):
+                if T[i] <= T[i - 1]:
+                    T[i] = T[i - 1] + 1.0
+
+            # Map durations and relative word timestamps
             for i, s in enumerate(scenes):
-                slice_words = scene_captions[i]
-                if slice_words:
-                    spoken_start = slice_words[0]["start"]
-                    spoken_end = slice_words[-1]["end"]
-                else:
-                    # fallback se não houver palavras mapeadas
-                    words_before = sum(len((prev.get("subtext") or prev.get("headline", "")).split()) for prev in scenes[:i])
-                    words_count = len((s.get("subtext") or s.get("headline", "")).split())
-                    spoken_start = (words_before / total_words) * total_audio_duration
-                    spoken_end = ((words_before + words_count) / total_words) * total_audio_duration
-
-                spoken_dur = spoken_end - spoken_start
-                min_dur = get_min_duration_for_scene(s, sources_count)
+                start_time = T[i]
+                end_time = T[i + 1]
+                s["duration_seconds"] = round(end_time - start_time, 2)
+                s["audio_url"] = None  # Play global narration continuously
                 
-                # Fórmula de duração: max(duração_áudio + 0.5s, duração_mínima_por_tipo)
-                duration = max(spoken_dur + 0.5, min_dur)
-                s["duration_seconds"] = round(duration, 1)
-
-                # Fatiar o áudio com ffmpeg
-                scene_filename = f"scene_{generation_id}_{i}.mp3"
-                scene_audio_path = _PROJECT_ROOT / "output" / scene_filename
-                
-                # Adicionar margem de segurança no final para não cortar ElevenLabs de repente
-                slice_end = min(total_audio_duration, spoken_end + 0.15)
-                
-                success = slice_audio(local_audio_path, spoken_start, slice_end, scene_audio_path)
-                if success:
-                    s["audio_url"] = f"{_get_localhost()}/output/{scene_filename}"
-                else:
-                    s["audio_url"] = None
-
-                # Mapear captions_words relativas ao início desta cena
+                slice_words = aligned[i]
                 s["caption_words"] = []
                 for w in slice_words:
-                    rel_start = round(max(0.0, w["start"] - spoken_start), 3)
-                    rel_end = round(max(0.0, w["end"] - spoken_start), 3)
+                    rel_start = round(max(0.0, w["start"] - start_time), 3)
+                    rel_end = round(max(0.0, w["end"] - start_time), 3)
                     s["caption_words"].append({
                         "word": w["word"],
                         "start": rel_start,
                         "end": rel_end
                     })
-
-            # Anular a narração global no retorno para o player usar apenas a local por cena
-            result["narration_url"] = None
         else:
             # Fallback when there is no audio duration
             for s in scenes:

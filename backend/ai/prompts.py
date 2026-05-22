@@ -14,6 +14,9 @@ REGRAS ABSOLUTAS:
 - Tom: direto, confiante, sem jargão excessivo — mas sem infantilizar.
 - Adapte o registro para o público brasileiro mesmo quando a notícia for em inglês.
 - Sem CTA: NÃO crie nenhuma cena de CTA, encerramento ou pedido de curtir/seguir. Termine o roteiro de forma informativa natural, usando o tempo final para prolongar o conteúdo.
+- FIGURAS PÚBLICAS: quando uma cena foca em uma pessoa conhecida, inclua "person_name:" com o nome completo e "tag_badge:" com cargo ou dado curto (ex: "PRESIDENTE DO FED", "CEO DESDE 2019") — máx 4 palavras maiúsculas.
+- CONTADORES: cenas de "data" só fazem sentido com números ≥ 100 ou com unidade (%, R$, US$). Não coloque "2 anos" ou "4 reuniões" em cenas data.
+- YOUTUBE SEARCH: use queries específicas em inglês (5-8 palavras) — nunca genéricas como "money", "finance", "economy".
 
 FORMATO DO ROTEIRO (siga EXATAMENTE esta estrutura, sem desvios):
 
@@ -25,29 +28,41 @@ FORMATO DO ROTEIRO (siga EXATAMENTE esta estrutura, sem desvios):
 ═══════════════════════════════════════════════════════
 
 [00:00 - 00:03] HOOK
-• Visual: [o que aparece na tela — imagem, animação ou texto grande]
-• Texto: "[frase de impacto — máx 8 palavras, cria curiosidade ou urgência]"
-• Narração: "[voz over ou legenda — 1-2 frases rápidas]"
+• Tipo Visual: hook
+• Decorador: stripes
+• Texto: "[frase de impacto — máx 6 palavras em CAIXA ALTA, cria urgência imediata]"
+• Narração: "[voz over urgente — 1-2 frases rápidas, sem introdução]"
 • Áudio: [tipo de trilha ou SFX sugerido]
 
 [00:04 - 00:12] CONTEXTO
-• Visual: [imagem/gráfico/animação sugerida]
-• Texto: "[dado ou stat principal]"
+• Tipo Visual: [newspaper_clip OU cutout OU video]
+• Decorador: [arrow OU circle OU stripes]
+• person_name: [nome completo da figura pública, ou null]
+• tag_badge: [cargo ou stat curto em MAIÚSCULO, ou null]
+• YouTube Search: "[query específica em inglês 5-8 palavras, se video]"
+• Texto: "[dado ou stat principal — máx 6 palavras]"
 • Narração: "[desenvolvimento do contexto em linguagem simples — 2-3 frases]"
 
 [00:13 - 00:28] DESENVOLVIMENTO
-• Visual: [descrição da cena]
-• Texto: "[informação central — dado, citação verificada ou fato]"
+• Tipo Visual: [video OU cutout OU split_video]
+• Decorador: [arrow OU circle OU stripes]
+• person_name: [nome completo, ou null]
+• tag_badge: [etiqueta curta MAIÚSCULO, ou null]
+• YouTube Search: "[query específica em inglês — DIFERENTE de todas as outras cenas]"
+• Texto: "[informação central — dado, citação verificada — máx 6 palavras]"
 • Narração: "[corpo principal adaptado para vídeo curto — máx 4 frases]"
 
 [00:29 - 00:38] DADO DE IMPACTO
-• Visual: [gráfico, número em destaque ou animação de impacto]
-• Texto: "[número, porcentagem ou frase de efeito — o clímax]"
+• Tipo Visual: data
+• Decorador: circle
+• Texto: "[número ≥ 100 ou com unidade — ex: 13,75%, R$ 4,5 TRI, +340 mil]"
 • Narração: "[reforço do ponto principal — por que isso importa para o viewer]"
 
 [00:39 - {end_time}] CONCLUSÃO / PROLONGAMENTO
-• Visual: [video OU cutout OU illustration]
-• Texto: "[fechamento ou dado conclusivo da notícia]"
+• Tipo Visual: [timeline OU video OU illustration OU map]
+• Decorador: [arrow OU circle OU stripes]
+• YouTube Search: "[query específica em inglês — DIFERENTE de todas as anteriores]"
+• Texto: "[fechamento ou projeção futura — máx 6 palavras]"
 • Narração: "[fechamento didático, analítico e natural da notícia, prolongando o vídeo sem CTA]"
 
 ═══════════════════════════════════════════════════════

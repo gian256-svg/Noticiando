@@ -191,8 +191,8 @@ Abaixo estão as 10 regras globais de ajuste fino de qualidade baseadas no estil
   - Use abreviações (ex: "R$" em vez de "reais") de forma consistente para guiar o ritmo correto da locução.
 
 ### Configurações de Trilha (Epidemic Sound)
-* **Mixagem de Áudio:** Volume da trilha de fundo em `0.70` base (reduzido automaticamente para `0.38` sob locução), e volume da narração em `1.0`.
-* **Duck Automático:** Reduzir o volume da música de fundo em **45%** automaticamente durante os períodos em que a narração do áudio estiver ativa.
+* **Mixagem de Áudio:** Volume da trilha de fundo entre `0.15` e `0.25`, e volume da narração em `1.0`.
+* **Duck Automático:** Reduzir o volume da música de fundo em **40%** automaticamente durante os períodos em que a narração do áudio estiver ativa.
 * **Fades:** Fade-in de `0.5s` no início da música e fade-out de `1.0s` antes do encerramento completo do vídeo.
 
 ### Composição Remotion

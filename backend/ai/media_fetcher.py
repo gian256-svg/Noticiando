@@ -66,18 +66,47 @@ def _find_cached_photo(url_hash: str) -> Optional[Path]:
 
 
 
-
-
-async def _ensure_fallback_video(category: str) -> str:
-    fallback_queries = {
-        "investments": "stock market trading chart loop",
-        "economy_br": "sao paulo avenue traffic aerial",
-        "economy_int": "new york wall street pedestrians",
-        "geopolitics": "spinning earth globe map",
-        "crypto": "bitcoin blockchain network loop",
-        "general": "newsroom abstract background"
+async def _ensure_fallback_video(category: str, scene_index: int = 0) -> str:
+    fallback_queries_rotation = {
+        "investments": [
+            "stock market trading chart loop",
+            "financial charts analysis trading",
+            "wall street bulls bears background",
+            "corporate finance office loop"
+        ],
+        "economy_br": [
+            "sao paulo avenue traffic aerial",
+            "avenida paulista movimento carros",
+            "brazilian bank real currency cash",
+            "rio de janeiro aerial cityscape"
+        ],
+        "economy_int": [
+            "new york wall street pedestrians",
+            "federal reserve building outside",
+            "global market trading screens",
+            "london financial city district"
+        ],
+        "geopolitics": [
+            "spinning earth globe map",
+            "world map geopolitics blue background",
+            "united nations flags assembly",
+            "international airport airplanes cargo"
+        ],
+        "crypto": [
+            "bitcoin blockchain network loop",
+            "cryptocurrency mining farm server",
+            "ethereum logo rotating technology",
+            "digital currency graphs neon"
+        ],
+        "general": [
+            "newsroom abstract background",
+            "business finance office corporate",
+            "news broadcast studio lights",
+            "documentary B-roll office work"
+        ]
     }
-    query = fallback_queries.get(category, fallback_queries["general"])
+    queries = fallback_queries_rotation.get(category, fallback_queries_rotation["general"])
+    query = queries[scene_index % len(queries)]
     qhash = _query_hash(f"fallback_{query}")
     
     dest = MEDIA_DIR / f"fallback_{qhash}.mp4"
@@ -86,7 +115,7 @@ async def _ensure_fallback_video(category: str) -> str:
     
     try:
         import yt_dlp
-        logger.info(f"Baixando video de fallback local ({category}): '{query}'…")
+        logger.info(f"Baixando video de fallback local ({category}, index {scene_index}): '{query}'…")
         ydl_opts = {
             "format": "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/best[ext=mp4][height<=720]/best[height<=720]",
             "outtmpl": str(MEDIA_DIR / f"fallback_{qhash}.%(ext)s"),
@@ -110,7 +139,7 @@ async def _ensure_fallback_video(category: str) -> str:
         logger.warning(f"Falha ao baixar video de fallback local: {e}")
         
     return f"{_get_localhost_base()}/output/media/fallback_{qhash}.mp4"
-
+ 
 async def fetch_youtube_broll(
     search_query: str,
     category: str = "general",
@@ -125,8 +154,8 @@ async def fetch_youtube_broll(
         import yt_dlp  # noqa: PLC0415
     except ImportError:
         logger.warning("yt-dlp não instalado. Pulando download de B-roll.")
-        return await _ensure_fallback_video(category)
-
+        return await _ensure_fallback_video(category, scene_index)
+ 
     queries_to_try = [search_query] + CATEGORY_FALLBACK_QUERIES.get(category, CATEGORY_FALLBACK_QUERIES["general"])
 
     for attempt, query in enumerate(queries_to_try[:3]):
@@ -191,7 +220,7 @@ async def fetch_youtube_broll(
             logger.warning(f"yt-dlp falhou para '{query}': {e}")
 
     logger.error("Todas as tentativas de B-roll falharam. Retornando fallback video.")
-    return await _ensure_fallback_video(category)
+    return await _ensure_fallback_video(category, scene_index)
 
 
 async def fetch_youtube_thumbnail(search_query: str) -> Optional[str]:
@@ -244,6 +273,141 @@ async def fetch_youtube_thumbnail(search_query: str) -> Optional[str]:
     except Exception as e:
         logger.warning(f"Falha ao obter thumbnail do YouTube para '{search_query}': {e}")
         return None
+
+
+async def fetch_person_photo(person_name: str) -> Optional[str]:
+    """
+    Busca a foto oficial de uma figura pública usando Wikipedia REST API.
+    Fallback: DuckDuckGo Images search. Remove fundo via rembg se disponível.
+    Retorna URL local do arquivo PNG transparente ou None.
+    """
+    if not person_name or not person_name.strip():
+        return None
+
+    # Normalize name for cache key
+    name_key = person_name.strip().lower().replace(" ", "_")
+    qhash = _query_hash(f"person_{name_key}")
+
+    # Check cache first
+    for ext in ("png", "jpg", "jpeg", "webp"):
+        cached = MEDIA_DIR / f"person_{qhash}.{ext}"
+        if cached.exists() and cached.stat().st_size > 5_000:
+            logger.info(f"Foto de pessoa em cache: {cached.name} ({person_name})")
+            return f"{_get_localhost_base()}/output/media/{cached.name}"
+
+    photo_url: Optional[str] = None
+
+    # ── 1. Wikipedia REST API ──────────────────────────────────────────────
+    try:
+        wiki_name = person_name.strip().replace(" ", "_")
+        wiki_api = f"https://en.wikipedia.org/api/rest_v1/page/summary/{wiki_name}"
+        async with httpx.AsyncClient(headers=BROWSER_HEADERS, timeout=10.0, follow_redirects=True) as client:
+            resp = await client.get(wiki_api)
+            if resp.status_code == 200:
+                data = resp.json()
+                thumb = data.get("thumbnail") or data.get("originalimage")
+                if thumb and thumb.get("source"):
+                    photo_url = thumb["source"]
+                    logger.info(f"Foto via Wikipedia para '{person_name}': {photo_url}")
+    except Exception as e:
+        logger.debug(f"Wikipedia falhou para '{person_name}': {e}")
+
+    # ── 2. DuckDuckGo Images fallback ──────────────────────────────────────
+    if not photo_url:
+        try:
+            ddg_query = f"{person_name} official portrait headshot"
+            ddg_url = f"https://duckduckgo.com/?q={ddg_query.replace(' ', '+')}&iax=images&ia=images"
+            ddg_api  = f"https://api.duckduckgo.com/?q={ddg_query.replace(' ', '+')}&format=json&ia=images"
+            async with httpx.AsyncClient(headers=BROWSER_HEADERS, timeout=10.0, follow_redirects=True) as client:
+                resp = await client.get(ddg_api)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    # RelatedTopics may contain image
+                    if data.get("Image"):
+                        photo_url = data["Image"]
+                        logger.info(f"Foto via DuckDuckGo DDG API para '{person_name}': {photo_url}")
+                    elif data.get("RelatedTopics"):
+                        for topic in data["RelatedTopics"][:3]:
+                            icon = topic.get("Icon", {})
+                            if icon.get("URL") and icon["URL"].startswith("http"):
+                                photo_url = icon["URL"]
+                                break
+        except Exception as e:
+            logger.debug(f"DuckDuckGo falhou para '{person_name}': {e}")
+
+    # ── 3. Wikipedia PT fallback ───────────────────────────────────────────
+    if not photo_url:
+        try:
+            wiki_name = person_name.strip().replace(" ", "_")
+            wiki_pt = f"https://pt.wikipedia.org/api/rest_v1/page/summary/{wiki_name}"
+            async with httpx.AsyncClient(headers=BROWSER_HEADERS, timeout=10.0, follow_redirects=True) as client:
+                resp = await client.get(wiki_pt)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    thumb = data.get("thumbnail") or data.get("originalimage")
+                    if thumb and thumb.get("source"):
+                        photo_url = thumb["source"]
+                        logger.info(f"Foto via Wikipedia PT para '{person_name}': {photo_url}")
+        except Exception as e:
+            logger.debug(f"Wikipedia PT falhou para '{person_name}': {e}")
+
+    if not photo_url:
+        logger.warning(f"Nenhuma foto encontrada para '{person_name}'")
+        return None
+
+    # ── 4. Download + remover fundo via rembg ──────────────────────────────
+    try:
+        dest_raw = MEDIA_DIR / f"person_raw_{qhash}.jpg"
+        async with httpx.AsyncClient(headers=BROWSER_HEADERS, timeout=20.0, follow_redirects=True) as client:
+            resp = await client.get(photo_url)
+            if resp.status_code != 200 or len(resp.content) < 5_000:
+                return None
+            dest_raw.write_bytes(resp.content)
+
+        dest_final = MEDIA_DIR / f"person_{qhash}.png"
+
+        # Try rembg background removal
+        try:
+            from rembg import remove as rembg_remove
+            from PIL import Image as PILImage
+            import io
+
+            def _remove_bg():
+                with open(dest_raw, "rb") as f:
+                    raw_bytes = f.read()
+                result_bytes = rembg_remove(raw_bytes)
+                img = PILImage.open(io.BytesIO(result_bytes)).convert("RGBA")
+                # Crop to portrait: take center 60% width, full height
+                w, h = img.size
+                crop_w = int(w * 0.85)
+                crop_x = (w - crop_w) // 2
+                img = img.crop((crop_x, 0, crop_x + crop_w, h))
+                img.save(str(dest_final), "PNG")
+
+            await asyncio.to_thread(_remove_bg)
+            # Clean up raw file
+            try:
+                dest_raw.unlink()
+            except Exception:
+                pass
+            logger.info(f"Foto de pessoa com fundo removido: {dest_final.name}")
+        except ImportError:
+            # rembg not installed — use raw photo without background removal
+            import shutil
+            shutil.copy(str(dest_raw), str(dest_final))
+            logger.info(f"Foto de pessoa sem remoção de fundo (rembg não instalado): {dest_final.name}")
+        except Exception as e:
+            logger.warning(f"rembg falhou para '{person_name}': {e} — usando foto bruta")
+            import shutil
+            shutil.copy(str(dest_raw), str(dest_final))
+
+        if dest_final.exists() and dest_final.stat().st_size > 3_000:
+            return f"{_get_localhost_base()}/output/media/{dest_final.name}"
+
+    except Exception as e:
+        logger.warning(f"Falha ao baixar foto de '{person_name}': {e}")
+
+    return None
 
 
 async def fetch_article_photos(
