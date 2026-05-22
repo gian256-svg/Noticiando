@@ -670,18 +670,34 @@ const NewspaperCollage: React.FC<{
   fps: number;
   fallbackHeadline?: string;
   fallbackSourceName?: string;
-}> = ({ sources, frame, fps, fallbackHeadline, fallbackSourceName }) => {
+  sceneSubtext?: string;
+}> = ({ sources, frame, fps, fallbackHeadline, fallbackSourceName, sceneSubtext }) => {
   const fallbackOutlets = ["Bloomberg", "Reuters", "The Wall Street Journal", "Financial Times", "New York Times", "BBC News"];
+
+  // Split subtext into sentences to use as variant titles per clip
+  const subtextSentences = (sceneSubtext || "")
+    .split(/[.!?]+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 15);
+
   const list = [...(sources || [])];
   while (list.length < 3) {
     const fallbackOutlet = fallbackOutlets[list.length % fallbackOutlets.length];
     list.push({
       source: fallbackOutlet,
-      title: fallbackHeadline || "Fato confirmado pelas fontes de mercado",
+      title: "",
     });
   }
 
-  const visibleSources = list.slice(0, 3);
+  // Assign unique titles: real source title if available, else subtext sentence, else fallback
+  const visibleSources = list.slice(0, 3).map((src, idx) => {
+    const allSameTitles = list.every(s => s.title === list[0].title);
+    let title = src.title;
+    if (!title || allSameTitles) {
+      title = subtextSentences[idx] || fallbackHeadline || "Fato confirmado pelas fontes de mercado";
+    }
+    return { ...src, title };
+  });
 
   const layouts = [
     { left: "6%", top: "42%", rotation: -1.5, delay: 0 },
@@ -2504,8 +2520,8 @@ const NewsScene: React.FC<SceneProps> = ({
           </>
         )}
 
-        {/* Country Flags Overlay */}
-        {matchedCountries.map((code, idx) => {
+        {/* Country Flags Overlay — skip for data/timeline/newspaper scenes */}
+        {!isData && !isTimeline && scene.visual_type !== "newspaper_clip" && matchedCountries.map((code, idx) => {
           const delay = 12 + idx * 8;
           const flagEntrance = spring({
             frame: Math.max(0, frame - delay),
@@ -2559,110 +2575,89 @@ const NewsScene: React.FC<SceneProps> = ({
         )}
         */}
 
-        {/* ── Rule 1: Centralized Headline Container ── */}
+        {/* ══════════════════════════════════════════════════════
+            HEADLINE + CATEGORY BADGE
+            Layout adapts based on scene type:
+            - hook/video: centered top overlay
+            - cutout/illustration: pushed to text-side half
+            - data/timeline/newspaper: compact header
+        ══════════════════════════════════════════════════════ */}
         <div style={{
           position: "absolute",
-          top: "8%",
-          left: "8%",
-          right: "8%",
+          top: isData || isTimeline ? "5%" : isHook ? "10%" : "6%",
+          left: hasSideAsset ? (assetSide === "right" ? "6%" : "54%") : "6%",
+          right: hasSideAsset ? (assetSide === "right" ? "54%" : "6%") : "6%",
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          textAlign: "center",
+          alignItems: hasSideAsset ? "flex-start" : "center",
+          textAlign: hasSideAsset ? "left" : "center",
           zIndex: 40,
           transform: `translateY(${interpolate(exitProgress, [0, 1], [0, -30])}px)`,
           opacity: 1 - exitProgress,
         }}>
-          {/* Selo/badge de editoria */}
+          {/* Category badge */}
           {category && (
             <div style={{
               display: "inline-block",
               fontFamily: "'Oswald', sans-serif",
-              fontSize: 20,
+              fontSize: isHook ? 22 : 18,
               fontWeight: 900,
               color: "#FFFFFF",
               backgroundColor: pal.accent,
-              padding: "4px 12px",
+              padding: "5px 14px",
               borderRadius: "4px",
-              letterSpacing: "0.1em",
-              marginBottom: 16,
-              boxShadow: `0 4px 12px ${pal.accent}40`,
-              opacity: interpolate(frame, [0, 10], [0, 1], { extrapolateRight: "clamp" }),
-              transform: `scale(${interpolate(frame, [0, 10], [0.8, 1], { extrapolateRight: "clamp" })})`,
+              letterSpacing: "0.12em",
+              marginBottom: 18,
+              boxShadow: `0 4px 16px ${pal.accent}50`,
+              opacity: interpolate(frame, [0, 8], [0, 1], { extrapolateRight: "clamp" }),
+              transform: `translateY(${interpolate(frame, [0, 8], [-12, 0], { extrapolateRight: "clamp" })}px)`,
             }}>
               {getEditorialLabel(category)}
             </div>
           )}
 
-          {/* Headline Text */}
+          {/* ── HEADLINE WORDS — per-word kinetic animation ── */}
           {filteredWordsWithIndices.length > 0 && (
             <div style={{
               display: "block",
-              textAlign: "center",
+              textAlign: hasSideAsset ? "left" : "center",
               width: "100%",
               wordBreak: "break-word",
-              opacity: interpolate(frame, [0, 12], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
-              transform: `translateY(${interpolate(frame, [0, 12], [24, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px)`,
             }}>
               {filteredWordsWithIndices.map(({ word, index }, i) => {
                 const isHighlighted = accentSet.has(index);
-                // Hook: each word slams in from a different direction with very tight delay
-                // Other: staggered by 2.5 frames
-                const delay = isHook ? i * 1.8 : i * 2.5;
+                const delay = isHook ? i * 1.8 : i * 1.5;
                 const wordFrame = Math.max(0, frame - delay);
-
                 let transform = "";
                 let opacity = 0;
                 let filter = "";
                 let textShadowExtra = "";
 
                 if (isHook) {
-                  // ── KINETIC SLAM — aggressive spring, overshoots then locks ──
-                  const slamDir = i % 3; // 0=from top, 1=from right, 2=from left
+                  // KINETIC SLAM — tight spring, 3-direction round robin
+                  const slamDir = i % 3;
                   const sSlam = spring({ frame: wordFrame, fps, config: { damping: 8, stiffness: 260, mass: 0.7 } });
                   const oSlam = interpolate(wordFrame, [0, 3], [0, 1], { extrapolateRight: "clamp" });
-                  let slamTransform = `scale(${interpolate(sSlam, [0, 1], [1.6, isHighlighted ? 1.08 : 1.0])})`;
-                  if (slamDir === 0) {
-                    slamTransform += ` translateY(${interpolate(sSlam, [0, 1], [-90, 0])}px)`;
-                  } else if (slamDir === 1) {
-                    slamTransform += ` translateX(${interpolate(sSlam, [0, 1], [80, 0])}px)`;
-                  } else {
-                    slamTransform += ` translateX(${interpolate(sSlam, [0, 1], [-80, 0])}px)`;
-                  }
-                  // After impact: subtle shake at frame 3-6
+                  let slamT = `scale(${interpolate(sSlam, [0, 1], [1.6, isHighlighted ? 1.08 : 1.0])})`;
+                  if (slamDir === 0) slamT += ` translateY(${interpolate(sSlam, [0, 1], [-90, 0])}px)`;
+                  else if (slamDir === 1) slamT += ` translateX(${interpolate(sSlam, [0, 1], [80, 0])}px)`;
+                  else slamT += ` translateX(${interpolate(sSlam, [0, 1], [-80, 0])}px)`;
                   const shakeAmt = interpolate(wordFrame, [3, 4, 5, 6, 7], [0, 3, -2, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-                  slamTransform += ` rotate(${shakeAmt}deg)`;
-                  transform = slamTransform;
+                  slamT += ` rotate(${shakeAmt}deg)`;
+                  transform = slamT;
                   opacity = oSlam;
                   textShadowExtra = isHighlighted
                     ? `0 0 40px ${pal.accent}CC, 0 0 80px ${pal.accent}55`
                     : "0 0 30px rgba(0,0,0,0.9)";
                 } else {
-                  const animStyle = sceneIndex % 3;
-
-                  if (animStyle === 0) {
-                    const s = spring({ frame: wordFrame, fps, config: { damping: 14, stiffness: 150 } });
-                    const y = interpolate(s, [0, 1], [24, 0]);
-                    const rot = interpolate(s, [0, 1], [-4, 0]);
-                    const o = interpolate(wordFrame, [0, 5], [0, 1], { extrapolateRight: "clamp" });
-                    transform = `scale(${s * (isHighlighted ? 1.12 : 1.0)}) translateY(${y}px) rotate(${rot + (isHighlighted ? 1.5 : 0)}deg)`;
-                    opacity = o;
-                  } else if (animStyle === 1) {
-                    const s = spring({ frame: wordFrame, fps, config: { damping: 10, stiffness: 180 } });
-                    const rot = interpolate(s, [0, 1], [8, 0]);
-                    const o = interpolate(wordFrame, [0, 4], [0, 1], { extrapolateRight: "clamp" });
-                    transform = `scale(${s * (isHighlighted ? 1.15 : 1.0)}) rotate(${rot}deg)`;
-                    opacity = o;
-                  } else {
-                    const s = spring({ frame: wordFrame, fps, config: { damping: 14, stiffness: 120 } });
-                    const x = interpolate(s, [0, 1], [-25, 0]);
-                    const blurVal = interpolate(s, [0, 1], [8, 0]);
-                    const o = interpolate(wordFrame, [0, 6], [0, 1], { extrapolateRight: "clamp" });
-                    transform = `scale(${s * (isHighlighted ? 1.12 : 1.0)}) translateX(${x}px)`;
-                    opacity = o;
-                    filter = `blur(${blurVal}px)`;
-                  }
+                  // BROADCAST REVEAL — fast upward snap, staggered
+                  const s = spring({ frame: wordFrame, fps, config: { damping: 11, stiffness: 200, mass: 0.8 } });
+                  const y = interpolate(s, [0, 1], [32, 0]);
+                  const scl = interpolate(s, [0, 1], [0.88, isHighlighted ? 1.05 : 1.0]);
+                  const o = interpolate(wordFrame, [0, 4], [0, 1], { extrapolateRight: "clamp" });
+                  transform = `translateY(${y}px) scale(${scl})`;
+                  opacity = o;
+                  if (isHighlighted) textShadowExtra = `0 0 24px ${pal.accent}99`;
                 }
 
                 return (
@@ -2671,25 +2666,26 @@ const NewsScene: React.FC<SceneProps> = ({
                     style={{
                       position: "relative",
                       display: "inline-block",
-                      marginRight: 16,
-                      marginBottom: 14,
-                      fontFamily: isCinematicVideo ? "'Georgia', 'Times New Roman', serif" : "'Oswald', 'Montserrat', 'Inter', sans-serif",
+                      marginRight: 14,
+                      marginBottom: 10,
+                      fontFamily: isCinematicVideo
+                        ? "'Georgia', 'Times New Roman', serif"
+                        : "'Oswald', 'Montserrat', sans-serif",
                       fontSize: titleFontSize,
                       fontWeight: isCinematicVideo ? 600 : 900,
                       textTransform: isCinematicVideo ? "none" : "uppercase",
-                      letterSpacing: isCinematicVideo ? "0em" : "-0.015em",
-                      lineHeight: isCinematicVideo ? 1.15 : 1.05,
+                      letterSpacing: isCinematicVideo ? "0.01em" : "-0.02em",
+                      lineHeight: 1.0,
                       color: isHighlighted ? highlightColor : textColor,
                       textShadow: textShadowExtra
-                        ? `0 2px 20px rgba(0,0,0,0.95), 0 1px 6px rgba(0,0,0,1), ${textShadowExtra}`
-                        : "0 2px 20px rgba(0,0,0,0.95), 0 1px 6px rgba(0,0,0,1)",
+                        ? `0 3px 24px rgba(0,0,0,1), 0 1px 8px rgba(0,0,0,1), ${textShadowExtra}`
+                        : "0 3px 24px rgba(0,0,0,1), 0 1px 8px rgba(0,0,0,1)",
                       transform,
-                      transformOrigin: "center center",
+                      transformOrigin: "bottom center",
                       opacity,
                       filter,
                       paddingBottom: isHighlighted ? 6 : 0,
                       maxWidth: "100%",
-                      wordWrap: "break-word",
                     }}
                   >
                     {word}
@@ -2706,42 +2702,51 @@ const NewsScene: React.FC<SceneProps> = ({
             </div>
           )}
 
-          {/* Divisor line below headline */}
-          {filteredWordsWithIndices.length > 0 && (
+          {/* Accent line — only non-cinematic, non-hook scenes */}
+          {!isHook && !isCinematicVideo && filteredWordsWithIndices.length > 0 && (
             <div style={{
-              width: "80px",
+              width: hasSideAsset ? "60px" : "80px",
               height: "3px",
-              backgroundColor: pal.accent,
-              margin: "16px auto",
-              opacity: interpolate(frame, [5, 15], [0, 1], { extrapolateRight: "clamp" }),
-              transform: `scaleX(${interpolate(frame, [5, 15], [0, 1], { extrapolateRight: "clamp" })})`,
+              background: `linear-gradient(to right, ${pal.accent}, ${pal.accent}40)`,
+              marginTop: 14,
+              marginLeft: hasSideAsset ? 0 : "auto",
+              marginRight: hasSideAsset ? 0 : "auto",
+              opacity: interpolate(frame, [5, 14], [0, 1], { extrapolateRight: "clamp" }),
+              transform: `scaleX(${interpolate(frame, [5, 14], [0, 1], { extrapolateRight: "clamp" })})`,
+              transformOrigin: "left center",
             }} />
           )}
 
-          {/* Subtext (Rule 1 & 10) */}
-          {scene.subtext && (
-            <p style={{
-              fontFamily: isCinematicVideo ? "'Georgia', 'Times New Roman', serif" : "'Inter', 'Montserrat', 'Roboto', sans-serif",
-              fontSize: Math.max(18, Math.round(titleFontSize / 3)),
-              fontWeight: 500,
-              color: textColor,
-              opacity: interpolate(frame, [10, 20], [0, 0.85], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
-              transform: `translateY(${interpolate(frame, [10, 20], [10, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px)`,
-              maxWidth: "85%",
-              margin: "0 auto",
-              lineHeight: 1.45,
-              textShadow: "0 2px 16px rgba(0,0,0,0.95), 0 1px 4px rgba(0,0,0,1)",
-              textAlign: "center",
-            }}>
-              {scene.subtext}
-            </p>
-          )}
+          {/* ── KICKER — short first sentence as caption ONLY for newspaper/timeline/data ── */}
+          {(isTimeline || scene.visual_type === "newspaper_clip") && scene.subtext && (() => {
+            const firstSentence = scene.subtext.split(/[.!?]/)[0]?.trim() || "";
+            if (!firstSentence || firstSentence.length < 15) return null;
+            const kickerOpacity = interpolate(frame, [12, 22], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+            const kickerY = interpolate(frame, [12, 22], [10, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+            return (
+              <p style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: 30,
+                fontWeight: 500,
+                color: "rgba(255,255,255,0.80)",
+                opacity: kickerOpacity,
+                transform: `translateY(${kickerY}px)`,
+                margin: "18px 0 0",
+                lineHeight: 1.35,
+                textShadow: "0 2px 12px rgba(0,0,0,1)",
+                textAlign: hasSideAsset ? "left" : "center",
+                maxWidth: "100%",
+              }}>
+                {firstSentence}.
+              </p>
+            );
+          })()}
         </div>
 
-        {/* ── Rule 1: Visual Asset Container (Centered below headline) ── */}
+        {/* ── Visual Asset Container — positions based on scene type ── */}
         <div style={{
           position: "absolute",
-          top: "38%",
+          top: isData ? "30%" : isTimeline ? "35%" : "38%",
           bottom: "10%",
           left: "5%",
           right: "5%",
@@ -2752,7 +2757,7 @@ const NewsScene: React.FC<SceneProps> = ({
           opacity: 1 - exitProgress,
         }}>
           {/* Big metric/percentage counter animation — only for % / monetary / large numbers ≥ 100 */}
-          {dataMetric && !isHook && (dataMetric.unit !== "" || dataMetric.num >= 100) && (
+          {dataMetric && !isHook && !isData && (dataMetric.unit !== "" || dataMetric.num >= 100) && (
             <BigMetricCounter
               value={dataMetric.rawString || `${dataMetric.num}${dataMetric.unit}`}
               color={highlightColor}
@@ -2770,6 +2775,7 @@ const NewsScene: React.FC<SceneProps> = ({
               fps={fps}
               fallbackHeadline={newsTitle || scene.headline}
               fallbackSourceName={sourceName}
+              sceneSubtext={scene.subtext}
             />
           )}
 
@@ -2805,8 +2811,12 @@ const NewsScene: React.FC<SceneProps> = ({
                   color: "#FFFFFF",
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  maxWidth: 480,
                 }}>
-                  {sceneIndex % 3 === 0 ? "DESEMPENHO HISTÓRICO" : (sceneIndex % 3 === 1 ? "FLUXO DE TENDÊNCIA" : "PROPORÇÃO DO MERCADO")}
+                  {(scene.headline || "DADO DE IMPACTO").toUpperCase()}
                 </span>
                 <span style={{
                   fontFamily: "'Inter', sans-serif",
@@ -3012,7 +3022,7 @@ const NewsScene: React.FC<SceneProps> = ({
                     gap: 12,
                   }}>
                     {[
-                      { label: "Média Esperada", val: "70%" },
+                      { label: "Referência", val: `${Math.round(parsedValue * 0.7)}${displayUnit}` },
                       { label: "Cenário Atual", val: `${currentCountText}${displayUnit}`, highlight: true },
                     ].map((item, idx) => (
                       <div key={idx} style={{
@@ -3063,7 +3073,7 @@ const NewsScene: React.FC<SceneProps> = ({
         sceneIndex={sceneIndex}
         totalScenes={totalScenes}
         durationInFrames={durationInFrames}
-        personName={scene.person_name || undefined}
+        personName={scene.person_name && !["null","none",""].includes(scene.person_name.toLowerCase()) ? scene.person_name : undefined}
         isHook={isHook}
       />
     </AbsoluteFill>

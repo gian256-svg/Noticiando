@@ -30,8 +30,8 @@ FORMATO DO ROTEIRO (siga EXATAMENTE esta estrutura, sem desvios):
 [00:00 - 00:03] HOOK
 • Tipo Visual: hook
 • Decorador: stripes
-• Texto: "[frase de impacto — máx 6 palavras em CAIXA ALTA, cria urgência imediata]"
-• Narração: "[voz over urgente — 1-2 frases rápidas, sem introdução]"
+• Texto: "[EXIBIDO NA TELA — máx 4 palavras em CAIXA ALTA, impacto imediato]"
+• Narração: "[VOZ OVER — não aparece na tela — 1-2 frases rápidas, 12-18 palavras]"
 • Áudio: [tipo de trilha ou SFX sugerido]
 
 [00:04 - 00:12] CONTEXTO
@@ -40,8 +40,8 @@ FORMATO DO ROTEIRO (siga EXATAMENTE esta estrutura, sem desvios):
 • person_name: [nome completo da figura pública, ou null]
 • tag_badge: [cargo ou stat curto em MAIÚSCULO, ou null]
 • YouTube Search: "[query específica em inglês 5-8 palavras, se video]"
-• Texto: "[dado ou stat principal — máx 6 palavras]"
-• Narração: "[desenvolvimento do contexto em linguagem simples — 2-3 frases]"
+• Texto: "[EXIBIDO NA TELA — dado ou stat em máx 4 palavras CAIXA ALTA]"
+• Narração: "[VOZ OVER — não aparece na tela — contexto em linguagem simples, 12-20 palavras]"
 
 [00:13 - 00:28] DESENVOLVIMENTO
 • Tipo Visual: [video OU cutout OU split_video]
@@ -49,21 +49,21 @@ FORMATO DO ROTEIRO (siga EXATAMENTE esta estrutura, sem desvios):
 • person_name: [nome completo, ou null]
 • tag_badge: [etiqueta curta MAIÚSCULO, ou null]
 • YouTube Search: "[query específica em inglês — DIFERENTE de todas as outras cenas]"
-• Texto: "[informação central — dado, citação verificada — máx 6 palavras]"
-• Narração: "[corpo principal adaptado para vídeo curto — máx 4 frases]"
+• Texto: "[EXIBIDO NA TELA — máx 4 palavras CAIXA ALTA, dado ou impacto central]"
+• Narração: "[VOZ OVER — não aparece na tela — corpo principal, 15-22 palavras]"
 
 [00:29 - 00:38] DADO DE IMPACTO
 • Tipo Visual: data
 • Decorador: circle
-• Texto: "[número ≥ 100 ou com unidade — ex: 13,75%, R$ 4,5 TRI, +340 mil]"
-• Narração: "[reforço do ponto principal — por que isso importa para o viewer]"
+• Texto: "[EXIBIDO NA TELA — número grande com unidade: 13,75%, R$ 4,5 TRI, +340 mil]"
+• Narração: "[VOZ OVER — reforço: por que este número importa para o viewer, 12-18 palavras]"
 
 [00:39 - {end_time}] CONCLUSÃO / PROLONGAMENTO
 • Tipo Visual: [timeline OU video OU illustration OU map]
 • Decorador: [arrow OU circle OU stripes]
 • YouTube Search: "[query específica em inglês — DIFERENTE de todas as anteriores]"
-• Texto: "[fechamento ou projeção futura — máx 6 palavras]"
-• Narração: "[fechamento didático, analítico e natural da notícia, prolongando o vídeo sem CTA]"
+• Texto: "[EXIBIDO NA TELA — máx 4 palavras CAIXA ALTA, projeção ou reflexão]"
+• Narração: "[VOZ OVER — fechamento didático e analítico, 15-22 palavras, sem CTA]"
 
 ═══════════════════════════════════════════════════════
 📋 HASHTAGS (15-20): #hashtag1 #hashtag2 ... (misture PT e EN, relevantes para finanças e o tema)

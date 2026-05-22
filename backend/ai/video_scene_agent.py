@@ -34,13 +34,28 @@ Sua missão: transformar uma notícia financeira ou geopolítica em um Reel vert
 
 Retorne APENAS JSON válido, sem markdown, sem explicações.
 
+╔═══════════════════════════════════════════════════════════╗
+║  DISTINÇÃO CRÍTICA — headline vs subtext                  ║
+║                                                           ║
+║  "headline" = TEXTO VISUAL (aparece na tela)              ║
+║    • Máximo 4 palavras, CAIXA ALTA, impacto imediato      ║
+║    • Ex: "FED CHOCA MERCADO", "TRILHÕES EM RISCO"         ║
+║    • NUNCA escreva frases completas no headline            ║
+║                                                           ║
+║  "subtext"  = NARRAÇÃO (voice-over, NÃO aparece na tela)  ║
+║    • Frase fluida de 12-20 palavras para o narrador falar ║
+║    • Ex: "O banco central americano surpreendeu o mercado ║
+║           ao manter os juros acima de 5% pela 6ª vez"    ║
+║    • NÃO use aqui palavras que já estão no headline       ║
+╚═══════════════════════════════════════════════════════════╝
+
 Schema obrigatório:
 {
   "scenes": [
     {
       "id": "scene_1",
-      "headline": "TEXTO CURTO IMPACTANTE EM CAIXA ALTA (máximo 5 palavras)",
-      "subtext": "Narração desta cena: fluida, dramática, 12-18 palavras com dados reais.",
+      "headline": "MÁXIMO 4 PALAVRAS IMPACTANTES",
+      "subtext": "Narração fluida de 12-20 palavras — o que o narrador fala enquanto esta cena aparece.",
       "duration_seconds": 4.0,
       "visual_type": "hook" | "video" | "cutout" | "illustration" | "data" | "map" | "timeline" | "collage" | "split_video" | "newspaper_clip",
       "accent_word_indices": [0, 2],
@@ -99,10 +114,12 @@ REGRA 5 — CONTADORES NUMÉRICOS (data scenes):
   * Exemplos INVÁLIDOS: "2 anos", "4 reuniões", "1 acordo" — números pequenos não merecem contador visual.
   * Se a notícia não tem número expressivo, não crie cena "data" — substitua por "timeline" ou "newspaper_clip".
 
-REGRA 6 — HEADLINES IMPACTANTES, NÃO DESCRITIVAS:
-  * Headline = 3-6 palavras no máximo, todas maiúsculas, foco em impacto emocional.
-  * CERTO: "TRILHÕES EM RISCO", "FED CHOCA MERCADO", "GUERRA DAS TARIFAS".
-  * ERRADO: "BANCO CENTRAL DECIDE TAXA DE JUROS", "EMPRESA ANUNCIA RESULTADO" (longo, descritivo).
+REGRA 6 — HEADLINE = TEXTO VISUAL (máximo 4 palavras, NUNCA frase completa):
+  * Headline aparece NA TELA em tipografia grande. Máximo 4 palavras, CAIXA ALTA.
+  * CERTO: "TRILHÕES EM RISCO" (3 palavras), "FED CHOCA MERCADO" (3 palavras).
+  * ERRADO: "O BANCO CENTRAL DECIDE A TAXA DE JUROS" — frases longas quebram o layout e são PROIBIDAS.
+  * subtext = narração em voz, NUNCA exibida na tela. Pode ser uma frase completa de 12-20 palavras.
+  * Não repita no subtext as mesmas palavras-chave que já estão no headline.
 
 REGRA 7 — NARRATIVA EM ESCALADA:
   * Cena 1 (hook): Pergunta inquietante ou fato chocante. Cria tensão imediata.
@@ -114,9 +131,12 @@ REGRA 8 — CREDIBILIDADE (ANTI-FABRICAÇÃO):
   * NUNCA invente manchetes ou dados. Use apenas fatos da notícia fornecida.
   * Quotes em subtext devem ser atribuídas ou parafraseadas — nunca inventadas.
 
-REGRA 9 — RITMO E DURAÇÃO:
-  * 30 segundos: 6-8 cenas. 45 segundos: 9-11 cenas. 60 segundos: 12-15 cenas.
-  * Cenas de impacto (data, hook) têm 3-4s. Cenas narrativas (video, cutout) têm 4-6s.
+REGRA 9 — RITMO E DURAÇÃO (MÍNIMOS OBRIGATÓRIOS):
+  * 30 segundos: MÍNIMO 7 cenas (nunca menos).
+  * 45 segundos: MÍNIMO 10 cenas (nunca menos).
+  * 60 segundos: MÍNIMO 13 cenas (nunca menos). Para 60s é OBRIGATÓRIO criar ao menos 13 cenas.
+  * Cenas de impacto (data, hook, newspaper_clip) têm 3-4s. Cenas narrativas (video, cutout) têm 4-6s.
+  * Para atingir a contagem mínima: cada momento narrativo vira uma cena separada. Prefira múltiplas cenas curtas e dinâmicas a poucas cenas longas paradas.
 
 REGRA 10 — TAG_BADGE (elemento flutuante estilo "etiqueta"):
   * Em cenas de "cutout" e "illustration", SEMPRE preencha tag_badge com algo curto e revelador.
@@ -143,15 +163,19 @@ DECORATOR_TYPE — obrigatório em toda cena:
 
 def _build_user_msg(title: str, summary: str, category: str, duration: int) -> str:
     if duration <= 30:
-        scene_count = "6 a 8"
+        min_scenes = 7
+        max_scenes = 9
     elif duration <= 45:
-        scene_count = "9 a 11"
+        min_scenes = 10
+        max_scenes = 12
     else:
-        scene_count = "12 a 15"
+        min_scenes = 13
+        max_scenes = 16
 
     return (
         f"Crie roteiro visual de exatamente {duration} segundos para Reels sobre esta notícia.\n"
-        f"Gere entre {scene_count} cenas no total para cobrir esse tempo com ritmo premium e cadenciado.\n\n"
+        f"OBRIGATÓRIO: gere ENTRE {min_scenes} E {max_scenes} cenas. Nunca menos de {min_scenes}.\n"
+        f"LEMBRETE: headline = máx 4 palavras VISUAIS. subtext = narração completa em voz (12-20 palavras, nunca exibida na tela).\n\n"
         f"Título: {title}\n"
         f"Categoria: {category}\n"
         f"Resumo: {summary or title}\n\n"

@@ -246,7 +246,14 @@ def parse_custom_script(text: str, category: str) -> dict[str, Any]:
             duration = 5.0
             
         start_idx = match.end()
-        end_idx = matches[i+1].start() if i + 1 < len(matches) else len(text)
+        end_idx_raw = matches[i+1].start() if i + 1 < len(matches) else len(text)
+        # Stop at separator line or metadata section (hashtags, images, music)
+        stop_match = re.search(
+            r'[═=]{3,}|^[📋🖼️🎵]\s|^##|^---',
+            text[start_idx:end_idx_raw],
+            re.MULTILINE
+        )
+        end_idx = start_idx + stop_match.start() if stop_match else end_idx_raw
         scene_body = text[start_idx:end_idx].strip()
         
         visual_type = "video"

@@ -28,7 +28,7 @@ export function VideoPreview({ props, newsTitle, onClose }: VideoPreviewProps) {
         newsTitle,
       })) as { canceled: boolean; filePath?: string };
 
-      if (saveResult.canceled || !saveResult.filePath) {
+      if (!saveResult || saveResult.canceled || !saveResult.filePath) {
         setRendering(false);
         return;
       }
