@@ -790,14 +790,19 @@ export const ReelsComposition: React.FC<ReelsCompositionProps> = ({
     const firstAppearance: Record<string, number> = {};
     let currentAbsoluteFrame = 0;
     return scenes.map((scene) => {
-      const durationFrames = Math.max(1, Math.round(scene.duration_seconds * fps));
+      // Guard: duration_seconds can be undefined/NaN if backend fails — default to 5s
+      const safeDuration = (typeof scene.duration_seconds === "number" && isFinite(scene.duration_seconds) && scene.duration_seconds > 0)
+        ? scene.duration_seconds
+        : 5;
+      const durationFrames = Math.max(1, Math.round(safeDuration * fps));
       const startFrame = currentAbsoluteFrame;
       let videoOffset = 0;
       if (scene.media_url) {
         if (firstAppearance[scene.media_url] === undefined) {
           firstAppearance[scene.media_url] = startFrame;
         }
-        videoOffset = startFrame - firstAppearance[scene.media_url];
+        // Cap videoOffset to avoid seeking past end of B-roll video
+        videoOffset = Math.max(0, startFrame - firstAppearance[scene.media_url]);
       }
       currentAbsoluteFrame += durationFrames;
       return {
@@ -1797,18 +1802,16 @@ const LowerThird: React.FC<{
           </div>
         </div>
 
-        {/* Right: scene position indicator (dots) */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center", paddingBottom: 4 }}>
-          {Array.from({ length: totalScenes }).map((_, i) => (
-            <div key={i} style={{
-              width: i === sceneIndex ? 20 : 8,
-              height: 8,
-              borderRadius: 4,
-              background: i === sceneIndex ? accentColor : "rgba(255,255,255,0.25)",
-              transition: "width 0.3s",
-              boxShadow: i === sceneIndex ? `0 0 8px ${accentColor}` : undefined,
-            }} />
-          ))}
+        {/* Right: scene counter — simple "2 / 5" style, not stories dots */}
+        <div style={{
+          fontFamily: "'Oswald', sans-serif",
+          fontSize: 16,
+          fontWeight: 700,
+          color: "rgba(255,255,255,0.35)",
+          letterSpacing: "0.08em",
+          paddingBottom: 4,
+        }}>
+          {sceneIndex + 1}<span style={{ color: accentColor, margin: "0 2px" }}>/</span>{totalScenes}
         </div>
       </div>
     </div>
@@ -1973,11 +1976,18 @@ const NewsScene: React.FC<SceneProps> = ({
     config: { damping: 15, stiffness: 85 },
   });
 
-  const exitOpacity = durationInFrames > 20
-    ? interpolate(frame, [durationInFrames - 3, durationInFrames], [1, 0], {
+  // Fade-in: first 12 frames — smooth entry
+  const fadeInOpacity = interpolate(frame, [0, 12], [0, 1], {
+    extrapolateLeft: "clamp", extrapolateRight: "clamp",
+  });
+  // Fade-out: last 18 frames — smooth exit into next scene
+  const exitOpacity = durationInFrames > 30
+    ? interpolate(frame, [durationInFrames - 18, durationInFrames], [1, 0], {
         extrapolateLeft: "clamp", extrapolateRight: "clamp",
       })
     : 1;
+  // Combined opacity: fades in then fades out
+  const sceneOpacity = Math.min(fadeInOpacity, exitOpacity);
 
   const assetSide = sceneIndex % 2 === 0 ? "right" : "left";
 
@@ -2013,7 +2023,7 @@ const NewsScene: React.FC<SceneProps> = ({
   // ── Ken Burns Direcional ──
   const _tensionKeywords = ["queda", "crise", "guerra", "conflito", "colapso", "perde", "cai", "caiu", "caem", "risco", "crash", "falência", "alerta", "alertas", "pânico", "sanções", "bombas", "ataque", "déficit", "caindo", "corte", "inflação"];
   const _revealKeywords  = ["alta", "sobe", "cresceu", "crescimento", "positivo", "recorde", "novo", "abre", "lança", "aprovado", "ganhou", "ganhos", "vence", "expande", "supera", "acordo", "recupera", "aumenta", "atingiu"];
-  const _headlineLower   = scene.headline.toLowerCase();
+  const _headlineLower   = (scene.headline || "").toLowerCase();
   const _hasTension  = _tensionKeywords.some(k => _headlineLower.includes(k));
   const _hasReveal   = !_hasTension && _revealKeywords.some(k => _headlineLower.includes(k));
   const _usePan      = !isFullVideo && !isSplitVideo && !_hasTension && !_hasReveal && !hasSideAsset;
@@ -2042,13 +2052,13 @@ const NewsScene: React.FC<SceneProps> = ({
   const glow2X = Math.cos(frame / 50) * 100 + 740;
   const glow2Y = Math.sin(frame / 70) * 150 + 1300;
 
-  // Headline parsing
-  const words = useMemo(() => scene.headline.split(" "), [scene.headline]);
+  // Headline parsing — guard against null/undefined headline
+  const words = useMemo(() => (scene.headline || "").split(" ").filter(Boolean), [scene.headline]);
   const accentSet = useMemo(() => new Set<number>(scene.accent_word_indices ?? []), [scene.accent_word_indices]);
   
   // Parse potential values (e.g. percentages or numbers) for all scenes
   const dataMetric = useMemo(() => {
-    const textToSearch = `${scene.headline} ${scene.subtext ?? ""}`;
+    const textToSearch = `${scene.headline ?? ""} ${scene.subtext ?? ""}`;
     const percentMatch = textToSearch.match(/(-?\d+(?:[.,]\d+)?)\s*%/);
     if (percentMatch) {
       const num = parseFloat(percentMatch[1].replace(",", "."));
@@ -2071,7 +2081,7 @@ const NewsScene: React.FC<SceneProps> = ({
   }, [scene.headline, scene.subtext]);
 
   const matchedCountries = useMemo(() => {
-    const cleanText = ` ${scene.headline} ${scene.subtext ?? ""} `
+    const cleanText = ` ${scene.headline ?? ""} ${scene.subtext ?? ""} `
       .toLowerCase()
       .replace(/[,.;:!?()"[\]]/g, " ")
       .replace(/\s+/g, " ");
@@ -2192,7 +2202,7 @@ const NewsScene: React.FC<SceneProps> = ({
     : interpolate(frame, [0, Math.round(durationInFrames * 0.7)], [0, 75], { extrapolateRight: "clamp" }).toFixed(0);
 
   return (
-    <AbsoluteFill style={{ opacity: exitOpacity, overflow: "hidden" }}>
+    <AbsoluteFill style={{ opacity: sceneOpacity, overflow: "hidden" }}>
       {/* 🎙️ Local Scene Narration Audio */}
       {scene.audio_url && !hasGlobalNarration && <Audio src={scene.audio_url} volume={1.0} />}
 
@@ -2268,45 +2278,34 @@ const NewsScene: React.FC<SceneProps> = ({
         <BrandLogo logoUrl={scene.logo_url} frame={frame} fps={fps} />
       )}
 
-      {/* ── Segmented Top Progress Indicators ── */}
-      <div style={{
-        position: "absolute",
-        top: 24, left: 24, right: 24,
-        display: "flex", gap: 6,
-        zIndex: 50,
-      }}>
-        {Array.from({ length: totalScenes }).map((_, i) => {
-          let fillRatio = 0;
-          if (i < sceneIndex) {
-            fillRatio = 1;
-          } else if (i === sceneIndex) {
-            fillRatio = interpolate(frame, [0, durationInFrames], [0, 1], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            });
-          }
-          return (
-            <div
-              key={i}
-              style={{
-                flex: 1,
-                height: 4,
-                borderRadius: 2,
-                background: "rgba(255, 255, 255, 0.15)",
-                overflow: "hidden",
-              }}
-            >
-              <div style={{
-                height: "100%",
-                width: `${fillRatio * 100}%`,
-                background: pal.accent,
-                borderRadius: 2,
-                boxShadow: fillRatio > 0 ? `0 0 10px ${pal.accent}` : undefined,
-              }} />
-            </div>
-          );
-        })}
-      </div>
+      {/* ── Single Continuous Progress Bar (not segmented/stories style) ── */}
+      {(() => {
+        // Compute overall progress across all scenes
+        const totalFramesAll = scenesWithOffsets.reduce((a, s) => a + s.durationFrames, 0);
+        const elapsedFrames = sceneIndex > 0
+          ? scenesWithOffsets.slice(0, sceneIndex).reduce((a, s) => a + s.durationFrames, 0)
+          : 0;
+        const overallProgress = totalFramesAll > 0
+          ? (elapsedFrames + frame) / totalFramesAll
+          : 0;
+        const barWidth = interpolate(overallProgress, [0, 1], [0, 100], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+        return (
+          <div style={{
+            position: "absolute",
+            top: 0, left: 0, right: 0,
+            height: 3,
+            background: "rgba(255,255,255,0.1)",
+            zIndex: 50,
+          }}>
+            <div style={{
+              height: "100%",
+              width: `${barWidth}%`,
+              background: `linear-gradient(to right, ${pal.accent}cc, ${pal.accent})`,
+              boxShadow: `0 0 8px ${pal.accent}80`,
+            }} />
+          </div>
+        );
+      })()}
 
       {/* ── Content Container with camera zoom (Parallax layout) ── */}
       <AbsoluteFill style={{ transform: `scale(${cameraScale}) translateX(${cameraPanX}%)`, transformOrigin: "center center" }}>
