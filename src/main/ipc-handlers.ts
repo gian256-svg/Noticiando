@@ -54,6 +54,31 @@ export function setupIpcHandlers() {
       return { success: false, error: String(err) };
     }
   });
+
+  // Open file's containing folder and select/highlight it
+  ipcMain.handle("shell:show-item", async (_e, filePath: string) => {
+    try {
+      if (filePath) shell.showItemInFolder(filePath);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  // Save As dialog — let user choose where to save the rendered video
+  ipcMain.handle("video:save-dialog", async (_e, { newsTitle }: { newsTitle: string }) => {
+    const safe = newsTitle
+      .replace(/[^\w\s]/g, "")
+      .trim()
+      .replace(/\s+/g, "_")
+      .slice(0, 40);
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: "Salvar Reels",
+      defaultPath: `Reels_${safe}.mp4`,
+      filters: [{ name: "Vídeo MP4", extensions: ["mp4"] }],
+    });
+    return { canceled, filePath };
+  });
   ipcMain.handle("app:version", () => app.getVersion());
 
   // video:generate-scenes — calls Python sidecar (Gemini → Groq cascade)
@@ -91,6 +116,7 @@ export function setupIpcHandlers() {
     compositionProps: Record<string, unknown>;
     newsTitle: string;
     totalFrames: number;
+    outputPath?: string;
   }) => {
     const port = getBackendPort();
     if (!port) return { ok: false, error: "Backend não iniciado." };
@@ -102,6 +128,7 @@ export function setupIpcHandlers() {
           composition_props: payload.compositionProps,
           news_title: payload.newsTitle,
           total_frames: payload.totalFrames,
+          output_path: payload.outputPath ?? null,
         }),
       });
       if (!res.ok) {

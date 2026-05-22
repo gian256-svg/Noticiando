@@ -23,17 +23,31 @@ export function VideoPreview({ props, newsTitle, onClose }: VideoPreviewProps) {
     setRendering(true);
     setRenderResult(null);
     try {
+      // 1. Ask user where to save before rendering
+      const saveResult = (await window.noticiando.invoke("video:save-dialog", {
+        newsTitle,
+      })) as { canceled: boolean; filePath?: string };
+
+      if (saveResult.canceled || !saveResult.filePath) {
+        setRendering(false);
+        return;
+      }
+
+      // 2. Render to chosen path
       const result = (await window.noticiando.invoke("video:render", {
         compositionProps: props,
         newsTitle,
         totalFrames,
+        outputPath: saveResult.filePath,
       })) as { ok: boolean; outputPath?: string; error?: string };
 
-      setRenderResult(
-        result.ok
-          ? { ok: true, path: result.outputPath }
-          : { ok: false, error: result.error ?? "Erro desconhecido" },
-      );
+      if (result.ok) {
+        setRenderResult({ ok: true, path: result.outputPath });
+        // Open the file's folder automatically
+        await window.noticiando.invoke("shell:show-item", result.outputPath);
+      } else {
+        setRenderResult({ ok: false, error: result.error ?? "Erro desconhecido" });
+      }
     } catch (err) {
       setRenderResult({ ok: false, error: String(err) });
     } finally {
@@ -110,7 +124,7 @@ export function VideoPreview({ props, newsTitle, onClose }: VideoPreviewProps) {
             {renderResult.ok ? (
               <>
                 <Download size={12} />
-                Salvo em: {renderResult.path}
+                Vídeo salvo! {renderResult.path?.split(/[\\/]/).pop()}
               </>
             ) : (
               <>

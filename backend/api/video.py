@@ -5,6 +5,7 @@ import os
 import re
 import time
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -154,14 +155,18 @@ class RenderVideoRequest(BaseModel):
     composition_props: dict
     news_title: str
     total_frames: int
+    output_path: str | None = None  # Optional: if set by frontend (Save Dialog), use it
 
 
 @router.post("/render-video")
 async def render_video_endpoint(req: RenderVideoRequest):
     """Render a Reels MP4 via the Remotion CLI."""
-    safe = re.sub(r"[^\w\s]", "", req.news_title).strip()
-    safe = re.sub(r"\s+", "_", safe)[:40]
-    output_path = str(_PROJECT_ROOT / "output" / f"Reels_{safe}_{int(time.time())}.mp4")
+    if req.output_path:
+        output_path = req.output_path
+    else:
+        safe = re.sub(r"[^\w\s]", "", req.news_title).strip()
+        safe = re.sub(r"\s+", "_", safe)[:40]
+        output_path = str(_PROJECT_ROOT / "output" / f"Reels_{safe}.mp4")
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     props_file = str(_PROJECT_ROOT / "output" / f".tmp_props_{int(time.time())}.json")
