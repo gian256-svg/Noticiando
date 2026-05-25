@@ -138,16 +138,17 @@ export function ScriptPanel({ news }: ScriptPanelProps) {
         });
         if (!resp.ok) {
           const detail = await resp.text().catch(() => String(resp.status));
-          result = { error: `Erro do backend: ${detail}` };
+          result = { error: `Erro do backend (${resp.status}): ${detail}` };
         } else {
           result = await resp.json();
         }
       }
 
       if (result.error || !result.scenes?.length) {
+        const rawKeys = Object.keys(result as object).join(", ") || "resposta vazia";
         setVideoError(
           result.error ??
-            "Falha ao gerar cenas — resposta sem campo 'scenes'. Reinicie o backend Python e tente novamente."
+            `Falha ao gerar cenas — resposta sem 'scenes' (chaves recebidas: ${rawKeys}). Verifique os logs do backend Python.`
         );
         return;
       }

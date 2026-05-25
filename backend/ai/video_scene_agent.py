@@ -68,6 +68,7 @@ Schema obrigatório:
       "map_country": "US" | "CN" | "BR" | "RU" | "IR" | "IL" | "UA" | "SA" | "GB" | "DE" | "FR" | "IN" | "JP" | "KP" | "VE" | "IT" | "CA" | "AR" | "MX" | "ZA" | null,
       "comparison_country": "US" | "CN" | "BR" | "RU" | "IR" | "IL" | "UA" | "SA" | "GB" | "DE" | "FR" | "IN" | "JP" | "KP" | "VE" | "IT" | "CA" | "AR" | "MX" | "ZA" | null,
       "comparison_brand_domain": "another-brand-domain.com or null",
+      "chart_type": "bar" | "line" | "donut" | null,
       "secondary_assets": ["keyword1", "keyword2"],
       "timeline_points": [
         {"label": "ANTERIOR", "value": "Real value"},
@@ -111,8 +112,13 @@ REGRA 4 — DISTRIBUIÇÃO VISUAL RICA (mínimos por reel):
   * "split_video": Usar para contrastes dramáticos de países (A vs B) ou marcas (A vs B). É OBRIGATÓRIO preencher map_country (país A) e comparison_country (país B), OU brand_domain (marca A) e comparison_brand_domain (marca B). Exemplo: BR vs US, ou petrobras.com.br vs exxonmobil.com.
   * NÃO crie cenas de CTA, encerramento, pedido de curtir/seguir.
 
-REGRA 5 — CONTADORES NUMÉRICOS (data scenes):
+REGRA 5 — CONTADORES NUMÉRICOS E TIPO DE GRÁFICO (data scenes):
   * A cena "data" deve conter um número GRANDE e SIGNIFICATIVO na headline ou subtext.
+  * Escolha o chart_type mais adequado ao dado:
+    - "bar"   → comparação entre 2-4 valores distintos (ex: PIB de países, crescimento por trimestre)
+    - "line"  → série temporal com tendência (ex: evolução da Selic, histórico de preços, crescimento ao longo do tempo)
+    - "donut" → distribuição/percentual de um todo (ex: participação de mercado, 90% do petróleo para China, alocação de portfólio)
+  * Para cenas que NÃO são "data", defina chart_type como null.
   * Exemplos válidos: R$ 4,5 trilhões, 13,75%, US$ 847 bilhões, +340 mil empregos.
   * Exemplos INVÁLIDOS: "2 anos", "4 reuniões", "1 acordo" — números pequenos não merecem contador visual.
   * Se a notícia não tem número expressivo, não crie cena "data" — substitua por "timeline" ou "newspaper_clip".
@@ -193,10 +199,25 @@ def _parse_json(text: str) -> dict[str, Any]:
         if match:
             text = match.group(1).strip()
     try:
-        return json.loads(text)
+        parsed = json.loads(text)
     except json.JSONDecodeError as e:
-        logger.error(f"JSON parse error: {e} | raw: {text[:300]}")
-        raise ValueError(f"Resposta inválida do modelo: {e}")
+        logger.error(f"JSON parse error: {e} | raw (primeiros 600 chars): {text[:600]} | tamanho total: {len(text)}")
+        raise ValueError(f"Resposta inválida do modelo (provável truncamento — {len(text)} chars): {e}")
+
+    # Alguns modelos retornam o array direto, sem o wrapper {"scenes": [...]}
+    if isinstance(parsed, list):
+        logger.warning(f"Modelo retornou array direto (sem wrapper). Wrapping em {{\"scenes\": [...]}}. Qtd cenas: {len(parsed)}")
+        return {"scenes": parsed}
+
+    # Alguns modelos retornam {"data": {"scenes": [...]}} ou {"result": {"scenes": [...]}}
+    if isinstance(parsed, dict) and "scenes" not in parsed:
+        for nested_key in ("data", "result", "output", "response"):
+            if nested_key in parsed and isinstance(parsed[nested_key], dict) and "scenes" in parsed[nested_key]:
+                logger.warning(f"Modelo retornou scenes dentro de '{nested_key}'. Unwrapping.")
+                return parsed[nested_key]
+        logger.error(f"Parsed JSON sem 'scenes'. Chaves: {list(parsed.keys())}. Preview: {str(parsed)[:400]}")
+
+    return parsed
 
 
 async def _generate_with_gemini(user_msg: str, api_key: str) -> dict[str, Any]:
@@ -208,7 +229,7 @@ async def _generate_with_gemini(user_msg: str, api_key: str) -> dict[str, Any]:
     full_prompt = f"{SYSTEM_PROMPT}\n\n{user_msg}"
     cfg = types.GenerateContentConfig(
         temperature=0.7,
-        max_output_tokens=2048,
+        max_output_tokens=8192,
         response_mime_type="application/json"
     )
 
@@ -232,7 +253,7 @@ async def _generate_with_groq(user_msg: str) -> dict[str, Any]:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_msg},
         ],
-        max_tokens=2048,
+        max_tokens=4096,
         temperature=0.7,
     )
     return _parse_json(response.choices[0].message.content or "")
@@ -302,7 +323,7 @@ async def _generate_with_ollama(user_msg: str) -> dict[str, Any]:
             {"role": "user",   "content": user_msg},
         ],
         "stream": False,
-        "options": {"temperature": 0.7, "num_predict": 2048},
+        "options": {"temperature": 0.7, "num_predict": 8192},
     }
     async with httpx.AsyncClient(timeout=120.0) as client:
         res = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
@@ -360,7 +381,10 @@ async def generate_video_scenes(
 
     def _validate(result: dict[str, Any], provider: str) -> dict[str, Any]:
         if not result.get("scenes"):
-            raise ValueError(f"Resposta sem campo 'scenes' (chaves recebidas: {list(result.keys())})")
+            logger.error(f"[{provider}] Resposta sem 'scenes'. Chaves recebidas: {list(result.keys())}. Preview: {str(result)[:400]}")
+            raise ValueError(f"[{provider}] Resposta sem campo 'scenes' (chaves: {list(result.keys())})")
+        n = len(result["scenes"])
+        logger.info(f"[{provider}] OK — {n} cenas geradas.")
         return result
 
     # 1. Gemini — primary key

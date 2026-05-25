@@ -37,6 +37,7 @@ export interface ReelsScene {
   map_country?: string;
   comparison_country?: string;
   comparison_brand_domain?: string;
+  chart_type?: "bar" | "line" | "donut";
 }
 
 export interface ReelsCompositionProps {
@@ -3854,7 +3855,7 @@ const NewsScene: React.FC<SceneProps> = ({
               </div>
 
               {/* Chart Types */}
-              {sceneIndex % 3 === 0 && (
+              {(scene.chart_type === "bar" || (!scene.chart_type && sceneIndex % 3 === 0)) && (
                 /* TYPE 0: Staggered Bar Chart */
                 <div style={{
                   display: "flex",
@@ -3921,7 +3922,7 @@ const NewsScene: React.FC<SceneProps> = ({
                 </div>
               )}
 
-              {sceneIndex % 3 === 1 && (() => {
+              {(scene.chart_type === "line" || (!scene.chart_type && sceneIndex % 3 === 1)) && (() => {
                 const startX = 30;
                 const endX = 470;
                 const deltaX = (endX - startX) / (parsedTimelinePoints.length - 1 || 1);
@@ -4037,7 +4038,7 @@ const NewsScene: React.FC<SceneProps> = ({
                 );
               })()}
 
-              {sceneIndex % 3 === 2 && (
+              {(scene.chart_type === "donut" || (!scene.chart_type && sceneIndex % 3 === 2)) && (
                 /* TYPE 2: Radial Donut Chart */
                 <div style={{
                   display: "flex",

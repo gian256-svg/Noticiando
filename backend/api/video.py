@@ -173,9 +173,24 @@ async def render_video_endpoint(req: RenderVideoRequest):
     with open(props_file, "w", encoding="utf-8") as f:
         json.dump(req.composition_props, f)
 
-    executable = "npx.cmd" if os.name == "nt" else "npx"
-    cmd = [
-        executable, "remotion", "render",
+    remotion_cli = _PROJECT_ROOT / "node_modules" / "@remotion" / "cli" / "remotion-cli.js"
+    if remotion_cli.exists():
+        cmd = ["node", str(remotion_cli)]
+    else:
+        local_remotion = _PROJECT_ROOT / "node_modules" / ".bin" / "remotion.cmd" if os.name == "nt" else _PROJECT_ROOT / "node_modules" / ".bin" / "remotion"
+        if os.name == "nt":
+            if local_remotion.exists():
+                cmd = ["cmd.exe", "/c", str(local_remotion)]
+            else:
+                cmd = ["cmd.exe", "/c", "npx", "remotion"]
+        else:
+            if local_remotion.exists():
+                cmd = [str(local_remotion)]
+            else:
+                cmd = ["npx", "remotion"]
+
+    cmd.extend([
+        "render",
         _VIDEO_ENTRY,
         "Reels",
         output_path,
@@ -185,16 +200,17 @@ async def render_video_endpoint(req: RenderVideoRequest):
         "--crf=16",              # Near-lossless quality (lower = better, 0-51)
         "--videoBitrate=12M",    # Target 12 Mbps — broadcast-quality for 1080x1920
         "--log=error",
-    ]
+    ])
 
     try:
         proc = await asyncio.create_subprocess_exec(
-            *cmd,
+            cmd[0],
+            *cmd[1:],
             cwd=str(_PROJECT_ROOT),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        _, stderr = await proc.communicate()
+        stdout, stderr = await proc.communicate()
 
         try:
             os.unlink(props_file)
@@ -202,7 +218,17 @@ async def render_video_endpoint(req: RenderVideoRequest):
             pass
 
         if proc.returncode != 0:
-            raise RuntimeError(stderr.decode(errors="replace").strip() or "Render failed")
+            stdout_str = stdout.decode(errors="replace").strip()
+            stderr_str = stderr.decode(errors="replace").strip()
+            error_msg = []
+            if stderr_str:
+                error_msg.append(f"STDERR:\n{stderr_str}")
+            if stdout_str:
+                error_msg.append(f"STDOUT:\n{stdout_str}")
+            
+            full_error = "\n\n".join(error_msg) or "Render failed with no output"
+            logger.error(f"Render failed with code {proc.returncode}. Output:\n{full_error}")
+            raise RuntimeError(full_error)
 
         return {"ok": True, "output_path": output_path}
 
@@ -786,8 +812,16 @@ async def generate_scenes_endpoint(req: VideoSceneRequest):
         # result["narration_url"] mantido como global
         result["music_url"] = music_url
 
+        n_scenes = len(result.get("scenes") or [])
+        logger.info(f"generate_scenes_endpoint: retornando {n_scenes} cenas. Chaves: {list(result.keys())}")
+        if n_scenes == 0:
+            logger.error(f"ATENÇÃO: resultado sem cenas! result keys: {list(result.keys())} | preview: {str(result)[:500]}")
+            raise HTTPException(status_code=500, detail="Nenhuma cena gerada — resposta do modelo não contém cenas válidas. Verifique os logs do backend.")
+
         return result
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Video scene generation error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
